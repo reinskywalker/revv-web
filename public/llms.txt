@@ -1,0 +1,24 @@
+# REVV- Web
+
+> REVV- Web is the official web portal and technical motorcycle hub for REVV – Riding Companion, hosted at https://revv.asteralabs.digital.
+
+## Overview
+REVV is designed for two-wheel riders and neighborhood motorcycle crews. It combines turn-by-turn navigation tailored for motorcycles, live squad telemetry, helmet intercom integration, digital garage maintenance logs, community feeds, and motorcycle journalism.
+
+## Key Features
+- **Riding Companion**: Coordinate pack rides, assign Lead and Sweep roles, view live rider locations, and resume multi-stage road trips without fragmenting route telemetry.
+- **Turn-by-Turn Navigation HUD**: High-contrast, motorcycle-optimized routing designed for daylight and night cockpit displays.
+- **Digital Garage**: Log vehicle specs, maintenance intervals, brake pad depth, tire pressures, and part wear schedules for your motorcycles.
+- **Motorcycle News (Garage Desk)**: Dispatches on pre-touring checklists, wet-weather riding craft, pack intercom etiquette, and mechanical diagnostics.
+- **Communities & Events**: Join verified clubs, participate in route discussions, and coordinate weekend runs.
+- **Rider Identity & Feed**: Share post-ride telemetry stories, route polylines, and bike photos stamped with telemetry marks.
+
+## Authentication Policy
+- **Sign-In Only**: REVV- Web supports passwordless OTP login for existing riders via email, username, or phone number.
+- **Mobile Registration**: Rider registration is exclusively performed via the REVV mobile app (iOS & Android). Account creation is disabled on the web portal.
+
+## Key Links
+- Home: https://revv.asteralabs.digital/
+- Motorcycle News: https://revv.asteralabs.digital/news
+- Rider Sign-In: https://revv.asteralabs.digital/login
+- Full Context: https://revv.asteralabs.digital/llms-full.txt

@@ -1,0 +1,22 @@
+# REVV- Web — Full Technical & Product Context
+
+## System Architecture
+- **Web App**: Built with TanStack Start, React 19, Tailwind CSS v4, and Nitro. Hosted on Vercel under the subdomain `revv.asteralabs.digital`.
+- **Backend API**: High-performance Axum/Rust backend service providing endpoints for Authentication (`/api/v1/auth/*`), News Articles (`/api/v1/news`), Garage Management (`/api/v1/me/garage`), Social Feed (`/api/v1/feed/*`), and WebSocket telemetry (`/api/v1/ws`).
+- **Mobile Companion**: Flutter application for iOS and Android with OpenStreetMap tile integration and live GPS tracking.
+
+## Core Philosophies
+1. **Safety & Clarity**: High-contrast, elderly-friendly legible interface ("RYDR bookend pattern") with cockpit identity and dark navigation aesthetics.
+2. **Pack Solidarity**: Riding together with clear communication, route resumption, and emergency spotter awareness.
+3. **Mechanical Pride**: Deep respect for machinery maintenance and service tracking in the Digital Garage.
+
+## News Desks
+- **MAINTENANCE**: Pre-ride checklists, fluid flushes, chain slack measurements, and preventative tire maintenance.
+- **SAFETY & COMMS**: Group formation rules, Lead/Sweep protocols, Push-to-Talk intercom discipline, and hazard alerts.
+- **RIDING CRAFT**: Cornering physics, wet-asphalt surface reading, throttle control, and emergency braking.
+- **PRODUCT**: Announcements regarding REVV features, telemetry photo modes, and app updates.
+
+## Access Policy
+- Web registration is strictly disallowed.
+- Login is open to authenticated riders using passwordless one-time passcodes (OTP) issued to their registered email or phone.
+- New accounts must be created using the REVV mobile app.

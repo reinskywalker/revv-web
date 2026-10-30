@@ -1,0 +1,154 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+/*
+ * REVV — dark cockpit design system with light readability panels.
+ * Dark values from the app's Flutter theme (revv_colors.dart):
+ * background #0A0D10, surface #141A20, elevated #1C242C,
+ * accent #EE4B3E, secondary text #9FB3C8, border #2D3843.
+ * Light "panel" values from the app's daylight theme (#F4F5F7, #111418),
+ * with darker secondary text for elderly-friendly contrast.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-panel: var(--panel);
+  --color-panel-card: var(--panel-card);
+  --color-panel-foreground: var(--panel-foreground);
+  --color-panel-muted: var(--panel-muted);
+  --color-panel-border: var(--panel-border);
+}
+
+@theme {
+  --font-display: "Archivo", "Inter", sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.15 0.008 255);
+  --foreground: oklch(0.975 0.005 250);
+  --card: oklch(0.21 0.016 245);
+  --card-foreground: oklch(0.975 0.005 250);
+  --popover: oklch(0.19 0.015 245);
+  --popover-foreground: oklch(0.975 0.005 250);
+  --primary: oklch(0.645 0.205 25);
+  --primary-foreground: oklch(0.98 0.01 25);
+  --secondary: oklch(0.265 0.018 240);
+  --secondary-foreground: oklch(0.8 0.025 250);
+  --muted: oklch(0.24 0.014 245);
+  --muted-foreground: oklch(0.8 0.025 250);
+  --accent: oklch(0.265 0.018 240);
+  --accent-foreground: oklch(0.645 0.205 25);
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.98 0.005 25);
+  --border: oklch(0.33 0.02 245);
+  --input: oklch(0.33 0.02 245);
+  --ring: oklch(0.645 0.205 25);
+  --success: oklch(0.79 0.14 162);
+  --warning: oklch(0.82 0.15 85);
+  --panel: oklch(0.965 0.006 255);
+  --panel-card: oklch(1 0 0);
+  --panel-foreground: oklch(0.225 0.008 250);
+  --panel-muted: oklch(0.42 0.02 245);
+  --panel-border: oklch(0.83 0.01 250);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: 1.125rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-primary);
+    color: var(--color-primary-foreground);
+  }
+}
+
+/* Mono, letter-spaced eyebrow labels — "01 / 03 · RIDE TOGETHER" */
+@utility eyebrow {
+  @apply font-mono text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground;
+}
+
+/* Light-panel variant of the eyebrow label */
+@utility eyebrow-panel {
+  @apply font-mono text-xs font-medium uppercase tracking-[0.3em] text-panel-muted;
+}
+
+/* Heavy uppercase display headings — "EVERY ROAD HAS A STORY." */
+@utility display-heading {
+  @apply font-display font-black uppercase leading-[0.95] text-foreground;
+}
+
+/* Light-panel variant of the display heading */
+@utility display-heading-panel {
+  @apply font-display font-black uppercase leading-[0.95] text-panel-foreground;
+}
+
+/* HUD-style bordered card (dark theme) */
+@utility hud-card {
+  @apply rounded-xl border border-border bg-card;
+}
+
+/* Light readability section shell — bright surface, near-black text */
+@utility panel {
+  @apply bg-panel text-panel-foreground;
+}
+
+/* White card on the light panel */
+@utility panel-card {
+  @apply rounded-xl border border-panel-border bg-panel-card shadow-sm;
+}
+
+@utility btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-7 py-4 font-display text-base font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary/90;
+}
+
+@utility btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-7 py-4 font-display text-base font-bold uppercase tracking-wide text-foreground transition-colors hover:bg-secondary;
+}
+
+/* Ghost button for light sections */
+@utility btn-ghost-panel {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg border border-panel-border bg-transparent px-7 py-4 font-display text-base font-bold uppercase tracking-wide text-panel-foreground transition-colors hover:bg-panel;
+}
