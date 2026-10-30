@@ -284,7 +284,7 @@ export function NewsPage() {
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="rounded bg-panel px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-panel-fg">
+                      <span className="rounded bg-panel px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-panel-foreground">
                         {article.category}
                       </span>
                       <span className="flex items-center gap-1 font-mono text-xs text-panel-muted">
@@ -320,11 +320,11 @@ export function NewsPage() {
 
       {/* Article Modal */}
       {activeArticle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-panel-border bg-panel-card p-6 shadow-2xl md:p-10">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
+          <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-[#141A20] p-6 text-foreground shadow-2xl md:p-10">
             <button
               onClick={() => setActiveArticle(null)}
-              className="absolute right-5 top-5 rounded-lg border border-panel-border p-2 text-panel-muted transition-colors hover:bg-panel hover:text-panel-fg"
+              className="absolute right-5 top-5 rounded-lg border border-border/80 bg-secondary/50 p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
               aria-label="Close article"
             >
               <X className="size-5" />
@@ -334,18 +334,18 @@ export function NewsPage() {
               <span className="rounded bg-primary px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider text-primary-foreground">
                 {activeArticle.category}
               </span>
-              <span className="flex items-center gap-1 font-mono text-xs text-panel-muted">
+              <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
                 <Clock className="size-3.5" />
                 {activeArticle.reading_time_minutes} min read
               </span>
             </div>
 
-            <h2 className="display-heading-panel mt-4 text-2xl md:text-3xl">
+            <h2 className="display-heading mt-4 text-2xl text-foreground md:text-3xl">
               {activeArticle.title}
             </h2>
 
-            <div className="mt-3 flex items-center gap-3 border-b border-panel-border pb-4 font-mono text-xs text-panel-muted">
-              <span>By {activeArticle.author_name}</span>
+            <div className="mt-3 flex items-center gap-3 border-b border-border/60 pb-4 font-mono text-xs text-muted-foreground">
+              <span>By <strong className="text-foreground">{activeArticle.author_name}</strong></span>
               <span>•</span>
               <span>
                 {new Date(activeArticle.published_at).toLocaleDateString("en-US", {
@@ -356,14 +356,14 @@ export function NewsPage() {
               </span>
             </div>
 
-            <div className="mt-6 space-y-4 text-base leading-relaxed text-panel-fg whitespace-pre-line">
+            <div className="mt-6 space-y-4 text-base leading-relaxed text-foreground/90 whitespace-pre-line">
               {activeArticle.content}
             </div>
 
-            <div className="mt-8 flex justify-end border-t border-panel-border pt-4">
+            <div className="mt-8 flex justify-end border-t border-border/60 pt-4">
               <button
                 onClick={() => setActiveArticle(null)}
-                className="rounded-lg bg-primary px-6 py-2.5 font-display text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary/90"
+                className="btn-primary"
               >
                 Close Dispatch
               </button>

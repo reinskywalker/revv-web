@@ -41,6 +41,7 @@
   --color-warning: var(--warning);
   --color-panel: var(--panel);
   --color-panel-card: var(--panel-card);
+  --color-panel-fg: var(--panel-foreground);
   --color-panel-foreground: var(--panel-foreground);
   --color-panel-muted: var(--panel-muted);
   --color-panel-border: var(--panel-border);
