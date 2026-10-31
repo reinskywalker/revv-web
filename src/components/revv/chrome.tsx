@@ -8,9 +8,15 @@ export function SiteHeader() {
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
-        <Link to="/" aria-label="REVV- Web home" className="transition-opacity hover:opacity-80">
-          <Wordmark className="text-2xl" />
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link to="/" aria-label="REVV- Web home" className="transition-opacity hover:opacity-80">
+            <Wordmark className="text-2xl" />
+          </Link>
+          <span className="hidden items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-primary sm:inline-flex">
+            <span className="size-1.5 rounded-full bg-primary animate-pulse" />
+            Closed Beta
+          </span>
+        </div>
         <nav className="flex items-center gap-6">
           <Link to="/" className={navLinkClass} activeProps={{ className: "text-foreground" }}>
             Home
