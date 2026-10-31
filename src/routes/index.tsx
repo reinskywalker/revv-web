@@ -105,8 +105,20 @@ function HomePage() {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-background/40" />
         <div className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col justify-between px-6 pb-14 pt-28">
-          <div className="flex flex-col items-center pt-[12vh]">
-            <p className="eyebrow">Friendly Neighborhood Riding Companion</p>
+          <div className="flex flex-col items-center pt-[12vh] text-center">
+            {/* Closed Beta / Coming Soon indicator */}
+            <div className="inline-flex items-center gap-2.5 rounded-full border border-primary/50 bg-background/80 px-4 py-1.5 backdrop-blur-sm shadow-lg">
+              <span className="flex size-2 rounded-full bg-primary animate-pulse" />
+              <span className="font-mono text-xs font-bold uppercase tracking-[0.25em] text-primary">
+                COMING SOON
+              </span>
+              <span className="text-border">|</span>
+              <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                Currently in closed beta testing phase
+              </span>
+            </div>
+
+            <p className="eyebrow mt-6">Friendly Neighborhood Riding Companion</p>
             <Wordmark className="mt-6 text-[clamp(4rem,16vw,11rem)] leading-none" />
           </div>
           <div className="mt-16 max-w-2xl">
@@ -120,8 +132,8 @@ function HomePage() {
               Every road has a story.
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-foreground/85">
-              Start rides, share routes, and stay connected with crews around Jakarta — and
-              wherever the road takes you next.
+              Start rides, share routes, and stay connected with crews around Jakarta — and wherever
+              the road takes you next.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link to="/login" className="btn-primary">
@@ -329,8 +341,7 @@ function HomePage() {
             Ready to ride?
           </h2>
           <p className="max-w-lg text-lg leading-relaxed text-primary-foreground/90">
-            Grab your rider ID and join the neighborhood. Passwordless, no nonsense — just the
-            road.
+            Grab your rider ID and join the neighborhood. Passwordless, no nonsense — just the road.
           </p>
           <Link
             to="/login"
