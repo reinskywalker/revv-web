@@ -789,6 +789,47 @@ export async function deleteFeedPost(postId: string): Promise<void> {
   });
 }
 
+export interface PostCommentItem {
+  id: string;
+  post_id: string;
+  author_id: string;
+  author_username: string;
+  author_display_name: string;
+  author_avatar_url?: string | null;
+  comment: string;
+  created_at: string;
+}
+
+export async function likeFeedPost(postId: string): Promise<{ liked: boolean; like_count: number }> {
+  return authRequest<{ liked: boolean; like_count: number }>(`/feed/posts/${encodeURIComponent(postId)}/like`, {
+    method: "POST",
+  });
+}
+
+export async function unlikeFeedPost(postId: string): Promise<{ liked: boolean; like_count: number }> {
+  return authRequest<{ liked: boolean; like_count: number }>(`/feed/posts/${encodeURIComponent(postId)}/like`, {
+    method: "DELETE",
+  });
+}
+
+export async function fetchFeedComments(postId: string): Promise<PostCommentItem[]> {
+  return authRequest<PostCommentItem[]>(`/feed/posts/${encodeURIComponent(postId)}/comments`);
+}
+
+export async function createFeedComment(postId: string, comment: string): Promise<PostCommentItem> {
+  return authRequest<PostCommentItem>(`/feed/posts/${encodeURIComponent(postId)}/comments`, {
+    method: "POST",
+    body: JSON.stringify({ comment }),
+  });
+}
+
+export async function deleteFeedComment(postId: string, commentId: string): Promise<void> {
+  await authRequest<unknown>(
+    `/feed/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`,
+    { method: "DELETE" },
+  );
+}
+
 /**
  * Administrator Console APIs (`role === 'administrator'`)
  */

@@ -6,13 +6,16 @@ import {
   Check,
   Database,
   FileText,
+  Heart,
   Info,
   LayoutDashboard,
   Loader2,
   LogOut,
+  MessageCircle,
   MessageSquare,
   Plus,
   RefreshCw,
+  Send,
   ShieldAlert,
   ShieldCheck,
   Trash2,
@@ -33,6 +36,7 @@ import {
   createAdminComponent,
   createAdminMotorcycle,
   createAdminNewsArticle,
+  createFeedComment,
   createStatusPost,
   deleteAdminBrand,
   deleteAdminComponent,
@@ -40,6 +44,7 @@ import {
   deleteAdminNewsArticle,
   deleteAdminUser,
   deleteBetaRegistration,
+  deleteFeedComment,
   deleteFeedPost,
   deleteGarageMotorcycle,
   fetchAdminBrands,
@@ -48,6 +53,7 @@ import {
   fetchAdminMotorcycles,
   fetchAdminUsers,
   fetchBetaRegistrations,
+  fetchFeedComments,
   fetchFeedPosts,
   fetchMasterMotorcycles,
   fetchMyGarage,
@@ -56,13 +62,16 @@ import {
   type FeedPostItem,
   type GarageMotorcycle,
   getSavedSession,
+  likeFeedPost,
   type MasterBrandItem,
   type MasterComponentItem,
   type MasterMotorcycleItem,
   type NewsArticle,
+  type PostCommentItem,
   requestOtp,
   type RiderProfile,
   signInWithOtp,
+  unlikeFeedPost,
   updateAdminUser,
   updateBetaRegistration,
   updateGarageMotorcycle,
@@ -147,6 +156,12 @@ function LoginPage() {
   const [statusCaption, setStatusCaption] = useState("");
   const [statusBikeLabel, setStatusBikeLabel] = useState("");
   const [statusVisibility, setStatusVisibility] = useState("PUBLIC");
+
+  // Feed comments & interactions state
+  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
+  const [postComments, setPostComments] = useState<Record<string, PostCommentItem[]>>({});
+  const [newCommentText, setNewCommentText] = useState<Record<string, string>>({});
+  const [commentSubmitting, setCommentSubmitting] = useState<Record<string, boolean>>({});
 
   // Admin Console state
   const [adminSubTab, setAdminSubTab] = useState<AdminSubTab>("overview");
@@ -409,6 +424,88 @@ function LoginPage() {
       setPortalNotice("Status posted to Rider Feed.");
     } catch (err) {
       setPortalNotice(err instanceof Error ? err.message : "Failed to post status.");
+    }
+  };
+
+  const handleToggleComments = async (postId: string) => {
+    const isCurrentlyOpen = !!expandedComments[postId];
+    setExpandedComments((prev) => ({ ...prev, [postId]: !isCurrentlyOpen }));
+    if (!isCurrentlyOpen && !postComments[postId]) {
+      try {
+        const comments = await fetchFeedComments(postId);
+        setPostComments((prev) => ({ ...prev, [postId]: comments }));
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const handleLikePost = async (post: FeedPostItem) => {
+    try {
+      if (post.is_liked_by_me) {
+        await unlikeFeedPost(post.id);
+        setFeedPosts((prev) =>
+          prev.map((p) =>
+            p.id === post.id
+              ? { ...p, is_liked_by_me: false, like_count: Math.max(0, p.like_count - 1) }
+              : p,
+          ),
+        );
+      } else {
+        await likeFeedPost(post.id);
+        setFeedPosts((prev) =>
+          prev.map((p) =>
+            p.id === post.id
+              ? { ...p, is_liked_by_me: true, like_count: p.like_count + 1 }
+              : p,
+          ),
+        );
+        setPortalNotice(`Liked @${post.author_username}'s status update!`);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleAddComment = async (postId: string, e: React.FormEvent) => {
+    e.preventDefault();
+    const text = (newCommentText[postId] || "").trim();
+    if (!text) return;
+    setCommentSubmitting((prev) => ({ ...prev, [postId]: true }));
+    try {
+      const newComment = await createFeedComment(postId, text);
+      setPostComments((prev) => ({
+        ...prev,
+        [postId]: [...(prev[postId] || []), newComment],
+      }));
+      setNewCommentText((prev) => ({ ...prev, [postId]: "" }));
+      setFeedPosts((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, comment_count: p.comment_count + 1 } : p)),
+      );
+      setPortalNotice("Comment posted to Rider Feed!");
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to post comment");
+    } finally {
+      setCommentSubmitting((prev) => ({ ...prev, [postId]: false }));
+    }
+  };
+
+  const handleDeleteComment = async (postId: string, commentId: string) => {
+    if (!window.confirm("Delete this comment?")) return;
+    try {
+      await deleteFeedComment(postId, commentId);
+      setPostComments((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] || []).filter((c) => c.id !== commentId),
+      }));
+      setFeedPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId ? { ...p, comment_count: Math.max(0, p.comment_count - 1) } : p,
+        ),
+      );
+      setPortalNotice("Comment removed.");
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to delete comment");
     }
   };
 
@@ -706,7 +803,7 @@ function LoginPage() {
                 )}
               >
                 <UserCheck className="size-4" />
-                Profile & Status
+                Rider Profile
               </button>
               <button
                 type="button"
@@ -732,7 +829,7 @@ function LoginPage() {
                 )}
               >
                 <MessageSquare className="size-4" />
-                Rider Feed ({feedPosts.length})
+                Feed ({feedPosts.length})
               </button>
               {isAdministrator && (
                 <button
@@ -751,14 +848,19 @@ function LoginPage() {
               )}
             </div>
 
-            {/* TAB 1: PROFILE & STATUS */}
+            {/* TAB 1: RIDER PROFILE */}
             {activeTab === "profile" && (
-              <div className="grid gap-6 md:grid-cols-2">
-                <form onSubmit={handleSaveProfile} className="hud-card space-y-4 p-6">
-                  <h2 className="font-display text-xl font-black uppercase tracking-tight">
-                    Rider Identity & Sync
-                  </h2>
-                  <div className="grid gap-4 sm:grid-cols-2">
+              <div className="mx-auto max-w-2xl">
+                <form onSubmit={handleSaveProfile} className="hud-card space-y-4 p-6 sm:p-8">
+                  <div>
+                    <h2 className="font-display text-2xl font-black uppercase tracking-tight">
+                      Rider Profile
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Manage your public rider identity, callsign, and privacy settings.
+                    </p>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2 pt-2">
                     <div>
                       <label className="font-mono text-xs uppercase text-muted-foreground">
                         Username
@@ -845,62 +947,6 @@ function LoginPage() {
                   </div>
                   <button type="submit" className="btn-primary w-full">
                     Save Rider Profile
-                  </button>
-                </form>
-
-                <form onSubmit={handlePostStatus} className="hud-card space-y-4 p-6">
-                  <h2 className="font-display text-xl font-black uppercase tracking-tight">
-                    Broadcast Rider Status
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Post an update to the Rider Feed — synced with the REVV mobile app.
-                  </p>
-                  <div>
-                    <label className="font-mono text-xs uppercase text-muted-foreground">
-                      Status Message
-                    </label>
-                    <textarea
-                      rows={3}
-                      required
-                      value={statusCaption}
-                      onChange={(e) => setStatusCaption(e.target.value)}
-                      placeholder="Sunday morning run to Sentul — roads are dry and clear!"
-                      className="mt-1 w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2.5 text-sm text-foreground"
-                    />
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="font-mono text-xs uppercase text-muted-foreground">
-                        Machine Tag (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={statusBikeLabel}
-                        onChange={(e) => setStatusBikeLabel(e.target.value)}
-                        placeholder="Yamaha XMAX 250"
-                        className="mt-1 w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2.5 text-sm text-foreground"
-                      />
-                    </div>
-                    <div>
-                      <label className="font-mono text-xs uppercase text-muted-foreground">
-                        Visibility
-                      </label>
-                      <select
-                        value={statusVisibility}
-                        onChange={(e) => setStatusVisibility(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2.5 text-sm text-foreground"
-                      >
-                        <option value="PUBLIC" className="bg-background">
-                          PUBLIC
-                        </option>
-                        <option value="FRIENDS_ONLY" className="bg-background">
-                          FRIENDS ONLY
-                        </option>
-                      </select>
-                    </div>
-                  </div>
-                  <button type="submit" className="btn-primary w-full">
-                    Post Status Update
                   </button>
                 </form>
               </div>
@@ -1131,61 +1177,240 @@ function LoginPage() {
               </div>
             )}
 
-            {/* TAB 3: RIDER FEED & MODERATION */}
+            {/* TAB 3: RIDER FEED & COMMUNITY */}
             {activeTab === "feed" && (
-              <div className="space-y-4">
-                {feedPosts.length === 0 ? (
-                  <div className="hud-card p-8 text-center text-muted-foreground">
-                    No feed posts yet. Broadcast a status update from your Profile tab!
+              <div className="space-y-6">
+                {/* Broadcast / Create Post Card */}
+                <form onSubmit={handlePostStatus} className="hud-card space-y-4 p-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-display text-xl font-black uppercase tracking-tight">
+                      Share Status to Rider Feed
+                    </h2>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      Synced with Mobile App & Web
+                    </span>
                   </div>
-                ) : (
-                  feedPosts.map((post) => (
-                    <div
-                      key={post.id}
-                      className="hud-card flex flex-col justify-between gap-4 p-6 sm:flex-row sm:items-start"
-                    >
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold text-foreground">
-                            {post.author_display_name}
-                          </span>
-                          <span className="font-mono text-xs text-primary">
-                            @{post.author_username}
-                          </span>
-                          {post.motorcycle_label && (
-                            <span className="rounded border border-border bg-secondary/60 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
-                              {post.motorcycle_label}
-                            </span>
+                  <div>
+                    <label className="font-mono text-xs uppercase text-muted-foreground">
+                      What's on your mind?
+                    </label>
+                    <textarea
+                      rows={3}
+                      required
+                      value={statusCaption}
+                      onChange={(e) => setStatusCaption(e.target.value)}
+                      placeholder="Sunday morning run to Sentul — roads are dry and clear!"
+                      className="mt-1 w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60"
+                    />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="font-mono text-xs uppercase text-muted-foreground">
+                        Machine Tag (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={statusBikeLabel}
+                        onChange={(e) => setStatusBikeLabel(e.target.value)}
+                        placeholder="Yamaha XMAX 250"
+                        className="mt-1 w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2.5 text-sm text-foreground"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-mono text-xs uppercase text-muted-foreground">
+                        Audience
+                      </label>
+                      <select
+                        value={statusVisibility}
+                        onChange={(e) => setStatusVisibility(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2.5 text-sm text-foreground"
+                      >
+                        <option value="PUBLIC" className="bg-background">
+                          PUBLIC (Everyone)
+                        </option>
+                        <option value="FRIENDS_ONLY" className="bg-background">
+                          FRIENDS ONLY
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <button type="submit" className="btn-primary inline-flex items-center gap-2 px-6">
+                      <Send className="size-4" />
+                      Post Update
+                    </button>
+                  </div>
+                </form>
+
+                {/* Feed Posts List */}
+                <div className="space-y-4">
+                  {feedPosts.length === 0 ? (
+                    <div className="hud-card p-8 text-center text-muted-foreground">
+                      No feed posts yet. Share your first update using the box above!
+                    </div>
+                  ) : (
+                    feedPosts.map((post) => (
+                      <div key={post.id} className="hud-card space-y-4 p-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-bold text-foreground">
+                                {post.author_display_name}
+                              </span>
+                              <span className="font-mono text-xs text-primary">
+                                @{post.author_username}
+                              </span>
+                              {post.motorcycle_label && (
+                                <span className="rounded border border-border bg-secondary/60 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                                  {post.motorcycle_label}
+                                </span>
+                              )}
+                              <span className="font-mono text-xs text-muted-foreground">
+                                · {new Date(post.created_at).toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="mt-3 whitespace-pre-line text-base text-foreground/90">
+                              {post.caption}
+                            </p>
+                          </div>
+                          {(canModerate || post.author_id === profile?.id) && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!window.confirm("Are you sure you want to delete this feed post?")) return;
+                                await deleteFeedPost(post.id);
+                                setFeedPosts(await fetchFeedPosts());
+                                setPortalNotice("Feed post removed.");
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 font-mono text-xs uppercase text-destructive hover:bg-destructive/20"
+                            >
+                              <Trash2 className="size-3.5" />
+                              Delete
+                            </button>
                           )}
-                          <span className="font-mono text-xs text-muted-foreground">
-                            · {new Date(post.created_at).toLocaleString()}
+                        </div>
+
+                        {/* Social Interaction Bar */}
+                        <div className="flex items-center gap-4 border-t border-border/60 pt-3">
+                          <button
+                            type="button"
+                            onClick={() => void handleLikePost(post)}
+                            className={cn(
+                              "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                              post.is_liked_by_me
+                                ? "bg-red-500/15 text-red-400 hover:bg-red-500/25"
+                                : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground",
+                            )}
+                          >
+                            <Heart
+                              className={cn(
+                                "size-4",
+                                post.is_liked_by_me && "fill-current text-red-500",
+                              )}
+                            />
+                            <span>{post.like_count}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void handleToggleComments(post.id)}
+                            className={cn(
+                              "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                              expandedComments[post.id]
+                                ? "bg-primary/20 text-primary"
+                                : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground",
+                            )}
+                          >
+                            <MessageCircle className="size-4" />
+                            <span>{post.comment_count} Comments</span>
+                          </button>
+
+                          <span className="ml-auto font-mono text-[11px] text-muted-foreground uppercase">
+                            {post.visibility}
                           </span>
                         </div>
-                        <p className="mt-3 whitespace-pre-line text-base text-foreground/90">
-                          {post.caption}
-                        </p>
-                        <p className="mt-3 font-mono text-xs text-muted-foreground">
-                          Likes: {post.like_count} · Comments: {post.comment_count} · Visibility:{" "}
-                          {post.visibility}
-                        </p>
+
+                        {/* Expandable Comments Thread */}
+                        {expandedComments[post.id] && (
+                          <div className="space-y-3 rounded-lg border border-border/50 bg-secondary/20 p-4">
+                            {/* Comment list */}
+                            {postComments[post.id] && postComments[post.id]!.length > 0 ? (
+                              <div className="space-y-2.5">
+                                {postComments[post.id]!.map((c) => (
+                                  <div
+                                    key={c.id}
+                                    className="flex items-start justify-between gap-2 rounded-lg border border-border/40 bg-secondary/40 p-3 text-xs"
+                                  >
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-semibold text-foreground">
+                                          {c.author_display_name || c.author_username}
+                                        </span>
+                                        <span className="font-mono text-[11px] text-primary">
+                                          @{c.author_username}
+                                        </span>
+                                        <span className="font-mono text-[10px] text-muted-foreground">
+                                          · {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                      </div>
+                                      <p className="mt-1 text-foreground/90 whitespace-pre-wrap">{c.comment_text}</p>
+                                    </div>
+                                    {(canModerate || c.author_id === profile?.id || post.author_id === profile?.id) && (
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleDeleteComment(post.id, c.id)}
+                                        className="text-muted-foreground hover:text-destructive p-1"
+                                        title="Delete comment"
+                                      >
+                                        <Trash2 className="size-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="font-mono text-xs text-muted-foreground italic">
+                                No comments yet. Be the first to reply!
+                              </p>
+                            )}
+
+                            {/* Add comment form */}
+                            <form
+                              onSubmit={(e) => void handleAddComment(post.id, e)}
+                              className="flex gap-2 pt-1"
+                            >
+                              <input
+                                type="text"
+                                required
+                                value={newCommentText[post.id] || ""}
+                                onChange={(e) =>
+                                  setNewCommentText((prev) => ({
+                                    ...prev,
+                                    [post.id]: e.target.value,
+                                  }))
+                                }
+                                placeholder="Write a comment..."
+                                className="flex-1 rounded-lg border border-input bg-secondary/50 px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/60"
+                              />
+                              <button
+                                type="submit"
+                                disabled={commentSubmitting[post.id]}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 font-mono text-xs font-bold uppercase text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                              >
+                                {commentSubmitting[post.id] ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                  <Send className="size-3.5" />
+                                )}
+                                Reply
+                              </button>
+                            </form>
+                          </div>
+                        )}
                       </div>
-                      {(canModerate || post.author_id === profile?.id) && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await deleteFeedPost(post.id);
-                            setFeedPosts(await fetchFeedPosts());
-                            setPortalNotice("Feed post removed.");
-                          }}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 font-mono text-xs uppercase text-destructive hover:bg-destructive/20"
-                        >
-                          <Trash2 className="size-3.5" />
-                          Delete
-                        </button>
-                      )}
-                    </div>
-                  ))
-                )}
+                    ))
+                  )}
+                </div>
               </div>
             )}
 
@@ -1341,62 +1566,104 @@ function LoginPage() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2">
-                          <select
-                            value={u.role.toLowerCase()}
-                            onChange={async (e) => {
-                              await updateAdminUser(u.id, { role: e.target.value });
-                              setAdminUsers(await fetchAdminUsers());
-                              setPortalNotice(`Updated role for ${u.email || u.username}`);
-                            }}
-                            className="rounded border border-input bg-secondary/60 px-2.5 py-1.5 font-mono text-xs uppercase text-foreground"
-                          >
-                            <option value="user" className="bg-background">
-                              user
-                            </option>
-                            <option value="moderator" className="bg-background">
-                              moderator
-                            </option>
-                            <option value="administrator" className="bg-background">
-                              administrator
-                            </option>
-                          </select>
+                          {u.id === profile?.id || (profile?.email && u.email?.toLowerCase() === profile.email.toLowerCase()) ? (
+                            <span className="rounded border border-primary/50 bg-primary/20 px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider text-primary">
+                              You (Superuser)
+                            </span>
+                          ) : (
+                            <>
+                              <select
+                                value={u.role.toLowerCase()}
+                                onChange={async (e) => {
+                                  const nextRole = e.target.value;
+                                  if (nextRole === u.role.toLowerCase()) return;
+                                  const ok = window.confirm(
+                                    `Are you sure you want to change the role of ${u.email || u.username} to ${nextRole.toUpperCase()}?`,
+                                  );
+                                  if (!ok) {
+                                    e.target.value = u.role.toLowerCase();
+                                    return;
+                                  }
+                                  try {
+                                    await updateAdminUser(u.id, { role: nextRole });
+                                    setAdminUsers(await fetchAdminUsers());
+                                    setPortalNotice(`Updated role for ${u.email || u.username} to ${nextRole}`);
+                                  } catch (err: unknown) {
+                                    alert(err instanceof Error ? err.message : "Failed to update role");
+                                    setAdminUsers(await fetchAdminUsers());
+                                  }
+                                }}
+                                className="rounded border border-input bg-secondary/60 px-2.5 py-1.5 font-mono text-xs uppercase text-foreground"
+                              >
+                                <option value="user" className="bg-background">
+                                  user
+                                </option>
+                                <option value="moderator" className="bg-background">
+                                  moderator
+                                </option>
+                                <option value="administrator" className="bg-background">
+                                  administrator
+                                </option>
+                              </select>
 
-                          <select
-                            value={u.status}
-                            onChange={async (e) => {
-                              await updateAdminUser(u.id, { status: e.target.value });
-                              setAdminUsers(await fetchAdminUsers());
-                              setPortalNotice(`Updated status for ${u.email || u.username}`);
-                            }}
-                            className="rounded border border-input bg-secondary/60 px-2.5 py-1.5 font-mono text-xs uppercase text-foreground"
-                          >
-                            <option value="Active" className="bg-background">
-                              Active
-                            </option>
-                            <option value="Suspended" className="bg-background">
-                              Suspended
-                            </option>
-                            <option value="Banned" className="bg-background">
-                              Banned
-                            </option>
-                            <option value="Deleted" className="bg-background">
-                              Deleted
-                            </option>
-                          </select>
+                              <select
+                                value={u.status}
+                                onChange={async (e) => {
+                                  const nextStatus = e.target.value;
+                                  if (nextStatus === u.status) return;
+                                  const ok = window.confirm(
+                                    `Are you sure you want to change status of ${u.email || u.username} to ${nextStatus.toUpperCase()}?`,
+                                  );
+                                  if (!ok) {
+                                    e.target.value = u.status;
+                                    return;
+                                  }
+                                  try {
+                                    await updateAdminUser(u.id, { status: nextStatus });
+                                    setAdminUsers(await fetchAdminUsers());
+                                    setPortalNotice(`Updated status for ${u.email || u.username} to ${nextStatus}`);
+                                  } catch (err: unknown) {
+                                    alert(err instanceof Error ? err.message : "Failed to update status");
+                                    setAdminUsers(await fetchAdminUsers());
+                                  }
+                                }}
+                                className="rounded border border-input bg-secondary/60 px-2.5 py-1.5 font-mono text-xs uppercase text-foreground"
+                              >
+                                <option value="Active" className="bg-background">
+                                  Active
+                                </option>
+                                <option value="Suspended" className="bg-background">
+                                  Suspended
+                                </option>
+                                <option value="Banned" className="bg-background">
+                                  Banned
+                                </option>
+                                <option value="Deleted" className="bg-background">
+                                  Deleted
+                                </option>
+                              </select>
 
-                          {u.id !== profile?.id && (
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                await deleteAdminUser(u.id);
-                                setAdminUsers(await fetchAdminUsers());
-                                setPortalNotice("User soft-deleted and tokens revoked.");
-                              }}
-                              className="inline-flex items-center gap-1 rounded border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 font-mono text-xs uppercase text-destructive hover:bg-destructive/20"
-                            >
-                              <Trash2 className="size-3.5" />
-                              Soft Delete
-                            </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const ok = window.confirm(
+                                    `Are you sure you want to soft-delete user ${u.email || u.username}? All active bearer sessions will be immediately invalidated.`,
+                                  );
+                                  if (!ok) return;
+                                  try {
+                                    await deleteAdminUser(u.id);
+                                    setAdminUsers(await fetchAdminUsers());
+                                    setPortalNotice("User soft-deleted and tokens revoked.");
+                                  } catch (err: unknown) {
+                                    alert(err instanceof Error ? err.message : "Failed to delete user");
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 rounded border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 font-mono text-xs uppercase text-destructive hover:bg-destructive/20"
+                              >
+                                <Trash2 className="size-3.5" />
+                                Soft Delete
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
