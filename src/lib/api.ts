@@ -490,8 +490,25 @@ export async function signInWithOtp(
       throw new AuthApiError(msg, res.status);
     }
 
-    const tokens: AuthTokens = body?.data;
-    if (typeof window !== "undefined" && tokens?.access_token) {
+    const rawTokens: any = body?.data ?? body;
+    let accessToken = "";
+    let refreshToken = "";
+    if (Array.isArray(rawTokens)) {
+      accessToken = rawTokens[0] || "";
+      refreshToken = rawTokens[1] || "";
+    } else if (rawTokens && typeof rawTokens === "object") {
+      accessToken = rawTokens.access_token || rawTokens.accessToken || "";
+      refreshToken = rawTokens.refresh_token || rawTokens.refreshToken || "";
+    }
+
+    const tokens: AuthTokens = {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      token_type: "Bearer",
+      expires_in: 900,
+    };
+
+    if (typeof window !== "undefined" && tokens.access_token) {
       localStorage.setItem("revv_access_token", tokens.access_token);
       localStorage.setItem("revv_refresh_token", tokens.refresh_token || "");
       localStorage.setItem("revv_rider_id", cleanId);
@@ -519,10 +536,18 @@ export function getSavedSession(): {
   if (typeof window === "undefined") {
     return { token: null, refreshToken: null, riderId: null };
   }
+  const token = localStorage.getItem("revv_access_token");
+  const refreshToken = localStorage.getItem("revv_refresh_token");
+  const riderId = localStorage.getItem("revv_rider_id");
+
+  const cleanToken = token && token !== "undefined" && token !== "null" ? token : null;
+  const cleanRefresh = refreshToken && refreshToken !== "undefined" && refreshToken !== "null" ? refreshToken : null;
+  const cleanRider = riderId && riderId !== "undefined" && riderId !== "null" ? riderId : null;
+
   return {
-    token: localStorage.getItem("revv_access_token"),
-    refreshToken: localStorage.getItem("revv_refresh_token"),
-    riderId: localStorage.getItem("revv_rider_id"),
+    token: cleanToken,
+    refreshToken: cleanRefresh,
+    riderId: cleanRider,
   };
 }
 
@@ -535,7 +560,8 @@ export function clearSavedSession(): void {
 
 async function tryRefreshSession(): Promise<string | null> {
   if (typeof window === "undefined") return null;
-  const refreshToken = localStorage.getItem("revv_refresh_token");
+  const session = getSavedSession();
+  const refreshToken = session.refreshToken;
   if (!refreshToken) return null;
 
   try {
@@ -551,14 +577,24 @@ async function tryRefreshSession(): Promise<string | null> {
       clearSavedSession();
       return null;
     }
-    const body: ApiResponse<AuthTokens> = await res.json();
-    const tokens = body?.data;
-    if (tokens?.access_token) {
-      localStorage.setItem("revv_access_token", tokens.access_token);
-      if (tokens.refresh_token) {
-        localStorage.setItem("revv_refresh_token", tokens.refresh_token);
+    const body = await res.json().catch(() => null);
+    const rawTokens: any = body?.data ?? body;
+    let accessToken = "";
+    let refreshTokenNew = "";
+    if (Array.isArray(rawTokens)) {
+      accessToken = rawTokens[0] || "";
+      refreshTokenNew = rawTokens[1] || "";
+    } else if (rawTokens && typeof rawTokens === "object") {
+      accessToken = rawTokens.access_token || rawTokens.accessToken || "";
+      refreshTokenNew = rawTokens.refresh_token || rawTokens.refreshToken || "";
+    }
+
+    if (accessToken) {
+      localStorage.setItem("revv_access_token", accessToken);
+      if (refreshTokenNew) {
+        localStorage.setItem("revv_refresh_token", refreshTokenNew);
       }
-      return tokens.access_token;
+      return accessToken;
     }
   } catch {
     // ignore refresh network errors
@@ -574,7 +610,8 @@ export async function authRequest<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const baseUrl = getApiBaseUrl();
-  let token = typeof window !== "undefined" ? localStorage.getItem("revv_access_token") : null;
+  const session = getSavedSession();
+  let token = session.token;
   if (!token) {
     throw new AuthApiError("Not signed in.", 401);
   }
