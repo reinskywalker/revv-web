@@ -1,6 +1,6 @@
 /**
  * REVV- Web API Client
- * Connects to REVV Backend services (News, Auth/OTP, Profile)
+ * Connects to REVV Backend services (News, Auth/OTP, Profile, Garage, Feed, Admin Console, Beta Registrations)
  */
 
 export interface NewsArticle {
@@ -40,6 +40,164 @@ export interface AuthTokens {
 export interface RequestOtpResponseData {
   otp?: string;
   expires_at?: string;
+}
+
+export interface RiderProfile {
+  id: string;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  is_phone_verified: boolean;
+  is_email_verified: boolean;
+  role: string;
+  username?: string | null;
+  noreg?: string | null;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
+  avatar_url?: string | null;
+  banner_url?: string | null;
+  date_of_birth?: string | null;
+  bio?: string | null;
+  city?: string | null;
+  job?: string | null;
+  account_visibility?: string | null;
+  show_motorcycle_count?: boolean | null;
+  show_garage_details?: boolean | null;
+  show_city?: boolean | null;
+  show_job?: boolean | null;
+}
+
+export interface GarageMotorcycle {
+  id: string;
+  name: string;
+  type: string;
+  brand_name?: string | null;
+  series_name?: string | null;
+  nickname?: string | null;
+  current_mileage: number;
+  master_motorcycle_id?: number | null;
+  manufacture_year?: number | null;
+  engine_capacity_cc?: number | null;
+  transmission: string;
+  category: string;
+  plate_number?: string | null;
+  avg_daily_mileage: number;
+  is_primary: boolean;
+  image_path?: string | null;
+}
+
+export interface MasterMotorcycleItem {
+  id: number;
+  brand_id: number;
+  brand_name: string;
+  series_name: string;
+  transmission: string;
+  category: string;
+  engine_cc?: number | null;
+  is_active?: boolean;
+}
+
+export interface MasterBrandItem {
+  id: number;
+  name: string;
+  is_active: boolean;
+}
+
+export interface MasterComponentItem {
+  id: number;
+  code: string;
+  name: string;
+  default_interval_km?: number | null;
+  default_interval_months?: number | null;
+  applicable_transmission: string[];
+  is_active: boolean;
+}
+
+export interface FeedPostItem {
+  id: string;
+  author_id: string;
+  author_username: string;
+  author_display_name: string;
+  author_avatar_url?: string | null;
+  post_type: string;
+  caption?: string | null;
+  image_url: string;
+  motorcycle_label?: string | null;
+  metadata: Record<string, unknown>;
+  visibility: string;
+  like_count: number;
+  is_liked_by_me: boolean;
+  created_at: string;
+  comment_count: number;
+}
+
+export interface BetaRegistrationPayload {
+  full_name: string;
+  email: string;
+  phone?: string;
+  city?: string;
+  motorcycle_brand?: string;
+  motorcycle_series?: string;
+  playstore_email?: string;
+  riding_style?: string;
+  referral_source?: string;
+  notes?: string;
+  website?: string;
+}
+
+export interface BetaRegistrationRow {
+  id: string;
+  full_name: string;
+  email: string;
+  phone?: string | null;
+  city?: string | null;
+  motorcycle_brand?: string | null;
+  motorcycle_series?: string | null;
+  playstore_email?: string | null;
+  riding_style?: string | null;
+  referral_source?: string | null;
+  notes?: string | null;
+  status: string;
+  admin_notes?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminDashboardStats {
+  total_users: number;
+  active_users: number;
+  suspended_users: number;
+  deleted_users: number;
+  pending_registrations: number;
+  approved_registrations: number;
+  total_garages: number;
+  total_feed_posts: number;
+  total_communities: number;
+  total_master_brands: number;
+  total_master_motorcycles: number;
+  total_master_components: number;
+}
+
+export interface AdminUserItem {
+  id: string;
+  phone?: string | null;
+  email?: string | null;
+  username?: string | null;
+  noreg?: string | null;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
+  avatar_url?: string | null;
+  date_of_birth?: string | null;
+  bio?: string | null;
+  is_phone_verified: boolean;
+  is_email_verified: boolean;
+  status: string;
+  role: string;
+  created_at: string;
 }
 
 // Fallback articles mirroring revv-backend seed database for resilience
@@ -107,7 +265,6 @@ export function getApiBaseUrl(): string {
     return envUrl.trim().replace(/\/+$/, "");
   }
 
-  // If in browser on production domain revv.asteralabs.digital
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
     if (host.includes("asteralabs.digital") || host.includes("vercel.app")) {
@@ -149,7 +306,6 @@ export async function fetchNewsArticles(params?: {
     console.warn("REVV Backend news endpoint unreachable, using verified seed articles:", err);
   }
 
-  // Fallback to seed articles if backend is offline or has no articles
   return { articles: SEED_NEWS_ARTICLES, fromFallback: true };
 }
 
@@ -183,7 +339,7 @@ export async function fetchNewsArticleBySlug(slug: string): Promise<NewsArticle 
 }
 
 /**
- * Custom error for login operations
+ * Custom error for login & API operations
  */
 export class AuthApiError extends Error {
   statusCode: number;
@@ -199,11 +355,6 @@ export class AuthApiError extends Error {
 
 /**
  * Request OTP from revv-backend /api/v1/auth/request-otp
- *
- * Rules:
- * - Registration is NOT allowed on web.
- * - If user does not exist (404), throw an explicit "User not found" error explaining
- *   that registration must be done via the REVV mobile app.
  */
 export async function requestOtp(identifier: string): Promise<{
   success: boolean;
@@ -241,7 +392,7 @@ export async function requestOtp(identifier: string): Promise<{
 
     if (res.status === 404) {
       throw new AuthApiError(
-        "Rider account not found. Web registration is not supported. Please download the REVV mobile app to create your rider account.",
+        "Rider account not found. Apply for Closed Beta access or create your rider account on the REVV mobile app.",
         404,
         true,
       );
@@ -252,7 +403,6 @@ export async function requestOtp(identifier: string): Promise<{
     }
 
     if (!res.ok) {
-      // In local development or staging, if SMS/Email is not configured (503)
       if (res.status === 503) {
         return {
           success: true,
@@ -275,7 +425,6 @@ export async function requestOtp(identifier: string): Promise<{
     };
   } catch (err) {
     if (err instanceof AuthApiError) throw err;
-    // If backend is completely offline or unreachable
     console.warn("REVV Backend unreachable during requestOtp:", err);
     throw new AuthApiError(
       "Unable to reach the REVV authentication service. Please check your internet connection or try again later.",
@@ -326,7 +475,7 @@ export async function signInWithOtp(
 
     if (res.status === 404) {
       throw new AuthApiError(
-        "Rider account not found. Registration is exclusively available on the REVV mobile app.",
+        "Rider account not found. Apply for Closed Beta access or register via the REVV mobile app.",
         404,
         true,
       );
@@ -362,10 +511,17 @@ export async function signInWithOtp(
 /**
  * Rider session storage helpers
  */
-export function getSavedSession(): { token: string | null; riderId: string | null } {
-  if (typeof window === "undefined") return { token: null, riderId: null };
+export function getSavedSession(): {
+  token: string | null;
+  refreshToken: string | null;
+  riderId: string | null;
+} {
+  if (typeof window === "undefined") {
+    return { token: null, refreshToken: null, riderId: null };
+  }
   return {
     token: localStorage.getItem("revv_access_token"),
+    refreshToken: localStorage.getItem("revv_refresh_token"),
     riderId: localStorage.getItem("revv_rider_id"),
   };
 }
@@ -375,4 +531,381 @@ export function clearSavedSession(): void {
   localStorage.removeItem("revv_access_token");
   localStorage.removeItem("revv_refresh_token");
   localStorage.removeItem("revv_rider_id");
+}
+
+async function tryRefreshSession(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  const refreshToken = localStorage.getItem("revv_refresh_token");
+  if (!refreshToken) return null;
+
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!res.ok) {
+      clearSavedSession();
+      return null;
+    }
+    const body: ApiResponse<AuthTokens> = await res.json();
+    const tokens = body?.data;
+    if (tokens?.access_token) {
+      localStorage.setItem("revv_access_token", tokens.access_token);
+      if (tokens.refresh_token) {
+        localStorage.setItem("revv_refresh_token", tokens.refresh_token);
+      }
+      return tokens.access_token;
+    }
+  } catch {
+    // ignore refresh network errors
+  }
+  return null;
+}
+
+/**
+ * Authenticated request helper with automatic 401 refresh retry
+ */
+export async function authRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const baseUrl = getApiBaseUrl();
+  let token = typeof window !== "undefined" ? localStorage.getItem("revv_access_token") : null;
+  if (!token) {
+    throw new AuthApiError("Not signed in.", 401);
+  }
+
+  const doFetch = async (bearer: string) => {
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      Authorization: `Bearer ${bearer}`,
+      ...((options.headers as Record<string, string>) || {}),
+    };
+    if (options.body && typeof options.body === "string" && !headers["Content-Type"]) {
+      headers["Content-Type"] = "application/json";
+    }
+    return fetch(`${baseUrl}${path}`, {
+      ...options,
+      headers,
+    });
+  };
+
+  let res = await doFetch(token);
+  if (res.status === 401) {
+    const refreshed = await tryRefreshSession();
+    if (refreshed) {
+      token = refreshed;
+      res = await doFetch(token);
+    } else {
+      clearSavedSession();
+      throw new AuthApiError("Your session has expired. Please sign in again.", 401);
+    }
+  }
+
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    const msg = body?.meta?.message || body?.message || `Request failed (${res.status})`;
+    throw new AuthApiError(msg, res.status);
+  }
+
+  return body?.data as T;
+}
+
+/**
+ * Submit Closed Beta Pre-Registration (`POST /api/v1/registrations`)
+ */
+export async function submitBetaRegistration(
+  payload: BetaRegistrationPayload,
+): Promise<{ id: string; status: string; created_at: string }> {
+  const baseUrl = getApiBaseUrl();
+  const res = await fetch(`${baseUrl}/registrations`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    const msg =
+      body?.meta?.message || body?.message || "Unable to submit beta registration right now.";
+    throw new AuthApiError(msg, res.status);
+  }
+  return body?.data;
+}
+
+/**
+ * Public master motorcycle catalog (`GET /api/v1/master/motorcycles`)
+ */
+export async function fetchMasterMotorcycles(): Promise<MasterMotorcycleItem[]> {
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/master/motorcycles`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return [];
+    const body: ApiResponse<MasterMotorcycleItem[]> = await res.json();
+    return Array.isArray(body.data) ? body.data : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Rider Portal APIs (Authenticated)
+ */
+export async function fetchMyProfile(): Promise<RiderProfile> {
+  return authRequest<RiderProfile>("/me");
+}
+
+export async function updateMyProfile(payload: {
+  username?: string;
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+  bio?: string;
+  city?: string;
+  job?: string;
+  account_visibility?: string;
+}): Promise<RiderProfile> {
+  return authRequest<RiderProfile>("/me", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchMyGarage(): Promise<GarageMotorcycle[]> {
+  return authRequest<GarageMotorcycle[]>("/me/garage");
+}
+
+export async function addGarageMotorcycle(payload: {
+  master_motorcycle_id?: number | null;
+  brand_manual?: string;
+  series_manual?: string;
+  nickname?: string;
+  current_mileage?: number;
+  manufacture_year?: number;
+  engine_capacity_cc?: number;
+  transmission?: string;
+  category?: string;
+  plate_number?: string;
+  avg_daily_mileage?: number;
+  is_primary?: boolean;
+}): Promise<GarageMotorcycle> {
+  return authRequest<GarageMotorcycle>("/me/garage", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateGarageMotorcycle(
+  garageId: string,
+  payload: Partial<{
+    master_motorcycle_id: number | null;
+    brand_manual: string;
+    series_manual: string;
+    nickname: string;
+    current_mileage: number;
+    manufacture_year: number;
+    engine_capacity_cc: number;
+    transmission: string;
+    category: string;
+    plate_number: string;
+    avg_daily_mileage: number;
+    is_primary: boolean;
+  }>,
+): Promise<GarageMotorcycle> {
+  return authRequest<GarageMotorcycle>(`/me/garage/${encodeURIComponent(garageId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteGarageMotorcycle(garageId: string): Promise<void> {
+  await authRequest<unknown>(`/me/garage/${encodeURIComponent(garageId)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function fetchFeedPosts(): Promise<FeedPostItem[]> {
+  return authRequest<FeedPostItem[]>("/feed/posts");
+}
+
+export async function createStatusPost(payload: {
+  caption: string;
+  visibility?: string;
+  motorcycle_label?: string;
+}): Promise<FeedPostItem> {
+  return authRequest<FeedPostItem>("/feed/status", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteFeedPost(postId: string): Promise<void> {
+  await authRequest<unknown>(`/feed/posts/${encodeURIComponent(postId)}`, {
+    method: "DELETE",
+  });
+}
+
+/**
+ * Administrator Console APIs (`role === 'administrator'`)
+ */
+export async function fetchAdminDashboard(): Promise<AdminDashboardStats> {
+  return authRequest<AdminDashboardStats>("/admin/dashboard");
+}
+
+export async function fetchAdminUsers(): Promise<AdminUserItem[]> {
+  return authRequest<AdminUserItem[]>("/users");
+}
+
+export async function updateAdminUser(
+  userId: string,
+  payload: { role?: string; status?: string },
+): Promise<AdminUserItem> {
+  return authRequest<AdminUserItem>(`/users/${encodeURIComponent(userId)}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAdminUserStatus(
+  userId: string,
+  status: string,
+): Promise<AdminUserItem> {
+  return authRequest<AdminUserItem>(`/users/${encodeURIComponent(userId)}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function deleteAdminUser(userId: string): Promise<void> {
+  await authRequest<unknown>(`/users/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function fetchBetaRegistrations(status?: string): Promise<BetaRegistrationRow[]> {
+  const qs = status && status !== "ALL" ? `?status=${encodeURIComponent(status)}` : "";
+  return authRequest<BetaRegistrationRow[]>(`/admin/registrations${qs}`);
+}
+
+export async function updateBetaRegistration(
+  id: string,
+  payload: { status?: string; admin_notes?: string },
+): Promise<BetaRegistrationRow> {
+  return authRequest<BetaRegistrationRow>(`/admin/registrations/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteBetaRegistration(id: string): Promise<void> {
+  await authRequest<unknown>(`/admin/registrations/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function fetchAdminBrands(): Promise<MasterBrandItem[]> {
+  return authRequest<MasterBrandItem[]>("/admin/master/brands");
+}
+
+export async function createAdminBrand(payload: {
+  name: string;
+  is_active?: boolean;
+}): Promise<MasterBrandItem> {
+  return authRequest<MasterBrandItem>("/admin/master/brands", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAdminBrand(
+  id: number,
+  payload: { name?: string; is_active?: boolean },
+): Promise<MasterBrandItem> {
+  return authRequest<MasterBrandItem>(`/admin/master/brands/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteAdminBrand(id: number): Promise<void> {
+  await authRequest<unknown>(`/admin/master/brands/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function fetchAdminMotorcycles(): Promise<MasterMotorcycleItem[]> {
+  return authRequest<MasterMotorcycleItem[]>("/admin/master/motorcycles");
+}
+
+export async function createAdminMotorcycle(payload: {
+  brand_id: number;
+  series_name: string;
+  transmission: string;
+  category: string;
+  engine_cc?: number | null;
+  is_active?: boolean;
+}): Promise<MasterMotorcycleItem> {
+  return authRequest<MasterMotorcycleItem>("/admin/master/motorcycles", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteAdminMotorcycle(id: number): Promise<void> {
+  await authRequest<unknown>(`/admin/master/motorcycles/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function fetchAdminComponents(): Promise<MasterComponentItem[]> {
+  return authRequest<MasterComponentItem[]>("/admin/master/components");
+}
+
+export async function createAdminComponent(payload: {
+  code: string;
+  name: string;
+  default_interval_km?: number | null;
+  default_interval_months?: number | null;
+  applicable_transmission?: string[];
+  is_active?: boolean;
+}): Promise<MasterComponentItem> {
+  return authRequest<MasterComponentItem>("/admin/master/components", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteAdminComponent(id: number): Promise<void> {
+  await authRequest<unknown>(`/admin/master/components/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function createAdminNewsArticle(payload: {
+  title: string;
+  slug?: string;
+  summary: string;
+  content: string;
+  category?: string;
+  author_name?: string;
+  reading_time_minutes?: number;
+  is_highlight?: boolean;
+}): Promise<NewsArticle> {
+  return authRequest<NewsArticle>("/admin/news", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteAdminNewsArticle(id: string): Promise<void> {
+  await authRequest<unknown>(`/admin/news/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 }

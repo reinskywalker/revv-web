@@ -14,4 +14,12 @@ describe("App routing", () => {
 
     expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
   });
+
+  it("matches pages for /login, /register, and /news", () => {
+    const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
+
+    expect(router.matchRoutes("/login").at(-1)?.routeId).toBe("/login");
+    expect(router.matchRoutes("/register").at(-1)?.routeId).toBe("/register");
+    expect(router.matchRoutes("/news").at(-1)?.routeId).toBe("/news");
+  });
 });

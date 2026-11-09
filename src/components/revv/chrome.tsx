@@ -17,12 +17,19 @@ export function SiteHeader() {
             Closed Beta
           </span>
         </div>
-        <nav className="flex items-center gap-6">
+        <nav className="flex items-center gap-5 sm:gap-6">
           <Link to="/" className={navLinkClass} activeProps={{ className: "text-foreground" }}>
             Home
           </Link>
           <Link to="/news" className={navLinkClass} activeProps={{ className: "text-foreground" }}>
             News
+          </Link>
+          <Link
+            to="/register"
+            className={navLinkClass}
+            activeProps={{ className: "text-foreground" }}
+          >
+            Join Beta
           </Link>
           <Link
             to="/login"
@@ -45,12 +52,15 @@ export function SiteFooter() {
           <p className="eyebrow mt-3">Friendly Neighborhood Riding Companion</p>
         </div>
         <div className="flex flex-col gap-2 sm:items-end">
-          <div className="flex gap-5">
+          <div className="flex flex-wrap gap-5">
             <Link to="/" className={navLinkClass}>
               Home
             </Link>
             <Link to="/news" className={navLinkClass}>
               News
+            </Link>
+            <Link to="/register" className={navLinkClass}>
+              Join Beta
             </Link>
             <Link to="/login" className={navLinkClass}>
               Sign in

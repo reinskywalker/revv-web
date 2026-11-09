@@ -136,9 +136,12 @@ function HomePage() {
               the road takes you next.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
-              <Link to="/login" className="btn-primary">
-                Start riding
+              <Link to="/register" className="btn-primary">
+                Join Closed Beta
                 <ArrowRight className="size-5" />
+              </Link>
+              <Link to="/login" className="btn-ghost">
+                Rider Sign In
               </Link>
               <Link to="/news" className="btn-ghost">
                 Read the news
@@ -343,13 +346,21 @@ function HomePage() {
           <p className="max-w-lg text-lg leading-relaxed text-primary-foreground/90">
             Grab your rider ID and join the neighborhood. Passwordless, no nonsense — just the road.
           </p>
-          <Link
-            to="/login"
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-foreground px-9 py-4 font-display text-base font-bold uppercase tracking-wide text-background transition-opacity hover:opacity-90"
-          >
-            Get your rider ID
-            <ArrowRight className="size-5" />
-          </Link>
+          <div className="flex flex-wrap justify-center gap-4">
+            <Link
+              to="/register"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-foreground px-9 py-4 font-display text-base font-bold uppercase tracking-wide text-background transition-opacity hover:opacity-90"
+            >
+              Join Closed Beta
+              <ArrowRight className="size-5" />
+            </Link>
+            <Link
+              to="/login"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-primary-foreground/50 px-8 py-4 font-display text-base font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary-foreground/10"
+            >
+              Rider Sign In
+            </Link>
+          </div>
         </div>
       </section>
 

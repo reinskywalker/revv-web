@@ -11,8 +11,6 @@
   `src/styles.css` as Tailwind v4 tokens — never hardcode colors or fonts in
   components. Text and buttons stay at the enlarged, elderly-comfortable
   sizes; do not shrink them back.
-- `/login` is deliberately UI-only (simulated OTP, any 6 digits verify); the
-  real OTP backend calls replace the two `setTimeout` simulations in
-  `src/routes/login.tsx` when the user's backend is wired. `/news` renders an
-  empty state; real articles replace the empty `articles` array there.
+- `/register` provides Closed Beta pre-registration (`POST /api/v1/registrations`).
+- `/login` connects to real OTP endpoints (`/api/v1/auth/request-otp`, `/api/v1/auth/sign-in`, `/api/v1/auth/refresh`) and renders role-aware views: Rider Portal (Profile & Status, Digital Garage, Rider Feed & Moderation) and Administrator Console (`role === 'administrator'`).
 - Never mention other REVV product lines (e.g. REVV Gear) anywhere on the web.
