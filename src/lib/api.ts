@@ -1014,9 +1014,50 @@ export async function checkUsernameAvailability(username: string): Promise<{
   }
 }
 
+export async function compressImageFile(file: File, maxDimension = 2048, quality = 0.82): Promise<File> {
+  if (typeof window === "undefined" || !file.type.startsWith("image/")) return file;
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return resolve(file);
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return resolve(file);
+          const compressedFile = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+            type: "image/jpeg",
+          });
+          resolve(compressedFile);
+        },
+        "image/jpeg",
+        quality,
+      );
+    };
+    img.onerror = () => resolve(file);
+    img.src = url;
+  });
+}
+
 export async function uploadProfileAvatar(file: File): Promise<{ url: string; path: string }> {
+  const compressed = await compressImageFile(file, 1080, 0.82);
   const form = new FormData();
-  form.append("image", file);
+  form.append("image", compressed);
   return authRequest<{ url: string; path: string }>("/me/avatar", {
     method: "POST",
     body: form,
@@ -1024,8 +1065,9 @@ export async function uploadProfileAvatar(file: File): Promise<{ url: string; pa
 }
 
 export async function uploadProfileBanner(file: File): Promise<{ url: string; path: string }> {
+  const compressed = await compressImageFile(file, 2048, 0.80);
   const form = new FormData();
-  form.append("image", file);
+  form.append("image", compressed);
   return authRequest<{ url: string; path: string }>("/me/banner", {
     method: "POST",
     body: form,
