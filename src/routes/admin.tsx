@@ -107,7 +107,7 @@ function AdminPage() {
   const [broadcastBody, setBroadcastBody] = useState("");
   const [broadcastTargetType, setBroadcastTargetType] = useState<"all" | "user">("all");
   const [broadcastTargetUserId, setBroadcastTargetUserId] = useState<string>("");
-  const [broadcastDeepLink, setBroadcastDeepLink] = useState("/rides");
+  const [broadcastDeepLink, setBroadcastDeepLink] = useState("notifications");
   const [broadcastIsSending, setBroadcastIsSending] = useState(false);
 
   const isSuperuser =
@@ -1044,16 +1044,50 @@ function AdminPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      In-App Deep Link / Route (Optional)
+                    <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                      <span>In-App Deep Link / Target Route</span>
+                      <span className="text-[10px] text-primary font-bold uppercase tracking-wider">Predefined Only</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. /rides, /news, /garage"
+                    <select
                       value={broadcastDeepLink}
                       onChange={(e) => setBroadcastDeepLink(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
-                    />
+                      className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2.5 font-mono text-xs text-foreground focus:border-primary focus:outline-none"
+                    >
+                      <optgroup label="Core Navigation Screens">
+                        <option value="notifications">🔔 Notifications Screen (Default Inbox)</option>
+                        <option value="feed">📰 Rider Community Feed</option>
+                        <option value="community">👥 Motorcycle Clubs & Community</option>
+                        <option value="garage">🔧 Digital Garage & Telemetry Fleet</option>
+                        <option value="chat">💬 Direct Chat & Group Comms</option>
+                      </optgroup>
+
+                      {adminNews.length > 0 && (
+                        <optgroup label="Motorcycle News Articles">
+                          {adminNews.map((article) => (
+                            <option key={article.slug} value={`news/${article.slug}`}>
+                              📖 News: {article.title.length > 55 ? `${article.title.slice(0, 52)}...` : article.title}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+
+                      {adminUsers.length > 0 && (
+                        <optgroup label="Rider Public Profiles">
+                          {adminUsers
+                            .filter((u) => u.username)
+                            .slice(0, 40)
+                            .map((u) => (
+                              <option key={u.id} value={`profile/${u.username}`}>
+                                👤 Profile: @{u.username} ({u.first_name || u.username})
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                    </select>
+                    <p className="font-mono text-[11px] text-muted-foreground flex items-center justify-between pt-0.5">
+                      <span>Selected Route Target:</span>
+                      <code className="text-primary font-bold">{broadcastDeepLink || "notifications"}</code>
+                    </p>
                   </div>
 
                   <button
@@ -1068,18 +1102,24 @@ function AdminPage() {
                       setBroadcastIsSending(true);
                       setNotice(null);
                       try {
+                        const routeTarget = broadcastDeepLink.trim() || "notifications";
                         const res = await sendAdminBroadcast({
                           title: broadcastTitle.trim(),
                           body: broadcastBody.trim(),
                           target_type: broadcastTargetType,
                           target_user_id: broadcastTargetType === "user" ? broadcastTargetUserId : undefined,
-                          data: { link: broadcastDeepLink.trim(), type: "admin_broadcast" },
+                          data: {
+                            route: routeTarget,
+                            link: routeTarget,
+                            type: "admin_broadcast",
+                          },
                         });
                         setNotice(
                           `Push notification dispatched successfully (${res.sent_count} device targets).`,
                         );
                         setBroadcastTitle("");
                         setBroadcastBody("");
+                        setBroadcastDeepLink("notifications");
                         setAdminBroadcasts(await fetchAdminBroadcasts().catch(() => []));
                       } catch (err) {
                         setNotice(
