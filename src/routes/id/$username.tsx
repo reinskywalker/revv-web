@@ -441,11 +441,13 @@ function ProfilePage() {
                   <h1 className="font-display text-2xl sm:text-3xl font-black text-foreground">
                     {displayName}
                   </h1>
+                  {/* Temporarily hidden noreg badge
                   {profile.noreg && (
                     <span className="rounded bg-secondary/80 px-2 py-0.5 font-mono text-[11px] font-bold text-muted-foreground border border-border">
                       #{profile.noreg}
                     </span>
                   )}
+                  */}
                 </div>
                 <p className="font-mono text-sm text-primary font-bold">
                   @{profile.username}
