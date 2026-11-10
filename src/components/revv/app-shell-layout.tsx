@@ -37,7 +37,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     user?.role?.toLowerCase() === "administrator" ||
     user?.role?.toLowerCase() === "moderator";
 
-  const myProfilePath = user?.username ? `/id/${encodeURIComponent(user.username)}` : "/login";
+  const myProfilePath = user?.username ? `/id/${encodeURIComponent(user.username)}` : "/id/me";
 
   const navItems = [
     {
@@ -50,11 +50,6 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
       label: "News",
       to: "/news",
       icon: FileText,
-    },
-    {
-      label: "Rider Feed",
-      to: "/feed",
-      icon: MessageSquare,
     },
     {
       label: "Digital Garage",

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import {
   cancelFriendRequest,
+  fetchMyProfile,
   fetchPublicProfile,
   sendFriendRequest,
   unfriendRider,
@@ -54,7 +55,9 @@ function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const isSelf =
-    !!user?.username && user.username.toLowerCase() === username.toLowerCase();
+    username === "me" ||
+    (!!user?.username && user.username.toLowerCase() === username.toLowerCase()) ||
+    (!!user?.id && user.id === username);
 
   const loadData = async () => {
     setLoading(true);
@@ -71,6 +74,40 @@ function ProfilePage() {
         setEditVisibility(data.account_visibility || "PUBLIC");
       }
     } catch (err: any) {
+      if (isSelf) {
+        try {
+          const myProf = await fetchMyProfile();
+          setProfile({
+            id: myProf.id,
+            username: myProf.username || "rider",
+            noreg: myProf.noreg || null,
+            first_name: myProf.first_name || null,
+            middle_name: myProf.middle_name || null,
+            last_name: myProf.last_name || null,
+            avatar_url: myProf.avatar_url || null,
+            banner_url: myProf.banner_url || null,
+            bio: myProf.bio || null,
+            city: myProf.city || null,
+            job: myProf.job || null,
+            account_visibility: myProf.account_visibility || "PUBLIC",
+            is_friend: true,
+            has_pending_request: false,
+            is_private: false,
+            motorcycle_count: null,
+            garage: null,
+            posts: null,
+          });
+          setEditFirstName(myProf.first_name || "");
+          setEditLastName(myProf.last_name || "");
+          setEditCity(myProf.city || "");
+          setEditJob(myProf.job || "");
+          setEditBio(myProf.bio || "");
+          setEditVisibility(myProf.account_visibility || "PUBLIC");
+          return;
+        } catch {
+          // ignore
+        }
+      }
       setError(err?.message || "Failed to load rider profile");
     } finally {
       setLoading(false);
@@ -163,10 +200,10 @@ function ProfilePage() {
         </h2>
         <p className="text-sm text-muted-foreground">{error || "User does not exist on REVV."}</p>
         <Link
-          to="/feed"
+          to="/"
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-primary-foreground"
         >
-          Back to Community Feed
+          Back to Home Feed
         </Link>
       </div>
     );

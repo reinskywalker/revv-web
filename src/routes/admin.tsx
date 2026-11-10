@@ -205,7 +205,7 @@ function AdminPage() {
               <ChevronRight className="size-4" />
             </Link>
           ) : (
-            <Link to="/feed" className="btn-primary inline-flex items-center gap-2">
+            <Link to="/" className="btn-primary inline-flex items-center gap-2">
               Go to Rider Feed
               <ChevronRight className="size-4" />
             </Link>

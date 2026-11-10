@@ -817,22 +817,105 @@ export interface PublicProfileResponse {
   posts: FeedPostItem[] | null;
 }
 
+export interface FriendUserItem {
+  friend_id: string;
+  username: string;
+  display_name: string;
+  avatar_url?: string | null;
+  city?: string | null;
+  job?: string | null;
+  connected_since: string;
+}
+
+export interface FriendRequestItem {
+  id: string;
+  user_id: string;
+  friend_id: string;
+  username: string;
+  display_name: string;
+  avatar_url?: string | null;
+  is_outgoing: boolean;
+  created_at: string;
+}
+
+export interface SocialRiderSearchResult {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_url?: string | null;
+  city?: string | null;
+  friendship_status: "friends" | "outgoing_request" | "incoming_request" | "none";
+}
+
+export async function fetchFriends(): Promise<FriendUserItem[]> {
+  return authRequest<FriendUserItem[]>("/friends");
+}
+
+export async function fetchFriendRequests(): Promise<FriendRequestItem[]> {
+  return authRequest<FriendRequestItem[]>("/friends/requests");
+}
+
+export async function acceptFriendRequest(requestId: string): Promise<void> {
+  await authRequest(`/friends/requests/${encodeURIComponent(requestId)}/accept`, {
+    method: "POST",
+  });
+}
+
+export async function rejectFriendRequest(requestId: string): Promise<void> {
+  await authRequest(`/friends/requests/${encodeURIComponent(requestId)}/reject`, {
+    method: "POST",
+  });
+}
+
+export async function searchRiders(query: string): Promise<SocialRiderSearchResult[]> {
+  const clean = query.trim();
+  if (!clean) return [];
+  return authRequest<SocialRiderSearchResult[]>(`/friends/search?q=${encodeURIComponent(clean)}`);
+}
+
 export async function fetchPublicProfile(
   identifier: string,
 ): Promise<PublicProfileResponse> {
+  const clean = identifier.trim() || "me";
   const session = getSavedSession();
+
   if (session.token) {
     try {
-      return await authRequest<PublicProfileResponse>(
-        `/users/${encodeURIComponent(identifier)}/profile`,
+      const res = await authRequest<PublicProfileResponse>(
+        `/users/${encodeURIComponent(clean)}/profile`,
       );
+      if (res) return res;
     } catch {
-      // fallback to unauthenticated public request
+      // If viewing self and public endpoint fails, fall back to /me
+      if (clean === "me" || clean === session.username || clean === session.riderId) {
+        const myProf = await fetchMyProfile();
+        return {
+          id: myProf.id,
+          username: myProf.username || "rider",
+          noreg: myProf.noreg || null,
+          first_name: myProf.first_name || null,
+          middle_name: myProf.middle_name || null,
+          last_name: myProf.last_name || null,
+          avatar_url: myProf.avatar_url || null,
+          banner_url: myProf.banner_url || null,
+          bio: myProf.bio || null,
+          city: myProf.city || null,
+          job: myProf.job || null,
+          account_visibility: myProf.account_visibility || "PUBLIC",
+          is_friend: true,
+          has_pending_request: false,
+          is_private: false,
+          motorcycle_count: null,
+          garage: null,
+          posts: null,
+        };
+      }
     }
   }
+
   const baseUrl = getApiBaseUrl();
   const res = await fetch(
-    `${baseUrl}/users/${encodeURIComponent(identifier)}/profile`,
+    `${baseUrl}/users/${encodeURIComponent(clean)}/profile`,
     {
       headers: { Accept: "application/json" },
     },

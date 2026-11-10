@@ -73,7 +73,7 @@ function LoginPage() {
           if (prof.username) {
             navigate({ to: "/id/$username", params: { username: prof.username } });
           } else {
-            navigate({ to: "/feed" });
+            navigate({ to: "/" });
           }
         } catch {
           // If profile fetch fails, stay on screen
@@ -148,7 +148,7 @@ function LoginPage() {
       if (targetUsername && !targetUsername.includes("@") && !targetUsername.startsWith("+")) {
         navigate({ to: "/id/$username", params: { username: targetUsername } });
       } else {
-        navigate({ to: "/feed" });
+        navigate({ to: "/" });
       }
     } catch (err) {
       setStep("otp");
@@ -246,7 +246,7 @@ function LoginPage() {
             </Link>
 
             <Link
-              to="/feed"
+              to="/"
               className="flex items-center justify-between rounded-lg border border-border bg-secondary/40 px-4 py-3 font-mono text-xs font-semibold uppercase tracking-wider text-foreground transition-colors hover:border-primary/50 hover:bg-secondary"
             >
               <span className="flex items-center gap-2">

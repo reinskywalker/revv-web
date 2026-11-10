@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
-import { Route as FeedRouteImport } from './routes/feed'
 import { Route as GarageRouteImport } from './routes/garage'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as NewsRouteImport } from './routes/news'
@@ -26,11 +25,6 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FeedRoute = FeedRouteImport.update({
-  id: '/feed',
-  path: '/feed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GarageRoute = GarageRouteImport.update({
@@ -62,7 +56,6 @@ const IdUsernameRoute = IdUsernameRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/feed': typeof FeedRoute
   '/garage': typeof GarageRoute
   '/login': typeof LoginRoute
   '/news': typeof NewsRoute
@@ -72,7 +65,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/feed': typeof FeedRoute
   '/garage': typeof GarageRoute
   '/login': typeof LoginRoute
   '/news': typeof NewsRoute
@@ -83,7 +75,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/feed': typeof FeedRoute
   '/garage': typeof GarageRoute
   '/login': typeof LoginRoute
   '/news': typeof NewsRoute
@@ -95,7 +86,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
-    | '/feed'
     | '/garage'
     | '/login'
     | '/news'
@@ -105,7 +95,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
-    | '/feed'
     | '/garage'
     | '/login'
     | '/news'
@@ -115,7 +104,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
-    | '/feed'
     | '/garage'
     | '/login'
     | '/news'
@@ -126,7 +114,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
-  FeedRoute: typeof FeedRoute
   GarageRoute: typeof GarageRoute
   LoginRoute: typeof LoginRoute
   NewsRoute: typeof NewsRoute
@@ -148,13 +135,6 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/feed': {
-      id: '/feed'
-      path: '/feed'
-      fullPath: '/feed'
-      preLoaderRoute: typeof FeedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/garage': {
@@ -198,7 +178,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
-  FeedRoute: FeedRoute,
   GarageRoute: GarageRoute,
   LoginRoute: LoginRoute,
   NewsRoute: NewsRoute,
