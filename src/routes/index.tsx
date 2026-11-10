@@ -26,7 +26,7 @@ import {
 import { SiteFooter, SiteHeader } from "@/components/revv/chrome";
 import { FeedPhone, NavPhone, ProfilePhone } from "@/components/revv/phone-mockups";
 import { Wordmark } from "@/components/revv/wordmark";
-import heroNightRide from "@/assets/hero-night-ride.jpg";
+import heroRiders from "@/assets/hero-riders.webp";
 import bikeDetail from "@/assets/bike-detail.jpg";
 import routeMapDark from "@/assets/route-map-dark.jpg";
 import {
@@ -903,13 +903,36 @@ function MarketingLandingPage() {
       {/* Hero — dark cockpit identity */}
       <section className="relative flex min-h-screen flex-col overflow-hidden">
         <img
-          src={heroNightRide}
-          alt="A rider on a sport motorcycle crossing a rain-slick city street at night"
+          src={heroRiders}
+          alt="A crew of sport motorcycle riders on the road"
           width={1920}
           height={1088}
-          className="absolute inset-0 h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover object-center"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-background/40" />
+        {/* Darkening & cinematic vignette overlay */}
+        <div className="absolute inset-0 bg-black/45" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/35" />
+
+        {/* REVV signature dot matrix pattern overlay */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-35 mix-blend-screen"
+          style={{
+            backgroundImage: "radial-gradient(rgba(255, 255, 255, 0.22) 1.2px, transparent 1.2px)",
+            backgroundSize: "22px 22px",
+            maskImage: "radial-gradient(ellipse at center, black 35%, transparent 95%)",
+            WebkitMaskImage: "radial-gradient(ellipse at center, black 35%, transparent 95%)",
+          }}
+          aria-hidden="true"
+        />
+
+        {/* Subtle REVV primary atmospheric glow */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-25"
+          style={{
+            background: "radial-gradient(ellipse at 50% 25%, var(--primary) 0%, transparent 65%)",
+          }}
+          aria-hidden="true"
+        />
         <div className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col justify-between px-6 pb-14 pt-28">
           <div className="flex flex-col items-center pt-[12vh] text-center">
             {/* Closed Beta / Coming Soon indicator */}
