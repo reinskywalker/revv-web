@@ -10,13 +10,32 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as FeedRouteImport } from './routes/feed'
+import { Route as GarageRouteImport } from './routes/garage'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as NewsRouteImport } from './routes/news'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as IdUsernameRouteImport } from './routes/id/$username'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeedRoute = FeedRouteImport.update({
+  id: '/feed',
+  path: '/feed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GarageRoute = GarageRouteImport.update({
+  id: '/garage',
+  path: '/garage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -34,39 +53,85 @@ const RegisterRoute = RegisterRouteImport.update({
   path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IdUsernameRoute = IdUsernameRouteImport.update({
+  id: '/id/$username',
+  path: '/id/$username',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/feed': typeof FeedRoute
+  '/garage': typeof GarageRoute
   '/login': typeof LoginRoute
   '/news': typeof NewsRoute
   '/register': typeof RegisterRoute
+  '/id/$username': typeof IdUsernameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/feed': typeof FeedRoute
+  '/garage': typeof GarageRoute
   '/login': typeof LoginRoute
   '/news': typeof NewsRoute
   '/register': typeof RegisterRoute
+  '/id/$username': typeof IdUsernameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/feed': typeof FeedRoute
+  '/garage': typeof GarageRoute
   '/login': typeof LoginRoute
   '/news': typeof NewsRoute
   '/register': typeof RegisterRoute
+  '/id/$username': typeof IdUsernameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/news' | '/register'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/feed'
+    | '/garage'
+    | '/login'
+    | '/news'
+    | '/register'
+    | '/id/$username'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/news' | '/register'
-  id: '__root__' | '/' | '/login' | '/news' | '/register'
+  to:
+    | '/'
+    | '/admin'
+    | '/feed'
+    | '/garage'
+    | '/login'
+    | '/news'
+    | '/register'
+    | '/id/$username'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/feed'
+    | '/garage'
+    | '/login'
+    | '/news'
+    | '/register'
+    | '/id/$username'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
+  FeedRoute: typeof FeedRoute
+  GarageRoute: typeof GarageRoute
   LoginRoute: typeof LoginRoute
   NewsRoute: typeof NewsRoute
   RegisterRoute: typeof RegisterRoute
+  IdUsernameRoute: typeof IdUsernameRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -76,6 +141,27 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/feed': {
+      id: '/feed'
+      path: '/feed'
+      fullPath: '/feed'
+      preLoaderRoute: typeof FeedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/garage': {
+      id: '/garage'
+      path: '/garage'
+      fullPath: '/garage'
+      preLoaderRoute: typeof GarageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -99,14 +185,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/id/$username': {
+      id: '/id/$username'
+      path: '/id/$username'
+      fullPath: '/id/$username'
+      preLoaderRoute: typeof IdUsernameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
+  FeedRoute: FeedRoute,
+  GarageRoute: GarageRoute,
   LoginRoute: LoginRoute,
   NewsRoute: NewsRoute,
   RegisterRoute: RegisterRoute,
+  IdUsernameRoute: IdUsernameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

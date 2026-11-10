@@ -153,3 +153,18 @@
 @utility btn-ghost-panel {
   @apply inline-flex items-center justify-center gap-2 rounded-lg border border-panel-border bg-transparent px-7 py-4 font-display text-base font-bold uppercase tracking-wide text-panel-foreground transition-colors hover:bg-panel;
 }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

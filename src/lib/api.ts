@@ -532,23 +532,70 @@ export function getSavedSession(): {
   token: string | null;
   refreshToken: string | null;
   riderId: string | null;
+  username: string | null;
 } {
   if (typeof window === "undefined") {
-    return { token: null, refreshToken: null, riderId: null };
+    return { token: null, refreshToken: null, riderId: null, username: null };
   }
   const token = localStorage.getItem("revv_access_token");
   const refreshToken = localStorage.getItem("revv_refresh_token");
-  const riderId = localStorage.getItem("revv_rider_id");
+  const username = localStorage.getItem("revv_username");
+  const riderId = localStorage.getItem("revv_rider_id") || username;
 
-  const cleanToken = token && token !== "undefined" && token !== "null" ? token : null;
-  const cleanRefresh = refreshToken && refreshToken !== "undefined" && refreshToken !== "null" ? refreshToken : null;
-  const cleanRider = riderId && riderId !== "undefined" && riderId !== "null" ? riderId : null;
+  const cleanToken =
+    token && token !== "undefined" && token !== "null" ? token : null;
+  const cleanRefresh =
+    refreshToken && refreshToken !== "undefined" && refreshToken !== "null"
+      ? refreshToken
+      : null;
+  const cleanUsername =
+    username && username !== "undefined" && username !== "null" ? username : null;
+  const cleanRiderId =
+    riderId && riderId !== "undefined" && riderId !== "null" ? riderId : cleanUsername;
 
   return {
     token: cleanToken,
     refreshToken: cleanRefresh,
-    riderId: cleanRider,
+    riderId: cleanRiderId,
+    username: cleanUsername,
   };
+}
+
+export function saveAuthSession(
+  tokensOrAccessToken:
+    | string
+    | {
+        access_token?: string;
+        token?: string;
+        refresh_token?: string | null;
+        riderId?: string | null;
+        username?: string | null;
+      },
+  refreshToken?: string | null,
+  riderId?: string | null,
+): void {
+  if (typeof window === "undefined") return;
+  let access: string | undefined;
+  let refresh: string | null | undefined;
+  let rider: string | null | undefined;
+  let user: string | null | undefined;
+
+  if (typeof tokensOrAccessToken === "object" && tokensOrAccessToken !== null) {
+    access = tokensOrAccessToken.access_token || tokensOrAccessToken.token;
+    refresh = tokensOrAccessToken.refresh_token;
+    rider = tokensOrAccessToken.riderId;
+    user = tokensOrAccessToken.username || tokensOrAccessToken.riderId;
+  } else {
+    access = tokensOrAccessToken;
+    refresh = refreshToken;
+    rider = riderId;
+    user = riderId;
+  }
+
+  if (access) localStorage.setItem("revv_access_token", access);
+  if (refresh) localStorage.setItem("revv_refresh_token", refresh);
+  if (rider) localStorage.setItem("revv_rider_id", rider);
+  if (user) localStorage.setItem("revv_username", user);
 }
 
 export function clearSavedSession(): void {
@@ -556,6 +603,36 @@ export function clearSavedSession(): void {
   localStorage.removeItem("revv_access_token");
   localStorage.removeItem("revv_refresh_token");
   localStorage.removeItem("revv_rider_id");
+  localStorage.removeItem("revv_username");
+}
+
+export function checkUrlForAuthTokens(): {
+  token: string | null;
+  refreshToken: string | null;
+  username: string | null;
+} {
+  if (typeof window === "undefined") {
+    return { token: null, refreshToken: null, username: null };
+  }
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("access_token") || params.get("token");
+  const refreshToken = params.get("refresh_token");
+  const username = params.get("username") || params.get("rider_id");
+
+  if (token) {
+    saveAuthSession(token, refreshToken, username);
+    params.delete("access_token");
+    params.delete("token");
+    params.delete("refresh_token");
+    params.delete("username");
+    params.delete("rider_id");
+    const newSearch = params.toString();
+    const newUrl =
+      window.location.pathname + (newSearch ? `?${newSearch}` : "") + window.location.hash;
+    window.history.replaceState({}, "", newUrl);
+    return { token, refreshToken, username };
+  }
+  return { token: null, refreshToken: null, username: null };
 }
 
 async function tryRefreshSession(): Promise<string | null> {
@@ -696,7 +773,101 @@ export async function fetchMasterMotorcycles(): Promise<MasterMotorcycleItem[]> 
  * Rider Portal APIs (Authenticated)
  */
 export async function fetchMyProfile(): Promise<RiderProfile> {
-  return authRequest<RiderProfile>("/me");
+  const profile = await authRequest<RiderProfile>("/me");
+  if (typeof window !== "undefined" && profile.username) {
+    localStorage.setItem("revv_username", profile.username);
+    localStorage.setItem("revv_rider_id", profile.username);
+  }
+  return profile;
+}
+
+export interface PublicProfileGarageItem {
+  id: string;
+  brand_name: string;
+  series_name: string;
+  nickname: string | null;
+  category: string | null;
+  transmission: string | null;
+  image_path: string | null;
+  plate_number: string | null;
+  manufacture_year: number | null;
+  engine_capacity_cc: number | null;
+  current_mileage: number;
+  is_primary: boolean;
+}
+
+export interface PublicProfileResponse {
+  id: string;
+  username: string;
+  noreg: string | null;
+  first_name: string | null;
+  middle_name: string | null;
+  last_name: string | null;
+  avatar_url: string | null;
+  banner_url: string | null;
+  bio: string | null;
+  city: string | null;
+  job: string | null;
+  account_visibility: "PUBLIC" | "PRIVATE";
+  is_friend: boolean;
+  has_pending_request: boolean;
+  is_private: boolean;
+  motorcycle_count: number | null;
+  garage: PublicProfileGarageItem[] | null;
+  posts: FeedPostItem[] | null;
+}
+
+export async function fetchPublicProfile(
+  identifier: string,
+): Promise<PublicProfileResponse> {
+  const session = getSavedSession();
+  if (session.token) {
+    try {
+      return await authRequest<PublicProfileResponse>(
+        `/users/${encodeURIComponent(identifier)}/profile`,
+      );
+    } catch {
+      // fallback to unauthenticated public request
+    }
+  }
+  const baseUrl = getApiBaseUrl();
+  const res = await fetch(
+    `${baseUrl}/users/${encodeURIComponent(identifier)}/profile`,
+    {
+      headers: { Accept: "application/json" },
+    },
+  );
+  if (!res.ok) {
+    throw new AuthApiError(`Rider profile not found (${res.status})`, res.status);
+  }
+  const body = await res.json().catch(() => null);
+  return body?.data ?? body;
+}
+
+export async function sendFriendRequest(
+  friendId: string,
+): Promise<{ status: string }> {
+  return authRequest<{ status: string }>("/friends/request", {
+    method: "POST",
+    body: JSON.stringify({ friend_id: friendId }),
+  });
+}
+
+export async function cancelFriendRequest(
+  friendIdOrRequestId: string,
+): Promise<void> {
+  await authRequest<unknown>(
+    `/friends/requests/${encodeURIComponent(friendIdOrRequestId)}/cancel`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export async function unfriendRider(friendId: string): Promise<void> {
+  await authRequest<unknown>(`/friends/${encodeURIComponent(friendId)}`, {
+    method: "DELETE",
+  });
 }
 
 export async function updateMyProfile(payload: {

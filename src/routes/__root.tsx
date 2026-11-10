@@ -11,6 +11,8 @@ import {
 import { type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import { AuthProvider } from "../lib/auth-context";
+import { AppShellLayout } from "../components/revv/app-shell-layout";
 
 function NotFoundComponent() {
   return (
@@ -195,7 +197,11 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <AuthProvider>
+        <AppShellLayout>
+          <Outlet />
+        </AppShellLayout>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
