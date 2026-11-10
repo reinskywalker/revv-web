@@ -275,6 +275,23 @@ export function getApiBaseUrl(): string {
   return "http://localhost:8000/api/v1";
 }
 
+export function resolveMediaUrl(path?: string | null): string | null {
+  if (!path) return null;
+  const trimmed = path.trim();
+  if (!trimmed) return null;
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("blob:")
+  ) {
+    return trimmed;
+  }
+  const origin = getApiBaseUrl().replace(/\/api\/v1\/?$/, "");
+  const normalized = trimmed.startsWith("/") ? trimmed : `/uploads/${trimmed}`;
+  return `${origin}${normalized}`;
+}
+
 /**
  * Fetch news articles from revv-backend /api/v1/news
  */
@@ -961,11 +978,57 @@ export async function updateMyProfile(payload: {
   bio?: string;
   city?: string;
   job?: string;
+  avatar_url?: string;
+  banner_url?: string;
   account_visibility?: string;
 }): Promise<RiderProfile> {
   return authRequest<RiderProfile>("/me", {
     method: "PATCH",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function checkUsernameAvailability(username: string): Promise<{
+  available: boolean;
+  reason?: string | null;
+  message?: string;
+}> {
+  const clean = username.trim();
+  if (!clean) {
+    return { available: false, reason: "invalid", message: "Username is required" };
+  }
+  try {
+    const res = await fetch(
+      `${getApiBaseUrl()}/users/check-username?u=${encodeURIComponent(clean)}`,
+      { headers: { Accept: "application/json" } },
+    );
+    const body = await res.json().catch(() => null);
+    const data = body?.data ?? body;
+    return {
+      available: Boolean(data?.available),
+      reason: data?.reason ?? null,
+      message: data?.message,
+    };
+  } catch {
+    return { available: true };
+  }
+}
+
+export async function uploadProfileAvatar(file: File): Promise<{ url: string; path: string }> {
+  const form = new FormData();
+  form.append("image", file);
+  return authRequest<{ url: string; path: string }>("/me/avatar", {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function uploadProfileBanner(file: File): Promise<{ url: string; path: string }> {
+  const form = new FormData();
+  form.append("image", file);
+  return authRequest<{ url: string; path: string }>("/me/banner", {
+    method: "POST",
+    body: form,
   });
 }
 

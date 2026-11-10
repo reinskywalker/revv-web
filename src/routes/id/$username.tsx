@@ -1,30 +1,34 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  Calendar,
+  Camera,
   Check,
   Edit3,
   Gauge,
   Globe,
   Heart,
   Hourglass,
+  ImagePlus,
+  Loader2,
   Lock,
   MapPin,
   MessageSquare,
   ShieldAlert,
-  ShieldCheck,
-  UserCheck,
   UserPlus,
   UserX,
   Wrench,
 } from "lucide-react";
 import {
   cancelFriendRequest,
+  checkUsernameAvailability,
   fetchMyProfile,
   fetchPublicProfile,
+  resolveMediaUrl,
   sendFriendRequest,
   unfriendRider,
   updateMyProfile,
+  uploadProfileAvatar,
+  uploadProfileBanner,
   type PublicProfileResponse,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -46,13 +50,21 @@ function ProfilePage() {
 
   // Edit profile state (for self)
   const [isEditing, setIsEditing] = useState(false);
+  const [editUsername, setEditUsername] = useState("");
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
   const [editFirstName, setEditFirstName] = useState("");
+  const [editMiddleName, setEditMiddleName] = useState("");
   const [editLastName, setEditLastName] = useState("");
   const [editCity, setEditCity] = useState("");
   const [editJob, setEditJob] = useState("");
   const [editBio, setEditBio] = useState("");
   const [editVisibility, setEditVisibility] = useState("PUBLIC");
   const [isSaving, setIsSaving] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   const isSelf =
     username === "me" ||
@@ -66,7 +78,9 @@ function ProfilePage() {
       const data = await fetchPublicProfile(username);
       setProfile(data);
       if (isSelf) {
+        setEditUsername(data.username || "");
         setEditFirstName(data.first_name || "");
+        setEditMiddleName(data.middle_name || "");
         setEditLastName(data.last_name || "");
         setEditCity(data.city || "");
         setEditJob(data.job || "");
@@ -89,7 +103,7 @@ function ProfilePage() {
             bio: myProf.bio || null,
             city: myProf.city || null,
             job: myProf.job || null,
-            account_visibility: myProf.account_visibility || "PUBLIC",
+            account_visibility: (myProf.account_visibility as "PUBLIC" | "PRIVATE") || "PUBLIC",
             is_friend: true,
             has_pending_request: false,
             is_private: false,
@@ -97,7 +111,9 @@ function ProfilePage() {
             garage: null,
             posts: null,
           });
+          setEditUsername(myProf.username || "");
           setEditFirstName(myProf.first_name || "");
+          setEditMiddleName(myProf.middle_name || "");
           setEditLastName(myProf.last_name || "");
           setEditCity(myProf.city || "");
           setEditJob(myProf.job || "");
@@ -118,19 +134,65 @@ function ProfilePage() {
     void loadData();
   }, [username]);
 
+  // Debounced username validation when editing
+  useEffect(() => {
+    if (!isEditing || !profile) return;
+    const trimmed = editUsername.trim();
+    const initialUname = (profile.username || "").trim();
+    if (trimmed.toLowerCase() === initialUname.toLowerCase()) {
+      setUsernameError(null);
+      setCheckingUsername(false);
+      return;
+    }
+    if (!/^[a-zA-Z0-9._]{3,20}$/.test(trimmed)) {
+      setUsernameError("3-20 chars: letters, numbers, dot, underscore");
+      setCheckingUsername(false);
+      return;
+    }
+    setCheckingUsername(true);
+    const timer = setTimeout(async () => {
+      const check = await checkUsernameAvailability(trimmed);
+      setCheckingUsername(false);
+      if (!check.available) {
+        setUsernameError(check.message || "Username is already taken");
+      } else {
+        setUsernameError(null);
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [editUsername, isEditing, profile]);
+
+  const isDirty = Boolean(
+    profile &&
+      (editUsername.trim() !== (profile.username || "").trim() ||
+        editFirstName.trim() !== (profile.first_name || "").trim() ||
+        editMiddleName.trim() !== (profile.middle_name || "").trim() ||
+        editLastName.trim() !== (profile.last_name || "").trim() ||
+        editCity.trim() !== (profile.city || "").trim() ||
+        editJob.trim() !== (profile.job || "").trim() ||
+        editBio.trim() !== (profile.bio || "").trim() ||
+        editVisibility !== (profile.account_visibility || "PUBLIC")),
+  );
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isDirty || usernameError || checkingUsername) return;
     setIsSaving(true);
     setActionNotice(null);
     try {
-      await updateMyProfile({
+      const payload: Record<string, string | undefined> = {
         first_name: editFirstName.trim(),
+        middle_name: editMiddleName.trim(),
         last_name: editLastName.trim(),
         city: editCity.trim(),
         job: editJob.trim(),
         bio: editBio.trim(),
         account_visibility: editVisibility,
-      });
+      };
+      if (profile && editUsername.trim() !== (profile.username || "").trim()) {
+        payload.username = editUsername.trim();
+      }
+      await updateMyProfile(payload);
       setIsEditing(false);
       setActionNotice("Profile updated successfully");
       await refreshUser();
@@ -139,6 +201,42 @@ function ProfilePage() {
       setActionNotice(err?.message || "Failed to update profile");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleBannerFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadingBanner(true);
+    setActionNotice(null);
+    try {
+      await uploadProfileBanner(file);
+      setActionNotice("Profile banner updated & synced!");
+      await refreshUser();
+      await loadData();
+    } catch (err: any) {
+      setActionNotice(err?.message || "Could not upload banner image");
+    } finally {
+      setUploadingBanner(false);
+    }
+  };
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadingAvatar(true);
+    setActionNotice(null);
+    try {
+      await uploadProfileAvatar(file);
+      setActionNotice("Profile photo updated & synced!");
+      await refreshUser();
+      await loadData();
+    } catch (err: any) {
+      setActionNotice(err?.message || "Could not upload profile photo");
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
@@ -214,9 +312,30 @@ function ProfilePage() {
       .filter(Boolean)
       .join(" ")
       .trim() || profile.username;
+  const resolvedBannerUrl = resolveMediaUrl(profile.banner_url);
+  const resolvedAvatarUrl = resolveMediaUrl(profile.avatar_url);
 
   return (
     <div className="mx-auto max-w-5xl p-4 sm:p-8 space-y-8 animate-fade-in">
+      {isSelf && (
+        <>
+          <input
+            ref={bannerInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleBannerFileChange}
+          />
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleAvatarFileChange}
+          />
+        </>
+      )}
+
       {/* Action Notification Alert */}
       {actionNotice && (
         <div className="flex items-center justify-between rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 font-mono text-xs text-primary">
@@ -234,15 +353,43 @@ function ProfilePage() {
       {/* Profile Header Card */}
       <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
         {/* Banner */}
-        <div className="h-44 sm:h-52 w-full bg-gradient-to-r from-neutral-950 via-secondary/40 to-neutral-900 border-b border-border/80 relative">
-          <div className="absolute inset-0 bg-[radial-gradient(#2D3843_1px,transparent_1px)] [background-size:16px_16px] opacity-40" />
+        <div className="h-44 sm:h-52 w-full bg-gradient-to-r from-neutral-950 via-secondary/40 to-neutral-900 border-b border-border/80 relative overflow-hidden">
+          {resolvedBannerUrl ? (
+            <>
+              <img
+                src={resolvedBannerUrl}
+                alt={`${displayName} cover banner`}
+                className="size-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/30" />
+            </>
+          ) : (
+            <div className="absolute inset-0 bg-[radial-gradient(#2D3843_1px,transparent_1px)] [background-size:16px_16px] opacity-40" />
+          )}
+
+          {isSelf && (
+            <button
+              type="button"
+              disabled={uploadingBanner}
+              onClick={() => bannerInputRef.current?.click()}
+              className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/60 backdrop-blur-md px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-white hover:bg-black/80 transition disabled:opacity-50"
+            >
+              {uploadingBanner ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <ImagePlus className="size-3 text-primary" />
+              )}
+              {uploadingBanner ? "Uploading..." : "Change Banner"}
+            </button>
+          )}
+
           <div className="absolute top-4 right-4 flex items-center gap-2">
             <span
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-wider border",
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-wider border backdrop-blur-sm",
                 profile.account_visibility === "PUBLIC"
-                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
-                  : "border-amber-500/40 bg-amber-500/10 text-amber-400",
+                  ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
+                  : "border-amber-500/40 bg-amber-500/15 text-amber-400",
               )}
             >
               {profile.account_visibility === "PUBLIC" ? (
@@ -263,15 +410,30 @@ function ProfilePage() {
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 -mt-16 sm:-mt-20">
             {/* Avatar & Identifiers */}
             <div className="flex items-end gap-4">
-              <div className="relative size-24 sm:size-32 rounded-2xl border-4 border-card bg-secondary/80 shadow-2xl flex items-center justify-center overflow-hidden font-display text-4xl font-black text-primary">
-                {profile.avatar_url ? (
+              <div
+                onClick={isSelf ? () => avatarInputRef.current?.click() : undefined}
+                className={cn(
+                  "group relative size-24 sm:size-32 rounded-2xl border-4 border-card bg-secondary/80 shadow-2xl flex items-center justify-center overflow-hidden font-display text-4xl font-black text-primary",
+                  isSelf && "cursor-pointer",
+                )}
+              >
+                {resolvedAvatarUrl ? (
                   <img
-                    src={profile.avatar_url}
+                    src={resolvedAvatarUrl}
                     alt={displayName}
                     className="size-full object-cover"
                   />
                 ) : (
                   profile.username.charAt(0).toUpperCase()
+                )}
+                {isSelf && (
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                    {uploadingAvatar ? (
+                      <Loader2 className="size-6 animate-spin text-white" />
+                    ) : (
+                      <Camera className="size-6 text-white" />
+                    )}
+                  </div>
                 )}
               </div>
               <div className="space-y-1">
@@ -375,6 +537,31 @@ function ProfilePage() {
               Edit Rider Profile Information
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="sm:col-span-2 space-y-1">
+                <label className="font-mono text-muted-foreground uppercase">
+                  Username (@handle)
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={editUsername}
+                    onChange={(e) => setEditUsername(e.target.value)}
+                    placeholder="rider_handle"
+                    className={cn(
+                      "w-full rounded-lg border bg-secondary/50 px-3 py-2 text-foreground focus:outline-none",
+                      usernameError
+                        ? "border-destructive focus:border-destructive"
+                        : "border-border focus:border-primary",
+                    )}
+                  />
+                  {checkingUsername && (
+                    <Loader2 className="size-4 animate-spin text-muted-foreground absolute right-3 top-2.5" />
+                  )}
+                </div>
+                {usernameError && (
+                  <p className="font-mono text-[11px] text-destructive">{usernameError}</p>
+                )}
+              </div>
               <div className="space-y-1">
                 <label className="font-mono text-muted-foreground uppercase">First Name</label>
                 <input
@@ -458,7 +645,7 @@ function ProfilePage() {
               </button>
               <button
                 type="submit"
-                disabled={isSaving}
+                disabled={isSaving || !isDirty || !!usernameError || checkingUsername}
                 className="rounded-lg bg-primary px-5 py-2 font-display text-xs font-bold uppercase tracking-wider text-primary-foreground disabled:opacity-50"
               >
                 {isSaving ? "Saving..." : "Save Changes"}
