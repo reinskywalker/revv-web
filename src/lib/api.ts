@@ -987,3 +987,39 @@ export async function deleteAdminNewsArticle(id: string): Promise<void> {
     method: "DELETE",
   });
 }
+
+export interface BroadcastNotificationItem {
+  id: string;
+  sender_id: string | null;
+  title: string;
+  body: string;
+  target_type: "all" | "user";
+  target_user_id: string | null;
+  data_payload?: Record<string, unknown> | null;
+  sent_count: number;
+  created_at: string;
+}
+
+export interface SendBroadcastNotificationPayload {
+  title: string;
+  body: string;
+  target_type?: "all" | "user";
+  target_user_id?: string;
+  data?: Record<string, unknown>;
+}
+
+export async function fetchAdminBroadcasts(): Promise<BroadcastNotificationItem[]> {
+  return authRequest<BroadcastNotificationItem[]>("/admin/notifications/broadcasts");
+}
+
+export async function sendAdminBroadcast(
+  payload: SendBroadcastNotificationPayload,
+): Promise<{ broadcast_id: string; sent_count: number }> {
+  return authRequest<{ broadcast_id: string; sent_count: number }>(
+    "/admin/notifications/broadcast",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}

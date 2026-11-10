@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
   AtSign,
+  Bell,
   Check,
   Database,
   FileText,
@@ -14,6 +15,7 @@ import {
   MessageCircle,
   MessageSquare,
   Plus,
+  Radio,
   RefreshCw,
   Send,
   ShieldAlert,
@@ -31,6 +33,7 @@ import {
   type AdminUserItem,
   AuthApiError,
   type BetaRegistrationRow,
+  type BroadcastNotificationItem,
   clearSavedSession,
   createAdminBrand,
   createAdminComponent,
@@ -48,6 +51,7 @@ import {
   deleteFeedPost,
   deleteGarageMotorcycle,
   fetchAdminBrands,
+  fetchAdminBroadcasts,
   fetchAdminComponents,
   fetchAdminDashboard,
   fetchAdminMotorcycles,
@@ -70,6 +74,7 @@ import {
   type PostCommentItem,
   requestOtp,
   type RiderProfile,
+  sendAdminBroadcast,
   signInWithOtp,
   unlikeFeedPost,
   updateAdminUser,
@@ -104,7 +109,7 @@ export const Route = createFileRoute("/login")({
 
 type Step = "identifier" | "otp" | "verifying" | "success";
 type RiderTab = "profile" | "garage" | "feed" | "admin";
-type AdminSubTab = "overview" | "registrations" | "users" | "master" | "news";
+type AdminSubTab = "overview" | "registrations" | "users" | "master" | "news" | "broadcast";
 
 const OTP_LENGTH = 6;
 
@@ -172,6 +177,7 @@ function LoginPage() {
   const [adminMotorcycles, setAdminMotorcycles] = useState<MasterMotorcycleItem[]>([]);
   const [adminComponents, setAdminComponents] = useState<MasterComponentItem[]>([]);
   const [adminNews, setAdminNews] = useState<NewsArticle[]>([]);
+  const [adminBroadcasts, setAdminBroadcasts] = useState<BroadcastNotificationItem[]>([]);
 
   // Admin creation inputs
   const [newBrandName, setNewBrandName] = useState("");
@@ -188,6 +194,15 @@ function LoginPage() {
   const [newNewsCategory, setNewNewsCategory] = useState("PRODUCT");
   const [newNewsSummary, setNewNewsSummary] = useState("");
   const [newNewsContent, setNewNewsContent] = useState("");
+
+  // Broadcast Notification inputs
+  const [broadcastTitle, setBroadcastTitle] = useState("");
+  const [broadcastBody, setBroadcastBody] = useState("");
+  const [broadcastTargetType, setBroadcastTargetType] = useState<"all" | "user">("all");
+  const [broadcastTargetUserId, setBroadcastTargetUserId] = useState("");
+  const [broadcastDeepLink, setBroadcastDeepLink] = useState("/rides");
+  const [broadcastIsSending, setBroadcastIsSending] = useState(false);
+  const [broadcastNotice, setBroadcastNotice] = useState<string | null>(null);
 
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -218,7 +233,7 @@ function LoginPage() {
       setEditVisibility(prof.account_visibility || "PUBLIC");
 
       if (prof.role?.toLowerCase() === "administrator") {
-        const [stats, users, regs, brands, motos, comps, newsRes] = await Promise.all([
+        const [stats, users, regs, brands, motos, comps, newsRes, broadcasts] = await Promise.all([
           fetchAdminDashboard().catch(() => null),
           fetchAdminUsers().catch(() => []),
           fetchBetaRegistrations().catch(() => []),
@@ -226,6 +241,7 @@ function LoginPage() {
           fetchAdminMotorcycles().catch(() => []),
           fetchAdminComponents().catch(() => []),
           fetchNewsArticles({ limit: 50 }).catch(() => ({ articles: [], fromFallback: false })),
+          fetchAdminBroadcasts().catch(() => []),
         ]);
         setAdminStats(stats);
         setAdminUsers(users);
@@ -234,6 +250,7 @@ function LoginPage() {
         setAdminMotorcycles(motos);
         setAdminComponents(comps);
         setAdminNews(newsRes.articles);
+        setAdminBroadcasts(broadcasts);
         if (brands.length > 0 && !newMotoBrandId) {
           setNewMotoBrandId(String(brands[0].id));
         }
@@ -1425,6 +1442,7 @@ function LoginPage() {
                       ["users", `Users & RBAC (${adminUsers.length})`, Users],
                       ["master", "Master Data CRUD", Database],
                       ["news", `News CMS (${adminNews.length})`, FileText],
+                      ["broadcast", `Push Broadcast (${adminBroadcasts.length})`, Bell],
                     ] as const
                   ).map(([key, label, Icon]) => (
                     <button
@@ -2027,6 +2045,315 @@ function LoginPage() {
                           </button>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Admin Subtab: Broadcast Push Notifications CMS */}
+                {adminSubTab === "broadcast" && (
+                  <div className="space-y-6">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        <h3 className="font-display text-xl font-bold tracking-tight">
+                          Push Notification Broadcast CMS
+                        </h3>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Broadcast push notifications to all REVV mobile app riders or target specific users via Firebase Cloud Messaging & Realtime SSE.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setAdminBroadcasts(await fetchAdminBroadcasts().catch(() => []));
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-1.5 font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground transition hover:text-foreground"
+                      >
+                        <RefreshCw className="size-3.5" />
+                        Refresh Logs
+                      </button>
+                    </div>
+
+                    {broadcastNotice && (
+                      <div className="flex items-center justify-between rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-xs font-medium text-primary">
+                        <span>{broadcastNotice}</span>
+                        <button
+                          type="button"
+                          onClick={() => setBroadcastNotice(null)}
+                          className="font-mono text-xs uppercase hover:underline"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="grid gap-6 lg:grid-cols-12">
+                      {/* Composer Column */}
+                      <div className="space-y-4 rounded-xl border border-border bg-card/60 p-5 lg:col-span-7">
+                        <h4 className="flex items-center gap-2 font-display text-base font-bold uppercase tracking-wider text-foreground">
+                          <Radio className="size-4 text-primary" />
+                          Compose Push Notification
+                        </h4>
+
+                        <div className="space-y-2">
+                          <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            Target Audience
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBroadcastTargetType("all");
+                                setBroadcastTargetUserId("");
+                              }}
+                              className={cn(
+                                "flex items-center justify-center gap-2 rounded-lg border p-2.5 font-mono text-xs font-semibold uppercase tracking-wider transition-colors",
+                                broadcastTargetType === "all"
+                                  ? "border-primary bg-primary/20 text-primary"
+                                  : "border-border bg-secondary/30 text-muted-foreground hover:text-foreground",
+                              )}
+                            >
+                              <Users className="size-4" />
+                              All Active Riders
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBroadcastTargetType("user");
+                                if (adminUsers.length > 0 && !broadcastTargetUserId) {
+                                  setBroadcastTargetUserId(adminUsers[0].id);
+                                }
+                              }}
+                              className={cn(
+                                "flex items-center justify-center gap-2 rounded-lg border p-2.5 font-mono text-xs font-semibold uppercase tracking-wider transition-colors",
+                                broadcastTargetType === "user"
+                                  ? "border-primary bg-primary/20 text-primary"
+                                  : "border-border bg-secondary/30 text-muted-foreground hover:text-foreground",
+                              )}
+                            >
+                              <AtSign className="size-4" />
+                              Targeted Rider
+                            </button>
+                          </div>
+                        </div>
+
+                        {broadcastTargetType === "user" && (
+                          <div className="space-y-2">
+                            <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                              Select Target Rider
+                            </label>
+                            <select
+                              value={broadcastTargetUserId}
+                              onChange={(e) => setBroadcastTargetUserId(e.target.value)}
+                              className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none"
+                            >
+                              <option value="">-- Choose Rider --</option>
+                              {adminUsers.map((u) => (
+                                <option key={u.id} value={u.id}>
+                                  @{u.username} — {u.first_name} {u.last_name} ({u.role})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        <div className="space-y-2">
+                          <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            Notification Title
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Touring Akbar REVV 2026"
+                            value={broadcastTitle}
+                            onChange={(e) => setBroadcastTitle(e.target.value)}
+                            maxLength={100}
+                            className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            Message Body
+                          </label>
+                          <textarea
+                            placeholder="Tulis pesan notifikasi lengkap yang akan muncul di notification drawer mobile..."
+                            value={broadcastBody}
+                            onChange={(e) => setBroadcastBody(e.target.value)}
+                            rows={3}
+                            maxLength={500}
+                            className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
+                          />
+                          <p className="text-right font-mono text-[10px] text-muted-foreground">
+                            {broadcastBody.length} / 500
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            In-App Deep Link / Route (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. /rides, /news, /garage"
+                            value={broadcastDeepLink}
+                            onChange={(e) => setBroadcastDeepLink(e.target.value)}
+                            className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={broadcastIsSending || !broadcastTitle.trim() || !broadcastBody.trim()}
+                          onClick={async () => {
+                            if (!broadcastTitle.trim() || !broadcastBody.trim()) return;
+                            if (broadcastTargetType === "user" && !broadcastTargetUserId) {
+                              setBroadcastNotice("Please choose a target rider.");
+                              return;
+                            }
+                            setBroadcastIsSending(true);
+                            setBroadcastNotice(null);
+                            try {
+                              const res = await sendAdminBroadcast({
+                                title: broadcastTitle.trim(),
+                                body: broadcastBody.trim(),
+                                target_type: broadcastTargetType,
+                                target_user_id: broadcastTargetType === "user" ? broadcastTargetUserId : undefined,
+                                data: { link: broadcastDeepLink.trim(), type: "admin_broadcast" },
+                              });
+                              setBroadcastNotice(
+                                `Push notification dispatched successfully (${res.sent_count} device targets).`,
+                              );
+                              setBroadcastTitle("");
+                              setBroadcastBody("");
+                              setAdminBroadcasts(await fetchAdminBroadcasts().catch(() => []));
+                            } catch (err) {
+                              setBroadcastNotice(
+                                err instanceof Error ? err.message : "Failed to dispatch notification",
+                              );
+                            } finally {
+                              setBroadcastIsSending(false);
+                            }
+                          }}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-primary-foreground shadow transition hover:bg-primary/90 disabled:opacity-50"
+                        >
+                          {broadcastIsSending ? (
+                            <>
+                              <Loader2 className="size-4 animate-spin" />
+                              Dispatching Push Broadcast...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="size-4" />
+                              Dispatch Push Notification
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Live Preview Column */}
+                      <div className="space-y-4 rounded-xl border border-border bg-card/60 p-5 lg:col-span-5">
+                        <h4 className="flex items-center gap-2 font-display text-base font-bold uppercase tracking-wider text-foreground">
+                          <Bell className="size-4 text-primary" />
+                          Live Device Push Preview
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                          Real-time rendering of how riders will experience this alert in the mobile notification drawer:
+                        </p>
+
+                        <div className="rounded-xl border border-border/80 bg-neutral-950 p-4 shadow-xl">
+                          <div className="flex items-start gap-3">
+                            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary font-display text-sm font-extrabold text-primary-foreground">
+                              R
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between">
+                                <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                                  REVV • Just now
+                                </span>
+                                <span className="rounded bg-primary/20 px-1.5 py-0.5 font-mono text-[9px] font-bold text-primary">
+                                  {broadcastTargetType === "all" ? "BROADCAST" : "TARGETED"}
+                                </span>
+                              </div>
+                              <h5 className="mt-1 truncate font-display text-sm font-bold text-foreground">
+                                {broadcastTitle.trim() || "Notification Title Here"}
+                              </h5>
+                              <p className="mt-0.5 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+                                {broadcastBody.trim() ||
+                                  "Notification message body preview will dynamically render here as you compose..."}
+                              </p>
+                              {broadcastDeepLink && (
+                                <div className="mt-2 inline-flex items-center gap-1 rounded bg-secondary/80 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                                  <span>Route:</span>
+                                  <span className="text-primary">{broadcastDeepLink}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-border bg-secondary/20 p-3.5 space-y-2 text-xs">
+                          <div className="flex items-center justify-between font-mono text-[11px]">
+                            <span className="text-muted-foreground">Delivery Pipeline:</span>
+                            <span className="font-bold text-foreground">Firebase FCM + SSE</span>
+                          </div>
+                          <div className="flex items-center justify-between font-mono text-[11px]">
+                            <span className="text-muted-foreground">In-App Notification Inbox:</span>
+                            <span className="text-emerald-400 font-semibold">Active & Persistent</span>
+                          </div>
+                          <div className="flex items-center justify-between font-mono text-[11px]">
+                            <span className="text-muted-foreground">Foreground Toast Banner:</span>
+                            <span className="text-emerald-400 font-semibold">Real-time Pop-up</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* History Audit Table */}
+                    <div className="rounded-xl border border-border bg-card/60 p-5 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-display text-base font-bold uppercase tracking-wider text-foreground">
+                          Broadcast Audit History ({adminBroadcasts.length})
+                        </h4>
+                      </div>
+
+                      {adminBroadcasts.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
+                          No broadcast notifications sent yet. Use the composer above to dispatch an alert.
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+                          {adminBroadcasts.map((b) => (
+                            <div
+                              key={b.id}
+                              className="flex flex-col gap-2 p-4 transition-colors hover:bg-secondary/20 md:flex-row md:items-center md:justify-between"
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={cn(
+                                      "rounded px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider",
+                                      b.target_type === "all"
+                                        ? "bg-primary/20 text-primary border border-primary/40"
+                                        : "bg-amber-500/20 text-amber-400 border border-amber-500/40",
+                                    )}
+                                  >
+                                    {b.target_type === "all" ? "All Riders" : "Targeted Rider"}
+                                  </span>
+                                  <h5 className="font-display text-sm font-bold text-foreground">{b.title}</h5>
+                                </div>
+                                <p className="text-xs text-muted-foreground line-clamp-2">{b.body}</p>
+                              </div>
+                              <div className="flex shrink-0 items-center gap-4 font-mono text-[11px] text-muted-foreground">
+                                <div className="text-right">
+                                  <div className="font-bold text-foreground">
+                                    {b.sent_count} device{b.sent_count === 1 ? "" : "s"}
+                                  </div>
+                                  <div>{new Date(b.created_at).toLocaleString()}</div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
