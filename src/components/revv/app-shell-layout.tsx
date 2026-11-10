@@ -27,6 +27,12 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
 
+  // The left navigation sidebar is ONLY visible when the user is logged in.
+  // When logged out, render in standard full-screen public layout.
+  if (!isAuthenticated) {
+    return <div className="min-h-screen bg-background text-foreground antialiased">{children}</div>;
+  }
+
   const isAdministrator =
     user?.role?.toLowerCase() === "administrator" ||
     user?.role?.toLowerCase() === "moderator";
@@ -72,6 +78,10 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
   ];
 
   const currentPath = location.pathname;
+  const isDashboardPage =
+    currentPath.startsWith("/id") ||
+    currentPath === "/garage" ||
+    currentPath === "/admin";
 
   return (
     <div className="min-h-screen bg-background text-foreground antialiased flex flex-col md:flex-row">
@@ -310,7 +320,9 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
 
       {/* Main Content Area with Smooth Route Fade-in */}
       <main className="flex-1 min-w-0 overflow-y-auto">
-        <div className="animate-fade-in">{children}</div>
+        <div className={cn("animate-fade-in", isDashboardPage && "p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto")}>
+          {children}
+        </div>
       </main>
     </div>
   );

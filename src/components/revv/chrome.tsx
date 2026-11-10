@@ -1,10 +1,18 @@
 import { Link } from "@tanstack/react-router";
 import { Wordmark } from "./wordmark";
+import { useAuth } from "@/lib/auth-context";
 
 const navLinkClass =
   "font-mono text-sm uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:text-foreground";
 
 export function SiteHeader() {
+  const { isAuthenticated } = useAuth();
+
+  // If user is authenticated, the left cockpit sidebar handles navigation.
+  if (isAuthenticated) {
+    return null;
+  }
+
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
