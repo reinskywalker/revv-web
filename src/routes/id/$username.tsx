@@ -17,6 +17,7 @@ import {
   UserPlus,
   UserX,
   Wrench,
+  X,
 } from "lucide-react";
 import {
   cancelFriendRequest,
@@ -31,6 +32,7 @@ import {
   uploadProfileBanner,
   type PublicProfileResponse,
 } from "@/lib/api";
+import { compressImageToTarget } from "@/lib/image-compress";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +49,7 @@ function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"garage" | "posts">("garage");
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
   // Edit profile state (for self)
   const [isEditing, setIsEditing] = useState(false);
@@ -211,7 +214,8 @@ function ProfilePage() {
     setUploadingBanner(true);
     setActionNotice(null);
     try {
-      await uploadProfileBanner(file);
+      const compressed = await compressImageToTarget(file);
+      await uploadProfileBanner(compressed);
       setActionNotice("Profile banner updated & synced!");
       await refreshUser();
       await loadData();
@@ -229,7 +233,8 @@ function ProfilePage() {
     setUploadingAvatar(true);
     setActionNotice(null);
     try {
-      await uploadProfileAvatar(file);
+      const compressed = await compressImageToTarget(file);
+      await uploadProfileAvatar(compressed);
       setActionNotice("Profile photo updated & synced!");
       await refreshUser();
       await loadData();
@@ -353,7 +358,16 @@ function ProfilePage() {
       {/* Profile Header Card */}
       <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
         {/* Banner */}
-        <div className="h-44 sm:h-52 w-full bg-gradient-to-r from-neutral-950 via-secondary/40 to-neutral-900 border-b border-border/80 relative overflow-hidden">
+        <div
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest("button")) return;
+            if (resolvedBannerUrl) setPreviewImage({ url: resolvedBannerUrl, title: `${displayName} Cover Banner` });
+          }}
+          className={cn(
+            "h-44 sm:h-52 w-full bg-gradient-to-r from-neutral-950 via-secondary/40 to-neutral-900 border-b border-border/80 relative overflow-hidden",
+            resolvedBannerUrl && "cursor-pointer",
+          )}
+        >
           {resolvedBannerUrl ? (
             <>
               <img
@@ -411,10 +425,15 @@ function ProfilePage() {
             {/* Avatar & Identifiers */}
             <div className="flex items-end gap-4">
               <div
-                onClick={isSelf ? () => avatarInputRef.current?.click() : undefined}
+                onClick={() => {
+                  if (resolvedAvatarUrl) {
+                    setPreviewImage({ url: resolvedAvatarUrl, title: `${displayName} Profile Photo` });
+                  } else if (isSelf) {
+                    avatarInputRef.current?.click();
+                  }
+                }}
                 className={cn(
-                  "group relative size-24 sm:size-32 rounded-2xl border-4 border-card bg-secondary/80 shadow-2xl flex items-center justify-center overflow-hidden font-display text-4xl font-black text-primary",
-                  isSelf && "cursor-pointer",
+                  "group relative size-24 sm:size-32 rounded-2xl border-4 border-card bg-secondary/80 shadow-2xl flex items-center justify-center overflow-hidden font-display text-4xl font-black text-primary cursor-pointer",
                 )}
               >
                 {resolvedAvatarUrl ? (
@@ -427,13 +446,21 @@ function ProfilePage() {
                   profile.username.charAt(0).toUpperCase()
                 )}
                 {isSelf && (
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                  <button
+                    type="button"
+                    title="Change Profile Photo"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      avatarInputRef.current?.click();
+                    }}
+                    className="absolute bottom-1 right-1 p-1.5 rounded-full bg-black/70 hover:bg-black text-white transition border border-white/20"
+                  >
                     {uploadingAvatar ? (
-                      <Loader2 className="size-6 animate-spin text-white" />
+                      <Loader2 className="size-3.5 animate-spin text-white" />
                     ) : (
-                      <Camera className="size-6 text-white" />
+                      <Camera className="size-3.5 text-white" />
                     )}
-                  </div>
+                  </button>
                 )}
               </div>
               <div className="space-y-1">
@@ -809,6 +836,36 @@ function ProfilePage() {
               )}
             </div>
           )}
+        </div>
+      )}
+      {/* Fullscreen Lightbox Image Preview */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex items-center justify-between pb-3 text-white">
+              <span className="font-mono text-xs uppercase tracking-wider font-bold bg-white/10 px-3 py-1 rounded-full">
+                {previewImage.title}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="p-1 rounded-full bg-white/10 hover:bg-white/20 transition text-white"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            <img
+              src={previewImage.url}
+              alt={previewImage.title}
+              className="max-h-[80vh] max-w-full rounded-xl object-contain shadow-2xl border border-white/10"
+            />
+          </div>
         </div>
       )}
     </div>

@@ -53,6 +53,29 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 
+function formatRelativeTime(dateInput: string | Date | number): string {
+  const d = new Date(dateInput);
+  const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (diffSec < 10) return "just now";
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}h ago`;
+  const diffDays = Math.floor(diffHour / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) {
+    const w = Math.floor(diffDays / 7);
+    return `${w} ${w === 1 ? "week" : "weeks"} ago`;
+  }
+  if (diffDays < 365) {
+    const m = Math.floor(diffDays / 30);
+    return `${m} ${m === 1 ? "month" : "months"} ago`;
+  }
+  const y = Math.floor(diffDays / 365);
+  return `${y} ${y === 1 ? "year" : "years"} ago`;
+}
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -233,13 +256,14 @@ function AuthenticatedHome({ user }: { user: any }) {
   };
 
   const handleToggleLike = async (post: FeedPostItem) => {
-    const isLiked = post.viewer_has_liked;
+    const isLiked = post.is_liked_by_me ?? (post as any).viewer_has_liked ?? false;
     // Optimistic update
     setPosts((prev) =>
       prev.map((p) =>
         p.id === post.id
           ? {
               ...p,
+              is_liked_by_me: !isLiked,
               viewer_has_liked: !isLiked,
               like_count: isLiked ? Math.max(0, p.like_count - 1) : p.like_count + 1,
             }
@@ -248,11 +272,22 @@ function AuthenticatedHome({ user }: { user: any }) {
     );
 
     try {
-      if (isLiked) {
-        await unlikeFeedPost(post.id);
-      } else {
-        await likeFeedPost(post.id);
-      }
+      const res = isLiked
+        ? await unlikeFeedPost(post.id)
+        : await likeFeedPost(post.id);
+      // Sync authoritative state from backend
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === post.id
+            ? {
+                ...p,
+                is_liked_by_me: res.liked,
+                viewer_has_liked: res.liked,
+                like_count: res.like_count,
+              }
+            : p,
+        ),
+      );
     } catch {
       void loadFeed();
     }
@@ -532,7 +567,7 @@ function AuthenticatedHome({ user }: { user: any }) {
                       onClick={() => handleToggleLike(post)}
                       className={cn(
                         "flex items-center gap-1.5 transition-colors",
-                        post.viewer_has_liked
+                        (post.is_liked_by_me || post.viewer_has_liked)
                           ? "text-rose-500 font-bold"
                           : "hover:text-foreground",
                       )}
@@ -540,7 +575,7 @@ function AuthenticatedHome({ user }: { user: any }) {
                       <Heart
                         className={cn(
                           "size-4",
-                          post.viewer_has_liked && "fill-rose-500",
+                          (post.is_liked_by_me || post.viewer_has_liked) && "fill-rose-500",
                         )}
                       />
                       <span>{post.like_count}</span>
@@ -573,10 +608,12 @@ function AuthenticatedHome({ user }: { user: any }) {
                                 @{c.author_username}
                               </Link>
                               <span className="font-mono text-[10px] text-muted-foreground">
-                                {new Date(c.created_at).toLocaleDateString()}
+                                {formatRelativeTime(c.created_at)}
                               </span>
                             </div>
-                            <p className="text-muted-foreground font-sans">{c.comment_text}</p>
+                            <p className="text-muted-foreground font-sans">
+                              {c.comment || (c as any).comment_text}
+                            </p>
                           </div>
                         ))}
                       </div>
