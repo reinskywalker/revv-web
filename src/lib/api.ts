@@ -1403,3 +1403,45 @@ export async function sendAdminBroadcast(
     },
   );
 }
+
+export interface WebNotificationItem {
+  id: string;
+  user_id: string;
+  actor_id?: string | null;
+  actor_username?: string | null;
+  actor_avatar_url?: string | null;
+  notif_type: string;
+  title: string;
+  body: string;
+  payload?: Record<string, any> | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export async function fetchMyNotifications(): Promise<WebNotificationItem[]> {
+  return authRequest<WebNotificationItem[]>("/notifications");
+}
+
+export async function markNotificationAsRead(id: string): Promise<void> {
+  await authRequest<unknown>(`/notifications/${encodeURIComponent(id)}/read`, {
+    method: "POST",
+  });
+}
+
+export async function markAllNotificationsAsRead(): Promise<void> {
+  await authRequest<unknown>("/notifications", {
+    method: "PUT",
+  });
+}
+
+export async function deleteNotificationById(id: string): Promise<void> {
+  await authRequest<unknown>(`/notifications/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function clearAllMyNotifications(): Promise<void> {
+  await authRequest<unknown>("/notifications", {
+    method: "DELETE",
+  });
+}
