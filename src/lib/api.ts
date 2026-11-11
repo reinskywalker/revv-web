@@ -890,6 +890,18 @@ export async function searchRiders(query: string): Promise<SocialRiderSearchResu
   return authRequest<SocialRiderSearchResult[]>(`/friends/search?q=${encodeURIComponent(clean)}`);
 }
 
+export function getGoogleOAuthUrl(): string {
+  return `${getApiBaseUrl()}/auth/google`;
+}
+
+export async function deleteProfileAvatar(): Promise<void> {
+  await authRequest("/me/avatar", { method: "DELETE" });
+}
+
+export async function deleteProfileBanner(): Promise<void> {
+  await authRequest("/me/banner", { method: "DELETE" });
+}
+
 export async function fetchPublicProfile(
   identifier: string,
 ): Promise<PublicProfileResponse> {
@@ -898,10 +910,15 @@ export async function fetchPublicProfile(
 
   if (session.token) {
     try {
-      const res = await authRequest<PublicProfileResponse>(
+      const res = await authRequest<any>(
         `/users/${encodeURIComponent(clean)}/profile`,
       );
-      if (res) return res;
+      if (res) {
+        if (!res.garage && res.garage_details) {
+          res.garage = res.garage_details;
+        }
+        return res;
+      }
     } catch {
       // If viewing self and public endpoint fails, fall back to /me
       if (clean === "me" || clean === session.username || clean === session.riderId) {
@@ -941,7 +958,11 @@ export async function fetchPublicProfile(
     throw new AuthApiError(`Rider profile not found (${res.status})`, res.status);
   }
   const body = await res.json().catch(() => null);
-  return body?.data ?? body;
+  const data = body?.data ?? body;
+  if (data && !data.garage && data.garage_details) {
+    data.garage = data.garage_details;
+  }
+  return data;
 }
 
 export async function sendFriendRequest(
