@@ -67,8 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser({
             id: "",
             username,
+            name: username,
             role: "member",
-            status: "Active",
+            is_phone_verified: false,
+            is_email_verified: false,
           });
         }
       }

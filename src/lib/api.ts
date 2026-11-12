@@ -1384,7 +1384,7 @@ export interface SendBroadcastNotificationPayload {
   title: string;
   body: string;
   target_type?: "all" | "user";
-  target_user_id?: string;
+  target_user_id?: string | null | undefined;
   data?: Record<string, unknown>;
 }
 
@@ -1443,5 +1443,94 @@ export async function deleteNotificationById(id: string): Promise<void> {
 export async function clearAllMyNotifications(): Promise<void> {
   await authRequest<unknown>("/notifications", {
     method: "DELETE",
+  });
+}
+
+export interface SystemHealthStatus {
+  status: "ok" | "maintenance";
+  maintenance: boolean;
+  title: string;
+  message: string;
+  icon: string;
+  server_time?: string;
+  isDown?: boolean;
+}
+
+export interface AdminSystemStatusRecord {
+  id: string;
+  is_maintenance: boolean;
+  title: string;
+  message: string;
+  icon: string;
+  updated_by?: string | null;
+  updated_at: string;
+}
+
+export async function fetchSystemHealth(): Promise<SystemHealthStatus> {
+  const baseUrl = getApiBaseUrl();
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(`${baseUrl}/health`, {
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) {
+      if (res.status === 503) {
+        const body = await res.json().catch(() => null);
+        if (body?.data?.maintenance) {
+          return {
+            status: "maintenance",
+            maintenance: true,
+            title: body.data.title || "Under Scheduled Maintenance",
+            message: body.data.message || "REVV is currently undergoing maintenance.",
+            icon: body.data.icon || "wrench",
+          };
+        }
+      }
+      return {
+        status: "maintenance",
+        maintenance: true,
+        isDown: true,
+        title: "Server Offline",
+        message: "Unable to connect to the REVV backend. Please check back shortly.",
+        icon: "cloud_off",
+      };
+    }
+    const data = await res.json();
+    return {
+      status: data.status || "ok",
+      maintenance: Boolean(data.maintenance),
+      title: data.title || "Under Scheduled Maintenance",
+      message: data.message || "REVV is currently undergoing maintenance.",
+      icon: data.icon || "wrench",
+      server_time: data.server_time,
+    };
+  } catch {
+    return {
+      status: "maintenance",
+      maintenance: true,
+      isDown: true,
+      title: "Server Offline",
+      message: "Unable to connect to the REVV backend. Please check back shortly.",
+      icon: "cloud_off",
+    };
+  }
+}
+
+export async function fetchAdminSystemStatus(): Promise<AdminSystemStatusRecord> {
+  return await authRequest<AdminSystemStatusRecord>("/admin/system/status");
+}
+
+export async function updateAdminSystemStatus(payload: {
+  is_maintenance: boolean;
+  title?: string;
+  message?: string;
+  icon?: string;
+}): Promise<AdminSystemStatusRecord> {
+  return await authRequest<AdminSystemStatusRecord>("/admin/system/status", {
+    method: "PUT",
+    body: JSON.stringify(payload),
   });
 }

@@ -1,25 +1,32 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   AtSign,
   Bell,
+  CheckCircle2,
   ChevronRight,
+  CloudOff,
   Database,
   FileText,
   LayoutDashboard,
   Loader2,
+  Power,
   Radio,
   RefreshCw,
   Send,
+  Server,
   ShieldAlert,
   ShieldCheck,
   Smartphone,
   Trash2,
   UserCheck,
   Users,
+  Wrench,
 } from "lucide-react";
 import {
   type AdminDashboardStats,
+  type AdminSystemStatusRecord,
   type AdminUserItem,
   type BetaRegistrationRow,
   type BroadcastNotificationItem,
@@ -38,6 +45,7 @@ import {
   fetchAdminComponents,
   fetchAdminDashboard,
   fetchAdminMotorcycles,
+  fetchAdminSystemStatus,
   fetchAdminUsers,
   fetchBetaRegistrations,
   fetchNewsArticles,
@@ -47,6 +55,7 @@ import {
   type NewsArticle,
   sendAdminBroadcast,
   updateAdminBrand,
+  updateAdminSystemStatus,
   updateAdminUser,
   updateBetaRegistration,
 } from "@/lib/api";
@@ -66,7 +75,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-type AdminSubTab = "overview" | "registrations" | "users" | "master" | "news" | "broadcast";
+type AdminSubTab = "overview" | "registrations" | "users" | "master" | "news" | "broadcast" | "maintenance";
 
 function AdminPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -83,6 +92,16 @@ function AdminPage() {
   const [adminComponents, setAdminComponents] = useState<MasterComponentItem[]>([]);
   const [adminNews, setAdminNews] = useState<NewsArticle[]>([]);
   const [adminBroadcasts, setAdminBroadcasts] = useState<BroadcastNotificationItem[]>([]);
+
+  // Maintenance & System Health state
+  const [systemStatus, setSystemStatus] = useState<AdminSystemStatusRecord | null>(null);
+  const [isMaintenance, setIsMaintenance] = useState(false);
+  const [statusTitle, setStatusTitle] = useState("Under Scheduled Maintenance");
+  const [statusMessage, setStatusMessage] = useState(
+    "Kami sedang melakukan peningkatan performa dan perawatan server REVV. Mohon tunggu beberapa saat."
+  );
+  const [statusIcon, setStatusIcon] = useState("wrench");
+  const [isSavingStatus, setIsSavingStatus] = useState(false);
 
   // Master creation form inputs
   const [newBrandName, setNewBrandName] = useState("");
@@ -116,7 +135,7 @@ function AdminPage() {
   const refreshAllAdminData = async () => {
     try {
       setLoading(true);
-      const [stats, users, betas, brands, motos, comps, newsRes, broadcasts] = await Promise.all([
+      const [stats, users, betas, brands, motos, comps, newsRes, broadcasts, sysStatus] = await Promise.all([
         fetchAdminDashboard().catch(() => null),
         fetchAdminUsers().catch(() => []),
         fetchBetaRegistrations().catch(() => []),
@@ -125,6 +144,7 @@ function AdminPage() {
         fetchAdminComponents().catch(() => []),
         fetchNewsArticles({ limit: 50 }).catch(() => ({ articles: [], total: 0 })),
         fetchAdminBroadcasts().catch(() => []),
+        fetchAdminSystemStatus().catch(() => null),
       ]);
       setAdminStats(stats);
       setAdminUsers(users);
@@ -134,13 +154,46 @@ function AdminPage() {
       setAdminComponents(comps);
       setAdminNews(newsRes.articles);
       setAdminBroadcasts(broadcasts);
-      if (brands.length > 0 && !newMotoBrandId) {
+      if (sysStatus) {
+        setSystemStatus(sysStatus);
+        setIsMaintenance(sysStatus.is_maintenance);
+        setStatusTitle(sysStatus.title);
+        setStatusMessage(sysStatus.message);
+        setStatusIcon(sysStatus.icon);
+      }
+      if (brands.length > 0 && brands[0] && !newMotoBrandId) {
         setNewMotoBrandId(String(brands[0].id));
       }
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Failed to load administrator data.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveSystemStatus = async () => {
+    setIsSavingStatus(true);
+    try {
+      const updated = await updateAdminSystemStatus({
+        is_maintenance: isMaintenance,
+        title: statusTitle.trim(),
+        message: statusMessage.trim(),
+        icon: statusIcon.trim(),
+      });
+      setSystemStatus(updated);
+      setIsMaintenance(updated.is_maintenance);
+      setStatusTitle(updated.title);
+      setStatusMessage(updated.message);
+      setStatusIcon(updated.icon);
+      setNotice(
+        updated.is_maintenance
+          ? "⚠️ System status updated: MAINTENANCE MODE ACTIVE. Non-administrators are blocked from signing in."
+          : "✅ System status updated: OPERATIONAL. All riders can sign in normally."
+      );
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Failed to update system maintenance status.");
+    } finally {
+      setIsSavingStatus(false);
     }
   };
 
@@ -267,6 +320,11 @@ function AdminPage() {
             ["master", "Master Data CRUD", Database],
             ["news", `News CMS (${adminNews.length})`, FileText],
             ["broadcast", `Push Broadcast (${adminBroadcasts.length})`, Bell],
+            [
+              "maintenance",
+              isMaintenance ? "Maintenance (ACTIVE)" : "System Health",
+              isMaintenance ? AlertTriangle : Wrench,
+            ],
           ] as const
         ).map(([key, label, Icon]) => (
           <button
@@ -975,7 +1033,7 @@ function AdminPage() {
                         type="button"
                         onClick={() => {
                           setBroadcastTargetType("user");
-                          if (adminUsers.length > 0 && !broadcastTargetUserId) {
+                          if (adminUsers.length > 0 && adminUsers[0] && !broadcastTargetUserId) {
                             setBroadcastTargetUserId(adminUsers[0].id);
                           }
                         }}
@@ -1225,6 +1283,270 @@ function AdminPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 7: SYSTEM HEALTH & MAINTENANCE CONTROL */}
+          {activeSubTab === "maintenance" && (
+            <div className="space-y-6">
+              {/* Status Header Banner */}
+              <div
+                className={cn(
+                  "rounded-2xl border p-6 transition-colors",
+                  isMaintenance
+                    ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
+                    : "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                )}
+              >
+                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                  <div className="flex items-start gap-3.5">
+                    <div
+                      className={cn(
+                        "rounded-xl p-3 shrink-0",
+                        isMaintenance
+                          ? "bg-amber-500/20 text-amber-400"
+                          : "bg-emerald-500/20 text-emerald-400"
+                      )}
+                    >
+                      {isMaintenance ? (
+                        <AlertTriangle className="size-6" />
+                      ) : (
+                        <CheckCircle2 className="size-6" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold uppercase tracking-wider">
+                          {isMaintenance ? "MAINTENANCE MODE ACTIVE" : "SYSTEM OPERATIONAL"}
+                        </span>
+                        <span
+                          className={cn(
+                            "inline-block size-2 rounded-full",
+                            isMaintenance ? "bg-amber-400 animate-pulse" : "bg-emerald-400"
+                          )}
+                        />
+                      </div>
+                      <h3 className="font-display text-xl font-black uppercase tracking-tight text-white mt-1">
+                        {isMaintenance
+                          ? "User Logins Gated · Administrator Bypass Only"
+                          : "Normal Traffic Permitted · All Services Online"}
+                      </h3>
+                      <p className="mt-1 text-xs opacity-90 max-w-2xl leading-relaxed">
+                        {isMaintenance
+                          ? "Non-administrator accounts are blocked from requesting OTP or authenticating via Google OAuth. Mobile and web splash screens display the custom maintenance message below."
+                          : "All riders can sign in seamlessly via OTP or Google OAuth. Health checker returns status OK."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsMaintenance(!isMaintenance)}
+                    className={cn(
+                      "inline-flex items-center gap-2.5 rounded-xl px-5 py-3 font-mono text-xs font-bold uppercase tracking-wider shadow-lg transition-all active:scale-95 shrink-0",
+                      isMaintenance
+                        ? "bg-amber-500 hover:bg-amber-400 text-black shadow-amber-500/20"
+                        : "bg-secondary border border-border hover:bg-secondary/80 text-foreground"
+                    )}
+                  >
+                    <Power className="size-4" />
+                    <span>{isMaintenance ? "Turn Maintenance OFF" : "Turn Maintenance ON"}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                {/* Configuration Form Card */}
+                <div className="hud-card space-y-5 p-6">
+                  <div>
+                    <h4 className="font-display text-lg font-black uppercase tracking-tight text-foreground">
+                      Maintenance Screen Configuration
+                    </h4>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Customize the dynamic title, description, and icon broadcast to mobile and web clients.
+                    </p>
+                  </div>
+
+                  {/* Mode Toggle Checkbox */}
+                  <div className="flex items-center justify-between rounded-xl border border-border/80 bg-secondary/30 p-4">
+                    <div>
+                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground block">
+                        Enable Maintenance Mode
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        Toggle to immediately gate user access across Android, iOS, and Web.
+                      </span>
+                    </div>
+                    <label className="relative inline-flex cursor-pointer items-center">
+                      <input
+                        type="checkbox"
+                        checked={isMaintenance}
+                        onChange={(e) => setIsMaintenance(e.target.checked)}
+                        className="peer sr-only"
+                      />
+                      <div className="peer h-6 w-11 rounded-full bg-secondary peer-checked:bg-primary peer-focus:outline-none after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white" />
+                    </label>
+                  </div>
+
+                  {/* Title Field */}
+                  <div className="space-y-1.5">
+                    <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+                      Screen Title
+                    </label>
+                    <input
+                      type="text"
+                      value={statusTitle}
+                      onChange={(e) => setStatusTitle(e.target.value)}
+                      placeholder="Under Scheduled Maintenance"
+                      className="w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2.5 font-sans text-sm text-foreground focus:border-primary focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Message Field */}
+                  <div className="space-y-1.5">
+                    <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+                      Announcement / User Message
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={statusMessage}
+                      onChange={(e) => setStatusMessage(e.target.value)}
+                      placeholder="Kami sedang melakukan peningkatan performa server. Mohon tunggu beberapa saat..."
+                      className="w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2.5 font-sans text-sm text-foreground focus:border-primary focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Icon Selector */}
+                  <div className="space-y-2">
+                    <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+                      Visual Icon Theme
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {(
+                        [
+                          ["wrench", "Wrench / Tuning", Wrench],
+                          ["shield-alert", "Shield Alert", ShieldAlert],
+                          ["cloud-off", "Cloud Offline", CloudOff],
+                          ["server", "Server Cluster", Server],
+                          ["alert-triangle", "Warning / Caution", AlertTriangle],
+                        ] as const
+                      ).map(([val, label, IconComponent]) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setStatusIcon(val)}
+                          className={cn(
+                            "flex items-center gap-2 rounded-lg border p-2.5 text-xs font-mono transition-all",
+                            statusIcon === val
+                              ? "border-primary bg-primary/20 text-primary font-bold shadow-sm"
+                              : "border-border/60 bg-secondary/20 text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
+                          )}
+                        >
+                          <IconComponent className="size-4 shrink-0" />
+                          <span className="truncate">{label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Save Button */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      disabled={isSavingStatus}
+                      onClick={handleSaveSystemStatus}
+                      className="btn-primary flex w-full items-center justify-center gap-2 py-3"
+                    >
+                      {isSavingStatus ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Send className="size-4" />
+                      )}
+                      <span>{isSavingStatus ? "Updating Status…" : "Apply System Status"}</span>
+                    </button>
+                  </div>
+
+                  {/* Metadata info */}
+                  {systemStatus?.updated_at && (
+                    <p className="font-mono text-[10px] text-muted-foreground text-center">
+                      Last updated: {new Date(systemStatus.updated_at).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+
+                {/* Live Client Preview Card */}
+                <div className="hud-card flex flex-col justify-between space-y-4 p-6">
+                  <div>
+                    <h4 className="flex items-center gap-2 font-display text-base font-bold uppercase tracking-wider text-foreground">
+                      <Smartphone className="size-4 text-primary" />
+                      Live Mobile & Web Client Preview
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      Real-time simulation of how riders experience the health checker block on opening the app:
+                    </p>
+                  </div>
+
+                  {/* Simulated Mobile Screen */}
+                  <div className="mx-auto w-full max-w-xs rounded-[28px] border-2 border-border/80 bg-[#0B0F14] p-5 shadow-2xl space-y-6 text-center my-auto">
+                    {/* Status Bar */}
+                    <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground px-1">
+                      <span>09:41</span>
+                      <div className="flex items-center gap-1">
+                        <span>5G</span>
+                        <span>100%</span>
+                      </div>
+                    </div>
+
+                    {/* Logo */}
+                    <div className="pt-2">
+                      <span className="font-display font-black tracking-widest text-lg text-primary">REVV</span>
+                      <p className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">
+                        Digital Cockpit
+                      </p>
+                    </div>
+
+                    {/* Dynamic Icon */}
+                    <div className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-primary/40 bg-primary/10 text-primary shadow-inner">
+                      {statusIcon === "shield-alert" ? (
+                        <ShieldAlert className="size-8" />
+                      ) : statusIcon === "cloud-off" ? (
+                        <CloudOff className="size-8" />
+                      ) : statusIcon === "server" ? (
+                        <Server className="size-8" />
+                      ) : statusIcon === "alert-triangle" ? (
+                        <AlertTriangle className="size-8" />
+                      ) : (
+                        <Wrench className="size-8" />
+                      )}
+                    </div>
+
+                    {/* Title & Message */}
+                    <div className="space-y-2 px-2">
+                      <h5 className="font-display text-sm font-black uppercase tracking-tight text-white">
+                        {statusTitle.trim() || "Under Scheduled Maintenance"}
+                      </h5>
+                      <p className="text-[11px] leading-relaxed text-white/70 line-clamp-4">
+                        {statusMessage.trim() ||
+                          "Kami sedang melakukan peningkatan performa dan perawatan server REVV."}
+                      </p>
+                    </div>
+
+                    {/* Simulated Action Buttons */}
+                    <div className="space-y-2 pt-2">
+                      <div className="rounded-xl bg-primary/20 border border-primary/50 py-2.5 text-center text-xs font-bold text-primary font-mono uppercase">
+                        Refresh Status
+                      </div>
+                      <div className="rounded-xl border border-border/40 py-2 text-center text-[10px] text-muted-foreground font-mono">
+                        Administrator Access
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-center font-mono text-[10px] text-muted-foreground">
+                    Status endpoint: <code className="text-primary font-bold">GET /health</code> & <code className="text-primary font-bold">GET /api/v1/health</code>
+                  </p>
+                </div>
               </div>
             </div>
           )}

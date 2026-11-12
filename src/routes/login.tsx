@@ -10,18 +10,22 @@ import {
   Loader2,
   LogOut,
   Radio,
+  ShieldAlert,
   ShieldCheck,
   User,
+  Wrench,
 } from "lucide-react";
 import { Wordmark } from "@/components/revv/wordmark";
 import {
   AuthApiError,
   checkUrlForAuthTokens,
   fetchMyProfile,
+  fetchSystemHealth,
   getGoogleOAuthUrl,
   getSavedSession,
   requestOtp,
   signInWithOtp,
+  type SystemHealthStatus,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -54,22 +58,64 @@ function LoginPage() {
   const [isAccountNotFound, setIsAccountNotFound] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const [devOtpEcho, setDevOtpEcho] = useState<string | null>(null);
+  const [healthStatus, setHealthStatus] = useState<SystemHealthStatus | null>(null);
 
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // 1. Check if OAuth callback passed tokens via URL query parameters
+  // 0. Check system health on initial load
   useEffect(() => {
+    fetchSystemHealth()
+      .then((health) => {
+        setHealthStatus(health);
+      })
+      .catch(() => {
+        setHealthStatus({
+          status: "maintenance",
+          maintenance: true,
+          isDown: true,
+          title: "Server Offline",
+          message: "Unable to connect to REVV services. Please try again shortly.",
+          icon: "cloud-off",
+        });
+      });
+  }, []);
+
+  // 1. Check if OAuth callback passed tokens or error via URL query parameters
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const errParam = searchParams.get("error");
+    if (errParam === "maintenance_active" || errParam === "maintenance") {
+      setErrorMessage("System is currently under maintenance. Only administrators can sign in at this time.");
+    } else if (errParam) {
+      setErrorMessage(decodeURIComponent(errParam));
+    }
+
     const oauthSession = checkUrlForAuthTokens();
     if (oauthSession?.token) {
       void (async () => {
         try {
-          const prof = await fetchMyProfile();
+          const [health, prof] = await Promise.all([
+            fetchSystemHealth().catch(() => null),
+            fetchMyProfile(),
+          ]);
+
+          // If maintenance mode is active, reject non-administrators immediately
+          if (health?.maintenance && prof.role !== "administrator") {
+            logout();
+            setErrorMessage(
+              health.message || "REVV is currently undergoing scheduled maintenance. Administrator access only."
+            );
+            return;
+          }
+
           login(
             {
-              access_token: oauthSession.token,
-              refresh_token: oauthSession.refreshToken || undefined,
+              access_token: oauthSession.token!,
+              refresh_token: oauthSession.refreshToken || "",
+              token_type: "Bearer",
+              expires_in: 900,
             },
-            prof,
+            prof.username || undefined,
           );
           if (prof.username) {
             navigate({ to: "/id/$username", params: { username: prof.username } });
@@ -81,7 +127,7 @@ function LoginPage() {
         }
       })();
     }
-  }, [login, navigate]);
+  }, [login, logout, navigate]);
 
   // Countdown timer for OTP resend
   useEffect(() => {
@@ -142,10 +188,10 @@ function LoginPage() {
         // Fallback to basic session
       }
 
-      login(res.tokens, profile || undefined);
+      login(res.tokens, profile?.username || res.identifier);
 
       // Navigate directly away from /login!
-      const targetUsername = profile?.username || res.username || res.identifier;
+      const targetUsername = profile?.username || res.identifier;
       if (targetUsername && !targetUsername.includes("@") && !targetUsername.startsWith("+")) {
         navigate({ to: "/id/$username", params: { username: targetUsername } });
       } else {
@@ -209,6 +255,31 @@ function LoginPage() {
         </p>
       </div>
 
+      {/* Maintenance Banner */}
+      {healthStatus?.maintenance && (
+        <div className="mt-6 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-200">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-amber-500/20 p-2 text-amber-400 shrink-0">
+              <ShieldAlert className="size-5" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                  {healthStatus.isDown ? "SERVICE DISRUPTION" : "MAINTENANCE MODE ACTIVE"}
+                </span>
+              </div>
+              <h3 className="font-display text-sm font-bold uppercase text-amber-300">
+                {healthStatus.title || "Under Scheduled Maintenance"}
+              </h3>
+              <p className="text-xs text-amber-200/90 leading-relaxed">
+                {healthStatus.message ||
+                  "REVV is currently undergoing scheduled maintenance. Only authorized administrators may log in."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {authLoading ? (
         <div className="hud-card mt-8 flex items-center justify-center py-16">
           <Loader2 className="size-8 animate-spin text-primary" />
@@ -228,7 +299,7 @@ function LoginPage() {
                 {user.first_name} {user.last_name}
               </h2>
               <p className="font-mono text-xs text-muted-foreground truncate">
-                @{user.username || "rider"} · {user.email || user.phone_number || "Verified"}
+                @{user.username || "rider"} · {user.email || user.phone || "Verified"}
               </p>
             </div>
           </div>
