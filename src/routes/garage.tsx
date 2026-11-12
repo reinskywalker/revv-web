@@ -17,6 +17,7 @@ import {
   deleteGarageMotorcycle,
   fetchMasterMotorcycles,
   fetchMyGarage,
+  resolveMediaUrl,
   type GarageMotorcycle,
   type MasterMotorcycleItem,
   updateGarageMotorcycle,
@@ -66,7 +67,7 @@ function GaragePage() {
       try {
         setLoading(true);
         const [gar, masters] = await Promise.all([
-          fetchMyGarage().catch(() => []),
+          fetchMyGarage(),
           fetchMasterMotorcycles().catch(() => []),
         ]);
         if (isMounted) {
@@ -477,6 +478,7 @@ function GaragePage() {
             garage.map((bike) => {
               const displayName = bike.nickname || bike.series_name || bike.name || "Motorcycle";
               const isPrimary = bike.is_primary;
+              const imgUrl = resolveMediaUrl(bike.image_path);
 
               return (
                 <div
@@ -486,49 +488,63 @@ function GaragePage() {
                   }`}
                 >
                   <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-primary">
-                          {bike.brand_name || "Motorcycle"} · {bike.category}
-                        </span>
-                        {isPrimary && (
-                          <span className="inline-flex items-center gap-1 rounded bg-primary/20 px-2 py-0.5 font-mono text-[10px] font-black uppercase text-primary">
-                            <Sparkles className="size-2.5" />
-                            Primary Machine
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      {imgUrl && (
+                        <div className="relative h-32 w-full sm:h-28 sm:w-40 shrink-0 overflow-hidden rounded-xl border border-border/60 bg-muted/30">
+                          <img
+                            src={imgUrl}
+                            alt={displayName}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-primary">
+                            {bike.brand_name || "Motorcycle"} · {bike.category}
                           </span>
-                        )}
-                        {bike.plate_number && (
-                          <span className="rounded border border-border/80 bg-secondary/50 px-2 py-0.5 font-mono text-[10px] uppercase text-muted-foreground">
-                            {bike.plate_number}
+                          {isPrimary && (
+                            <span className="inline-flex items-center gap-1 rounded bg-primary/20 px-2 py-0.5 font-mono text-[10px] font-black uppercase text-primary">
+                              <Sparkles className="size-2.5" />
+                              Primary Machine
+                            </span>
+                          )}
+                          {bike.plate_number && (
+                            <span className="rounded border border-border/80 bg-secondary/50 px-2 py-0.5 font-mono text-[10px] uppercase text-muted-foreground">
+                              {bike.plate_number}
+                            </span>
+                          )}
+                        </div>
+
+                        <h3 className="font-display text-2xl font-black uppercase tracking-tight text-foreground">
+                          {displayName}
+                        </h3>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground">
+                          <span>
+                            Model:{" "}
+                            <strong className="text-foreground">
+                              {bike.series_name || bike.name || "Custom"}
+                            </strong>
                           </span>
-                        )}
-                      </div>
-
-                      <h3 className="font-display text-2xl font-black uppercase tracking-tight text-foreground">
-                        {displayName}
-                      </h3>
-
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground">
-                        <span>
-                          Model:{" "}
-                          <strong className="text-foreground">
-                            {bike.series_name || bike.name || "Custom"}
-                          </strong>
-                        </span>
-                        <span>·</span>
-                        <span className="flex items-center gap-1">
-                          <Gauge className="size-3 text-primary" />
-                          <strong className="text-foreground">
-                            {bike.current_mileage.toLocaleString()} km
-                          </strong>
-                        </span>
-                        <span>·</span>
-                        <span>
-                          Transmission:{" "}
-                          <strong className="text-foreground uppercase">
-                            {bike.transmission}
-                          </strong>
-                        </span>
+                          <span>·</span>
+                          <span className="flex items-center gap-1">
+                            <Gauge className="size-3 text-primary" />
+                            <strong className="text-foreground">
+                              {bike.current_mileage.toLocaleString()} km
+                            </strong>
+                          </span>
+                          <span>·</span>
+                          <span>
+                            Transmission:{" "}
+                            <strong className="text-foreground uppercase">
+                              {bike.transmission}
+                            </strong>
+                          </span>
+                        </div>
                       </div>
                     </div>
 
