@@ -317,15 +317,15 @@ export async function fetchNewsArticles(params?: {
 
     if (res.ok) {
       const data: ApiResponse<NewsArticle[]> = await res.json();
-      if (Array.isArray(data.data) && data.data.length > 0) {
+      if (Array.isArray(data.data)) {
         return { articles: data.data, fromFallback: false };
       }
     }
   } catch (err) {
-    console.warn("REVV Backend news endpoint unreachable, using verified seed articles:", err);
+    console.warn("REVV Backend news endpoint unreachable:", err);
   }
 
-  return { articles: SEED_NEWS_ARTICLES, fromFallback: true };
+  return { articles: [], fromFallback: false };
 }
 
 /**
@@ -351,10 +351,7 @@ export async function fetchNewsArticleBySlug(slug: string): Promise<NewsArticle 
     console.warn("REVV Backend article detail lookup failed:", err);
   }
 
-  const found = SEED_NEWS_ARTICLES.find(
-    (a) => a.slug === slug || a.id === slug || a.title.toLowerCase().includes(slug.toLowerCase()),
-  );
-  return found ?? null;
+  return null;
 }
 
 /**

@@ -19,24 +19,9 @@ export const Route = createFileRoute("/privacy")({
   component: PrivacyCompliancePage,
 });
 
-const FALLBACK_LEGAL_DOCS: LegalDocumentItem[] = [
-  {
-    id: "fallback-privacy",
-    slug: "privacy-policy",
-    title: "REVV Global Privacy Policy",
-    jurisdictions: "Global · EU GDPR · UK GDPR · US CCPA/CPRA",
-    version: "2.0",
-    is_published: true,
-    sort_order: 10,
-    updated_at: new Date().toISOString(),
-    content_html:
-      "<h2>1. Scope & Global Privacy Standards</h2><p>REVV processes personal account identifiers and ride telemetry strictly in accordance with the European Union General Data Protection Regulation (GDPR 2016/679), UK GDPR, California CCPA/CPRA, and international data protection frameworks.</p><h2>2. Data Minimization & Telemetry Controls</h2><p>GPS tracks, speed distribution, and lean-angle metrics are recorded only when you actively start navigation or trip logging. Voice intercom audio frames are ephemeral and never archived after a ride ends.</p><blockquote>REVV never sells your personal information or location history to third parties.</blockquote>",
-  },
-];
-
 function PrivacyCompliancePage() {
-  const [docs, setDocs] = useState<LegalDocumentItem[]>(FALLBACK_LEGAL_DOCS);
-  const [selectedSlug, setSelectedSlug] = useState<string>("privacy-policy");
+  const [docs, setDocs] = useState<LegalDocumentItem[]>([]);
+  const [selectedSlug, setSelectedSlug] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,11 +29,13 @@ function PrivacyCompliancePage() {
     (async () => {
       setLoading(true);
       const fetched = await fetchLegalDocuments();
-      if (!cancelled && fetched.length > 0 && fetched[0]) {
+      if (!cancelled) {
         setDocs(fetched);
-        setSelectedSlug(fetched[0].slug);
+        if (fetched.length > 0 && fetched[0]) {
+          setSelectedSlug(fetched[0].slug);
+        }
+        setLoading(false);
       }
-      if (!cancelled) setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -112,6 +99,12 @@ function PrivacyCompliancePage() {
               </span>
             )}
           </div>
+
+          {!loading && docs.length === 0 && (
+            <div className="panel-card mt-8 p-10 text-center text-sm text-panel-muted">
+              No legal &amp; compliance documents are published yet.
+            </div>
+          )}
 
           {activeDoc && (
             <article className="panel-card mt-8 p-6 md:p-10">

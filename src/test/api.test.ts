@@ -7,7 +7,6 @@ import {
   getSavedSession,
   clearSavedSession,
   AuthApiError,
-  SEED_NEWS_ARTICLES,
   sanitizeRichHtml,
 } from "../lib/api";
 
@@ -17,18 +16,16 @@ describe("REVV- Web API Client", () => {
   });
 
   describe("News Articles", () => {
-    it("returns seed news articles when backend is unreachable", async () => {
+    it("returns empty news articles when backend is unreachable", async () => {
       const result = await fetchNewsArticles();
       expect(result.articles).toBeDefined();
-      expect(result.articles.length).toBeGreaterThan(0);
-      expect(result.articles[0].title).toBe(SEED_NEWS_ARTICLES[0].title);
+      expect(result.articles).toEqual([]);
     });
 
-    it("can retrieve a single article by slug", async () => {
+    it("returns null for article slug when backend is unreachable", async () => {
       const slug = "pre-touring-checklist-preparing-brakes-tires-chain-for-cross-java-routes";
       const article = await fetchNewsArticleBySlug(slug);
-      expect(article).not.toBeNull();
-      expect(article?.category).toBe("MAINTENANCE");
+      expect(article).toBeNull();
     });
   });
 
