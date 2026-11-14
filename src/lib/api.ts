@@ -1554,6 +1554,7 @@ export interface SupportTicketItem {
   admin_reply?: string | null;
   replied_at?: string | null;
   created_at: string;
+  device_info?: Record<string, unknown> | null;
   can_user_reply?: boolean;
   messages?: SupportTicketMessageItem[];
 }

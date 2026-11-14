@@ -2146,6 +2146,41 @@ function SupportInboxTab({ onNotice }: { onNotice: (msg: string | null) => void 
                 </span>
               </div>
 
+              {t.device_info && Object.keys(t.device_info).length > 0 && (
+                <div className="rounded-lg border border-border/60 bg-secondary/20 px-3.5 py-2.5 text-xs">
+                  <span className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-wider text-primary">
+                    Device Diagnostics
+                  </span>
+                  <div className="grid gap-1.5 text-muted-foreground sm:grid-cols-4">
+                    <span>
+                      Brand:{" "}
+                      <strong className="text-foreground">
+                        {String(t.device_info.brand || t.device_info.manufacturer || "—")}
+                      </strong>
+                    </span>
+                    <span>
+                      Series:{" "}
+                      <strong className="text-foreground">
+                        {String(t.device_info.series || t.device_info.model || "—")}
+                      </strong>
+                    </span>
+                    <span>
+                      OS:{" "}
+                      <strong className="text-foreground">
+                        {String(t.device_info.osVersion || t.device_info.osName || "—")}
+                      </strong>
+                    </span>
+                    <span>
+                      App:{" "}
+                      <strong className="text-foreground">
+                        v{String(t.device_info.appVersion || "0.1.0")} (Build{" "}
+                        {String(t.device_info.buildNumber || "1")})
+                      </strong>
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {t.messages && t.messages.length > 0 ? (
                 <div className="space-y-2.5">
                   {t.messages.map((m) => {
