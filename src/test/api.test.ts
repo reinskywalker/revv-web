@@ -8,6 +8,7 @@ import {
   clearSavedSession,
   AuthApiError,
   SEED_NEWS_ARTICLES,
+  sanitizeRichHtml,
 } from "../lib/api";
 
 describe("REVV- Web API Client", () => {
@@ -52,6 +53,19 @@ describe("REVV- Web API Client", () => {
       clearSavedSession();
       expect(getSavedSession().token).toBeNull();
       expect(getSavedSession().riderId).toBeNull();
+    });
+  });
+
+  describe("HTML Sanitizer", () => {
+    it("preserves safe formatting, quotes, and captioned figures while stripping scripts", () => {
+      const clean = sanitizeRichHtml(
+        '<p><b>Bold</b> <i>Italic</i> <u>Line</u></p><blockquote>Ride safe</blockquote><figure><img src="/uploads/media/a.webp" onerror="alert(1)" alt="Moto"/><figcaption>Image : Chain prep</figcaption></figure><script>alert(2)</script>',
+      );
+      expect(clean).toContain("<b>Bold</b>");
+      expect(clean).toContain("<blockquote>Ride safe</blockquote>");
+      expect(clean).toContain("<figcaption>Image : Chain prep</figcaption>");
+      expect(clean).not.toContain("<script>");
+      expect(clean).not.toContain("onerror");
     });
   });
 });

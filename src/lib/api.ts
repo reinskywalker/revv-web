@@ -15,6 +15,7 @@ export interface NewsArticle {
   thumbnail_url?: string | null;
   reading_time_minutes: number;
   is_highlight: boolean;
+  high_importance?: boolean;
   is_broadcasted?: boolean;
   published_at: string;
 }
@@ -257,8 +258,9 @@ export const SEED_NEWS_ARTICLES: NewsArticle[] = [
 ];
 
 export function getApiBaseUrl(): string {
-  if (typeof window !== "undefined" && (window as any).__REVV_API_URL__) {
-    return (window as any).__REVV_API_URL__;
+  const win = typeof window !== "undefined" ? (window as { __REVV_API_URL__?: string }) : undefined;
+  if (win?.__REVV_API_URL__) {
+    return win.__REVV_API_URL__;
   }
   const envUrl = import.meta.env.VITE_API_BASE_URL;
   if (envUrl && envUrl.trim().length > 0) {
@@ -416,7 +418,10 @@ export async function requestOtp(identifier: string): Promise<{
     }
 
     if (res.status === 429) {
-      throw new AuthApiError("Too many OTP requests. Please wait a few minutes before trying again.", 429);
+      throw new AuthApiError(
+        "Too many OTP requests. Please wait a few minutes before trying again.",
+        429,
+      );
     }
 
     if (!res.ok) {
@@ -499,7 +504,10 @@ export async function signInWithOtp(
     }
 
     if (res.status === 401) {
-      throw new AuthApiError("Invalid or expired verification code. Please check and try again.", 401);
+      throw new AuthApiError(
+        "Invalid or expired verification code. Please check and try again.",
+        401,
+      );
     }
 
     if (!res.ok) {
@@ -559,12 +567,9 @@ export function getSavedSession(): {
   const username = localStorage.getItem("revv_username");
   const riderId = localStorage.getItem("revv_rider_id") || username;
 
-  const cleanToken =
-    token && token !== "undefined" && token !== "null" ? token : null;
+  const cleanToken = token && token !== "undefined" && token !== "null" ? token : null;
   const cleanRefresh =
-    refreshToken && refreshToken !== "undefined" && refreshToken !== "null"
-      ? refreshToken
-      : null;
+    refreshToken && refreshToken !== "undefined" && refreshToken !== "null" ? refreshToken : null;
   const cleanUsername =
     username && username !== "undefined" && username !== "null" ? username : null;
   const cleanRiderId =
@@ -699,10 +704,7 @@ async function tryRefreshSession(): Promise<string | null> {
 /**
  * Authenticated request helper with automatic 401 refresh retry
  */
-export async function authRequest<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
+export async function authRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const baseUrl = getApiBaseUrl();
   const session = getSavedSession();
   let token = session.token;
@@ -902,17 +904,13 @@ export async function deleteProfileBanner(): Promise<void> {
   await authRequest("/me/banner", { method: "DELETE" });
 }
 
-export async function fetchPublicProfile(
-  identifier: string,
-): Promise<PublicProfileResponse> {
+export async function fetchPublicProfile(identifier: string): Promise<PublicProfileResponse> {
   const clean = identifier.trim() || "me";
   const session = getSavedSession();
 
   if (session.token) {
     try {
-      const res = await authRequest<any>(
-        `/users/${encodeURIComponent(clean)}/profile`,
-      );
+      const res = await authRequest<any>(`/users/${encodeURIComponent(clean)}/profile`);
       if (res) {
         if (!res.garage && res.garage_details) {
           res.garage = res.garage_details;
@@ -948,12 +946,9 @@ export async function fetchPublicProfile(
   }
 
   const baseUrl = getApiBaseUrl();
-  const res = await fetch(
-    `${baseUrl}/users/${encodeURIComponent(clean)}/profile`,
-    {
-      headers: { Accept: "application/json" },
-    },
-  );
+  const res = await fetch(`${baseUrl}/users/${encodeURIComponent(clean)}/profile`, {
+    headers: { Accept: "application/json" },
+  });
   if (!res.ok) {
     throw new AuthApiError(`Rider profile not found (${res.status})`, res.status);
   }
@@ -965,18 +960,14 @@ export async function fetchPublicProfile(
   return data;
 }
 
-export async function sendFriendRequest(
-  friendId: string,
-): Promise<{ status: string }> {
+export async function sendFriendRequest(friendId: string): Promise<{ status: string }> {
   return authRequest<{ status: string }>("/friends/request", {
     method: "POST",
     body: JSON.stringify({ friend_id: friendId }),
   });
 }
 
-export async function cancelFriendRequest(
-  friendIdOrRequestId: string,
-): Promise<void> {
+export async function cancelFriendRequest(friendIdOrRequestId: string): Promise<void> {
   await authRequest<unknown>(
     `/friends/requests/${encodeURIComponent(friendIdOrRequestId)}/cancel`,
     {
@@ -1035,7 +1026,11 @@ export async function checkUsernameAvailability(username: string): Promise<{
   }
 }
 
-export async function compressImageFile(file: File, maxDimension = 2048, quality = 0.82): Promise<File> {
+export async function compressImageFile(
+  file: File,
+  maxDimension = 2048,
+  quality = 0.82,
+): Promise<File> {
   if (typeof window === "undefined" || !file.type.startsWith("image/")) return file;
   return new Promise((resolve) => {
     const img = new Image();
@@ -1086,7 +1081,7 @@ export async function uploadProfileAvatar(file: File): Promise<{ url: string; pa
 }
 
 export async function uploadProfileBanner(file: File): Promise<{ url: string; path: string }> {
-  const compressed = await compressImageFile(file, 2048, 0.80);
+  const compressed = await compressImageFile(file, 2048, 0.8);
   const form = new FormData();
   form.append("image", compressed);
   return authRequest<{ url: string; path: string }>("/me/banner", {
@@ -1180,16 +1175,26 @@ export interface PostCommentItem {
   created_at: string;
 }
 
-export async function likeFeedPost(postId: string): Promise<{ liked: boolean; like_count: number }> {
-  return authRequest<{ liked: boolean; like_count: number }>(`/feed/posts/${encodeURIComponent(postId)}/like`, {
-    method: "POST",
-  });
+export async function likeFeedPost(
+  postId: string,
+): Promise<{ liked: boolean; like_count: number }> {
+  return authRequest<{ liked: boolean; like_count: number }>(
+    `/feed/posts/${encodeURIComponent(postId)}/like`,
+    {
+      method: "POST",
+    },
+  );
 }
 
-export async function unlikeFeedPost(postId: string): Promise<{ liked: boolean; like_count: number }> {
-  return authRequest<{ liked: boolean; like_count: number }>(`/feed/posts/${encodeURIComponent(postId)}/like`, {
-    method: "DELETE",
-  });
+export async function unlikeFeedPost(
+  postId: string,
+): Promise<{ liked: boolean; like_count: number }> {
+  return authRequest<{ liked: boolean; like_count: number }>(
+    `/feed/posts/${encodeURIComponent(postId)}/like`,
+    {
+      method: "DELETE",
+    },
+  );
 }
 
 export async function fetchFeedComments(postId: string): Promise<PostCommentItem[]> {
@@ -1346,28 +1351,6 @@ export async function deleteAdminComponent(id: number): Promise<void> {
   });
 }
 
-export async function createAdminNewsArticle(payload: {
-  title: string;
-  slug?: string;
-  summary: string;
-  content: string;
-  category?: string;
-  author_name?: string;
-  reading_time_minutes?: number;
-  is_highlight?: boolean;
-}): Promise<NewsArticle> {
-  return authRequest<NewsArticle>("/admin/news", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function deleteAdminNewsArticle(id: string): Promise<void> {
-  await authRequest<unknown>(`/admin/news/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-  });
-}
-
 export interface BroadcastNotificationItem {
   id: string;
   sender_id: string | null;
@@ -1452,18 +1435,12 @@ export interface SystemHealthStatus {
   title: string;
   message: string;
   icon: string;
+  hasPurpose?: boolean;
+  purposeTitle?: string;
+  purposeMessage?: string;
+  isDestroySession?: boolean;
   server_time?: string;
   isDown?: boolean;
-}
-
-export interface AdminSystemStatusRecord {
-  id: string;
-  is_maintenance: boolean;
-  title: string;
-  message: string;
-  icon: string;
-  updated_by?: string | null;
-  updated_at: string;
 }
 
 export async function fetchSystemHealth(): Promise<SystemHealthStatus> {
@@ -1486,6 +1463,10 @@ export async function fetchSystemHealth(): Promise<SystemHealthStatus> {
             title: body.data.title || "Under Scheduled Maintenance",
             message: body.data.message || "REVV is currently undergoing maintenance.",
             icon: body.data.icon || "wrench",
+            hasPurpose: Boolean(body.data.hasPurpose),
+            purposeTitle: body.data.purposeTitle || "",
+            purposeMessage: body.data.purposeMessage || "",
+            isDestroySession: Boolean(body.data.isDestroySession),
           };
         }
       }
@@ -1505,6 +1486,10 @@ export async function fetchSystemHealth(): Promise<SystemHealthStatus> {
       title: data.title || "Under Scheduled Maintenance",
       message: data.message || "REVV is currently undergoing maintenance.",
       icon: data.icon || "wrench",
+      hasPurpose: Boolean(data.hasPurpose),
+      purposeTitle: data.purposeTitle || "",
+      purposeMessage: data.purposeMessage || "",
+      isDestroySession: Boolean(data.isDestroySession),
       server_time: data.server_time,
     };
   } catch {
@@ -1519,8 +1504,72 @@ export async function fetchSystemHealth(): Promise<SystemHealthStatus> {
   }
 }
 
-export async function fetchAdminSystemStatus(): Promise<AdminSystemStatusRecord> {
-  return await authRequest<AdminSystemStatusRecord>("/admin/system/status");
+export interface CurrentRiderProfile {
+  id: string;
+  role: string;
+  email?: string | null;
+  phone?: string | null;
+  name?: string | null;
+  username?: string | null;
+}
+
+export interface SystemStatusConfig {
+  id: string;
+  is_maintenance: boolean;
+  title: string;
+  message: string;
+  icon: string;
+  hasPurpose: boolean;
+  purposeTitle: string;
+  purposeMessage: string;
+  isDestroySession: boolean;
+  updated_by?: string | null;
+  updated_at?: string;
+}
+
+export type AdminSystemStatusRecord = SystemStatusConfig;
+
+export interface SupportTicketItem {
+  id: string;
+  user_id: string;
+  purpose_label: string;
+  submission_counter: number;
+  noreg: string;
+  reference_code: string;
+  reporter_name: string;
+  reporter_phone: string;
+  reporter_email: string;
+  message: string;
+  status: string;
+  admin_reply?: string | null;
+  replied_at?: string | null;
+  created_at: string;
+}
+
+export interface LegalDocumentItem {
+  id: string;
+  slug: string;
+  title: string;
+  content_html: string;
+  jurisdictions: string;
+  version: string;
+  is_published: boolean;
+  sort_order: number;
+  updated_at: string;
+}
+
+export async function fetchCurrentUser(): Promise<CurrentRiderProfile | null> {
+  const { token } = getSavedSession();
+  if (!token) return null;
+  try {
+    return await authRequest<CurrentRiderProfile>("/me");
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchAdminSystemStatus(): Promise<SystemStatusConfig> {
+  return authRequest<SystemStatusConfig>("/admin/system/status");
 }
 
 export async function updateAdminSystemStatus(payload: {
@@ -1528,9 +1577,306 @@ export async function updateAdminSystemStatus(payload: {
   title?: string;
   message?: string;
   icon?: string;
-}): Promise<AdminSystemStatusRecord> {
-  return await authRequest<AdminSystemStatusRecord>("/admin/system/status", {
+  hasPurpose?: boolean;
+  purposeTitle?: string;
+  purposeMessage?: string;
+  isDestroySession?: boolean;
+}): Promise<SystemStatusConfig> {
+  return authRequest<SystemStatusConfig>("/admin/system/status", {
     method: "PUT",
     body: JSON.stringify(payload),
   });
+}
+
+export async function fetchAdminNewsArticles(): Promise<NewsArticle[]> {
+  return authRequest<NewsArticle[]>("/admin/news");
+}
+
+export async function createAdminNewsArticle(payload: {
+  title: string;
+  slug?: string;
+  summary: string;
+  content: string;
+  category?: string;
+  author_name?: string;
+  cover_image_url?: string | null;
+  thumbnail_url?: string | null;
+  reading_time_minutes?: number;
+  is_highlight?: boolean;
+  high_importance?: boolean;
+}): Promise<{ id: string; slug: string; push_sent_count?: number }> {
+  return authRequest<{ id: string; slug: string; push_sent_count?: number }>("/admin/news", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAdminNewsArticle(
+  articleId: string,
+  payload: {
+    title?: string;
+    slug?: string;
+    summary?: string;
+    content?: string;
+    category?: string;
+    author_name?: string;
+    cover_image_url?: string | null;
+    thumbnail_url?: string | null;
+    reading_time_minutes?: number;
+    is_highlight?: boolean;
+    high_importance?: boolean;
+  },
+): Promise<{ id: string; push_sent_count?: number }> {
+  return authRequest<{ id: string; push_sent_count?: number }>(
+    `/admin/news/${encodeURIComponent(articleId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function deleteAdminNewsArticle(articleId: string): Promise<void> {
+  await authRequest<unknown>(`/admin/news/${encodeURIComponent(articleId)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function fetchAdminSupportTickets(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+}): Promise<{ tickets: SupportTicketItem[]; total: number; totalPages: number }> {
+  const baseUrl = getApiBaseUrl();
+  const { token } = getSavedSession();
+  const q = new URLSearchParams({
+    page: String(params?.page ?? 1),
+    limit: String(params?.limit ?? 20),
+  });
+  if (params?.status && params.status !== "ALL") {
+    q.set("status", params.status);
+  }
+  const res = await fetch(`${baseUrl}/admin/support/tickets?${q.toString()}`, {
+    headers: {
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  const body = (await res.json().catch(() => null)) as ApiResponse<SupportTicketItem[]> | null;
+  if (!res.ok || !body) {
+    throw new AuthApiError(body?.meta?.message || "Failed to load support tickets", res.status);
+  }
+  const meta = (body.results as { total?: number; total_pages?: number } | undefined) ?? {};
+  return {
+    tickets: body.data ?? [],
+    total: meta.total ?? body.data?.length ?? 0,
+    totalPages: meta.total_pages ?? 1,
+  };
+}
+
+export async function replyAdminSupportTicket(
+  ticketId: string,
+  reply: string,
+  status = "Replied",
+): Promise<{ ticket: SupportTicketItem; push_sent_count: number }> {
+  return authRequest<{ ticket: SupportTicketItem; push_sent_count: number }>(
+    `/admin/support/tickets/${encodeURIComponent(ticketId)}/reply`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reply, status }),
+    },
+  );
+}
+
+export async function fetchLegalDocuments(): Promise<LegalDocumentItem[]> {
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/legal`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return [];
+    const body = (await res.json().catch(() => null)) as ApiResponse<LegalDocumentItem[]> | null;
+    return body?.data ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchAdminLegalDocuments(): Promise<LegalDocumentItem[]> {
+  return authRequest<LegalDocumentItem[]>("/admin/legal");
+}
+
+export async function upsertAdminLegalDocument(
+  slug: string,
+  payload: {
+    title: string;
+    content_html: string;
+    jurisdictions: string;
+    version: string;
+    is_published: boolean;
+    sort_order: number;
+  },
+): Promise<LegalDocumentItem> {
+  return authRequest<LegalDocumentItem>(`/admin/legal/${encodeURIComponent(slug)}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+async function renderCanvasBlob(
+  img: HTMLImageElement,
+  maxDimension: number,
+  quality: number,
+): Promise<{ blob: Blob; mime: string; ext: string }> {
+  const ratio = Math.min(1, maxDimension / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+  const width = Math.max(1, Math.round((img.naturalWidth || 1) * ratio));
+  const height = Math.max(1, Math.round((img.naturalHeight || 1) * ratio));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas context unavailable");
+  }
+  ctx.drawImage(img, 0, 0, width, height);
+
+  const tryEncode = (mime: string, q: number) =>
+    new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), mime, q));
+
+  const webp = await tryEncode("image/webp", quality);
+  if (webp && webp.type === "image/webp" && webp.size > 0) {
+    return { blob: webp, mime: "image/webp", ext: "webp" };
+  }
+  const jpeg = await tryEncode("image/jpeg", quality);
+  if (jpeg && jpeg.size > 0) {
+    return { blob: jpeg, mime: "image/jpeg", ext: "jpg" };
+  }
+  throw new Error("Failed to compress image");
+}
+
+export async function uploadCompressedMedia(file: File): Promise<{
+  url: string;
+  thumbnail_url: string;
+  size: number;
+}> {
+  const { token } = getSavedSession();
+  if (!token) {
+    throw new AuthApiError("Sign in as Administrator before uploading media", 401);
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Invalid image file"));
+      el.src = objectUrl;
+    });
+
+    const mainAsset = await renderCanvasBlob(img, 1280, 0.82);
+    const thumbAsset = await renderCanvasBlob(img, 480, 0.72);
+
+    const form = new FormData();
+    form.append("file", mainAsset.blob, `image.${mainAsset.ext}`);
+    form.append("thumbnail", thumbAsset.blob, `thumb.${thumbAsset.ext}`);
+
+    const res = await fetch(`${getApiBaseUrl()}/media`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    const body = (await res.json().catch(() => null)) as ApiResponse<{
+      url: string;
+      thumbnail_url: string;
+      size: number;
+    }> | null;
+
+    if (!res.ok || !body?.data?.url) {
+      throw new AuthApiError(body?.meta?.message || "Media upload failed", res.status);
+    }
+    return body.data;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+const ALLOWED_TAGS = new Set([
+  "p",
+  "br",
+  "strong",
+  "b",
+  "em",
+  "i",
+  "u",
+  "blockquote",
+  "h2",
+  "h3",
+  "ul",
+  "ol",
+  "li",
+  "figure",
+  "img",
+  "figcaption",
+  "a",
+  "div",
+]);
+
+export function sanitizeRichHtml(rawHtml: string): string {
+  if (!rawHtml) return "";
+  if (typeof window === "undefined" || typeof DOMParser === "undefined") {
+    return rawHtml
+      .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "")
+      .replace(/\son\w+=(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div>${rawHtml}</div>`, "text/html");
+  const root = doc.body.firstElementChild;
+  if (!root) return "";
+
+  const cleanNode = (node: Node): void => {
+    const children = Array.from(node.childNodes);
+    for (const child of children) {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const el = child as HTMLElement;
+        const tag = el.tagName.toLowerCase();
+        if (!ALLOWED_TAGS.has(tag)) {
+          if (tag === "script" || tag === "style" || tag === "iframe" || tag === "object") {
+            el.remove();
+            continue;
+          }
+          const frag = doc.createDocumentFragment();
+          while (el.firstChild) frag.appendChild(el.firstChild);
+          cleanNode(frag);
+          el.replaceWith(frag);
+          continue;
+        }
+
+        for (const attr of Array.from(el.attributes)) {
+          const name = attr.name.toLowerCase();
+          const val = attr.value.trim();
+          const keepHref = tag === "a" && name === "href" && /^https?:\/\//i.test(val);
+          const keepSrc =
+            tag === "img" &&
+            name === "src" &&
+            (/^https?:\/\//i.test(val) || val.startsWith("/uploads/"));
+          const keepAlt = tag === "img" && name === "alt";
+          if (!keepHref && !keepSrc && !keepAlt) {
+            el.removeAttribute(attr.name);
+          }
+        }
+        if (tag === "a") {
+          el.setAttribute("rel", "noopener noreferrer");
+          el.setAttribute("target", "_blank");
+        }
+        if (tag === "img") {
+          el.setAttribute("loading", "lazy");
+        }
+        cleanNode(el);
+      }
+    }
+  };
+
+  cleanNode(root);
+  return root.innerHTML;
 }

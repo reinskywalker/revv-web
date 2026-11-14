@@ -14,7 +14,8 @@ import {
   X,
 } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/revv/chrome";
-import { fetchNewsArticles, type NewsArticle } from "@/lib/api";
+import { RichHtmlContent } from "@/components/revv/RichHtmlContent";
+import { fetchNewsArticles, resolveMediaUrl, type NewsArticle } from "@/lib/api";
 
 export const Route = createFileRoute("/news")({
   head: () => ({
@@ -133,7 +134,8 @@ export function NewsPage() {
                 Motorcycle News
               </h1>
               <p className="mt-2 text-lg text-panel-muted">
-                Fresh technical dispatches, maintenance guides, and riding craft from the REVV Garage Desk.
+                Fresh technical dispatches, maintenance guides, and riding craft from the REVV
+                Garage Desk.
               </p>
             </div>
             <p className="font-mono text-sm uppercase tracking-[0.25em] text-panel-muted">
@@ -200,7 +202,8 @@ export function NewsPage() {
               </div>
               <h2 className="display-heading-panel mt-6 text-3xl">No stories found</h2>
               <p className="mt-3 max-w-lg text-lg leading-relaxed text-panel-muted">
-                No articles matched your criteria. Clear your search or check back soon for new dispatches from the garage desk.
+                No articles matched your criteria. Clear your search or check back soon for new
+                dispatches from the garage desk.
               </p>
               {searchQuery && (
                 <button
@@ -219,6 +222,22 @@ export function NewsPage() {
           {/* Highlight Article */}
           {!loading && highlightArticle && (
             <div className="mt-12 overflow-hidden rounded-2xl border border-panel-border bg-panel-card p-6 shadow-sm transition-shadow hover:shadow-md md:p-8">
+              {resolveMediaUrl(
+                highlightArticle.cover_image_url || highlightArticle.thumbnail_url,
+              ) && (
+                <div className="mb-6 overflow-hidden rounded-xl border border-panel-border/60">
+                  <img
+                    src={
+                      resolveMediaUrl(
+                        highlightArticle.cover_image_url || highlightArticle.thumbnail_url,
+                      ) ?? undefined
+                    }
+                    alt={highlightArticle.title}
+                    loading="lazy"
+                    className="h-56 w-full object-cover md:h-72"
+                  />
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-3">
                 <span className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider text-primary">
                   <Sparkles className="size-3.5" />
@@ -283,6 +302,19 @@ export function NewsPage() {
                   className="group flex cursor-pointer flex-col justify-between rounded-xl border border-panel-border bg-panel-card p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
                 >
                   <div>
+                    {resolveMediaUrl(article.thumbnail_url || article.cover_image_url) && (
+                      <div className="mb-4 overflow-hidden rounded-lg border border-panel-border/60">
+                        <img
+                          src={
+                            resolveMediaUrl(article.thumbnail_url || article.cover_image_url) ??
+                            undefined
+                          }
+                          alt={article.title}
+                          loading="lazy"
+                          className="h-40 w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                        />
+                      </div>
+                    )}
                     <div className="flex items-center justify-between gap-2">
                       <span className="rounded bg-panel px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-panel-foreground">
                         {article.category}
@@ -303,7 +335,9 @@ export function NewsPage() {
                   </div>
 
                   <div className="mt-6 flex items-center justify-between border-t border-panel-border/50 pt-4 text-xs text-panel-muted">
-                    <span className="font-mono uppercase tracking-wider">{article.author_name}</span>
+                    <span className="font-mono uppercase tracking-wider">
+                      {article.author_name}
+                    </span>
                     <span>
                       {new Date(article.published_at).toLocaleDateString("en-US", {
                         month: "short",
@@ -345,7 +379,9 @@ export function NewsPage() {
             </h2>
 
             <div className="mt-3 flex items-center gap-3 border-b border-border/60 pb-4 font-mono text-xs text-muted-foreground">
-              <span>By <strong className="text-foreground">{activeArticle.author_name}</strong></span>
+              <span>
+                By <strong className="text-foreground">{activeArticle.author_name}</strong>
+              </span>
               <span>•</span>
               <span>
                 {new Date(activeArticle.published_at).toLocaleDateString("en-US", {
@@ -356,15 +392,25 @@ export function NewsPage() {
               </span>
             </div>
 
-            <div className="mt-6 space-y-4 text-base leading-relaxed text-foreground/90 whitespace-pre-line">
-              {activeArticle.content}
+            {resolveMediaUrl(activeArticle.cover_image_url || activeArticle.thumbnail_url) && (
+              <div className="mt-5 overflow-hidden rounded-xl border border-border/70">
+                <img
+                  src={
+                    resolveMediaUrl(activeArticle.cover_image_url || activeArticle.thumbnail_url) ??
+                    undefined
+                  }
+                  alt={activeArticle.title}
+                  className="max-h-80 w-full object-cover"
+                />
+              </div>
+            )}
+
+            <div className="mt-6">
+              <RichHtmlContent html={activeArticle.content} variant="dark" />
             </div>
 
             <div className="mt-8 flex justify-end border-t border-border/60 pt-4">
-              <button
-                onClick={() => setActiveArticle(null)}
-                className="btn-primary"
-              >
+              <button onClick={() => setActiveArticle(null)} className="btn-primary">
                 Close Dispatch
               </button>
             </div>

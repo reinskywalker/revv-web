@@ -14,6 +14,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as GarageRouteImport } from './routes/garage'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as NewsRouteImport } from './routes/news'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as IdUsernameRouteImport } from './routes/id/$username'
 
@@ -42,6 +43,11 @@ const NewsRoute = NewsRouteImport.update({
   path: '/news',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/garage': typeof GarageRoute
   '/login': typeof LoginRoute
   '/news': typeof NewsRoute
+  '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/id/$username': typeof IdUsernameRoute
 }
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/garage': typeof GarageRoute
   '/login': typeof LoginRoute
   '/news': typeof NewsRoute
+  '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/id/$username': typeof IdUsernameRoute
 }
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/garage': typeof GarageRoute
   '/login': typeof LoginRoute
   '/news': typeof NewsRoute
+  '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/id/$username': typeof IdUsernameRoute
 }
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/garage'
     | '/login'
     | '/news'
+    | '/privacy'
     | '/register'
     | '/id/$username'
   fileRoutesByTo: FileRoutesByTo
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/garage'
     | '/login'
     | '/news'
+    | '/privacy'
     | '/register'
     | '/id/$username'
   id:
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/garage'
     | '/login'
     | '/news'
+    | '/privacy'
     | '/register'
     | '/id/$username'
   fileRoutesById: FileRoutesById
@@ -117,6 +129,7 @@ export interface RootRouteChildren {
   GarageRoute: typeof GarageRoute
   LoginRoute: typeof LoginRoute
   NewsRoute: typeof NewsRoute
+  PrivacyRoute: typeof PrivacyRoute
   RegisterRoute: typeof RegisterRoute
   IdUsernameRoute: typeof IdUsernameRoute
 }
@@ -158,6 +171,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NewsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/register': {
       id: '/register'
       path: '/register'
@@ -181,6 +201,7 @@ const rootRouteChildren: RootRouteChildren = {
   GarageRoute: GarageRoute,
   LoginRoute: LoginRoute,
   NewsRoute: NewsRoute,
+  PrivacyRoute: PrivacyRoute,
   RegisterRoute: RegisterRoute,
   IdUsernameRoute: IdUsernameRoute,
 }

@@ -36,7 +36,8 @@ export const Route = createFileRoute("/login")({
       { title: "Rider Sign In — REVV Web" },
       {
         name: "description",
-        content: "Sign in with OTP or OAuth to access your REVV Digital Garage, Community Feed, and rider telemetry.",
+        content:
+          "Sign in with OTP or OAuth to access your REVV Digital Garage, Community Feed, and rider telemetry.",
       },
     ],
   }),
@@ -85,7 +86,9 @@ function LoginPage() {
     const searchParams = new URLSearchParams(window.location.search);
     const errParam = searchParams.get("error");
     if (errParam === "maintenance_active" || errParam === "maintenance") {
-      setErrorMessage("System is currently under maintenance. Only administrators can sign in at this time.");
+      setErrorMessage(
+        "System is currently under maintenance. Only administrators can sign in at this time.",
+      );
     } else if (errParam) {
       setErrorMessage(decodeURIComponent(errParam));
     }
@@ -103,7 +106,8 @@ function LoginPage() {
           if (health?.maintenance && prof.role !== "administrator") {
             logout();
             setErrorMessage(
-              health.message || "REVV is currently undergoing scheduled maintenance. Administrator access only."
+              health.message ||
+                "REVV is currently undergoing scheduled maintenance. Administrator access only.",
             );
             return;
           }
@@ -289,7 +293,11 @@ function LoginPage() {
         <div className="hud-card mt-8 space-y-6 p-7">
           <div className="flex items-center gap-3 border-b border-border/50 pb-5">
             <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 border border-primary/30 text-primary font-black text-xl">
-              {user.first_name ? user.first_name.charAt(0).toUpperCase() : user.username ? user.username.charAt(0).toUpperCase() : "R"}
+              {user.first_name
+                ? user.first_name.charAt(0).toUpperCase()
+                : user.username
+                  ? user.username.charAt(0).toUpperCase()
+                  : "R"}
             </div>
             <div className="min-w-0 flex-1">
               <span className="font-mono text-[10px] uppercase tracking-wider text-primary font-bold">
@@ -345,7 +353,8 @@ function LoginPage() {
               <ChevronRight className="size-4 text-muted-foreground" />
             </Link>
 
-            {(user.role.toLowerCase() === "administrator" || user.role.toLowerCase() === "moderator") && (
+            {(user.role.toLowerCase() === "administrator" ||
+              user.role.toLowerCase() === "moderator") && (
               <Link
                 to="/admin"
                 className="flex items-center justify-between rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 font-mono text-xs font-semibold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20"
@@ -418,7 +427,8 @@ function LoginPage() {
                 )}
 
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  A 6-digit one-time verification passcode (OTP) will be dispatched directly to your device.
+                  A 6-digit one-time verification passcode (OTP) will be dispatched directly to your
+                  device.
                 </p>
 
                 <button
@@ -540,9 +550,7 @@ function LoginPage() {
                   ))}
                 </div>
 
-                {errorMessage && (
-                  <p className="mt-3 text-xs text-destructive">{errorMessage}</p>
-                )}
+                {errorMessage && <p className="mt-3 text-xs text-destructive">{errorMessage}</p>}
 
                 {step === "verifying" && (
                   <div className="mt-4 flex items-center justify-center gap-2 font-mono text-xs text-primary">
@@ -552,9 +560,7 @@ function LoginPage() {
                 )}
 
                 <div className="mt-6 flex items-center justify-between border-t border-border/40 pt-4 text-xs font-mono">
-                  <span className="text-muted-foreground">
-                    Didn't receive the passcode?
-                  </span>
+                  <span className="text-muted-foreground">Didn't receive the passcode?</span>
                   {resendIn > 0 ? (
                     <span className="text-muted-foreground">Resend in {resendIn}s</span>
                   ) : (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
@@ -8,12 +8,18 @@ import {
   ChevronRight,
   CloudOff,
   Database,
+  FilePlus2,
   FileText,
+  ImagePlus,
   LayoutDashboard,
   Loader2,
+  Megaphone,
+  MessageSquare,
+  Pencil,
   Power,
   Radio,
   RefreshCw,
+  Scale,
   Send,
   Server,
   ShieldAlert,
@@ -24,6 +30,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
+import { RichTextEditor } from "@/components/revv/RichTextEditor";
 import {
   type AdminDashboardStats,
   type AdminSystemStatusRecord,
@@ -44,20 +51,29 @@ import {
   fetchAdminBroadcasts,
   fetchAdminComponents,
   fetchAdminDashboard,
+  fetchAdminLegalDocuments,
   fetchAdminMotorcycles,
+  fetchAdminNewsArticles,
+  fetchAdminSupportTickets,
   fetchAdminSystemStatus,
   fetchAdminUsers,
   fetchBetaRegistrations,
-  fetchNewsArticles,
+  type LegalDocumentItem,
   type MasterBrandItem,
   type MasterComponentItem,
   type MasterMotorcycleItem,
   type NewsArticle,
+  replyAdminSupportTicket,
+  resolveMediaUrl,
   sendAdminBroadcast,
+  type SupportTicketItem,
   updateAdminBrand,
+  updateAdminNewsArticle,
   updateAdminSystemStatus,
   updateAdminUser,
   updateBetaRegistration,
+  uploadCompressedMedia,
+  upsertAdminLegalDocument,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -68,14 +84,26 @@ export const Route = createFileRoute("/admin")({
       { title: "Administrator Command Console — REVV Web" },
       {
         name: "description",
-        content: "REVV Superuser Command Center for user management, master catalog, beta tester roster, and push broadcast CMS.",
+        content:
+          "REVV Superuser Command Center for user management, master catalog, beta tester roster, and push broadcast CMS.",
       },
     ],
   }),
   component: AdminPage,
 });
 
-type AdminSubTab = "overview" | "registrations" | "users" | "master" | "news" | "broadcast" | "maintenance";
+type AdminSubTab =
+  | "overview"
+  | "registrations"
+  | "users"
+  | "master"
+  | "news"
+  | "broadcast"
+  | "support"
+  | "legal"
+  | "maintenance";
+
+const NEWS_CATEGORIES = ["EDITORIAL", "UPDATE", "SAFETY", "COMMUNITY", "TELEMETRY", "EVENT"];
 
 function AdminPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -98,9 +126,13 @@ function AdminPage() {
   const [isMaintenance, setIsMaintenance] = useState(false);
   const [statusTitle, setStatusTitle] = useState("Under Scheduled Maintenance");
   const [statusMessage, setStatusMessage] = useState(
-    "Kami sedang melakukan peningkatan performa dan perawatan server REVV. Mohon tunggu beberapa saat."
+    "Kami sedang melakukan peningkatan performa dan perawatan server REVV. Mohon tunggu beberapa saat.",
   );
   const [statusIcon, setStatusIcon] = useState("wrench");
+  const [hasPurpose, setHasPurpose] = useState(false);
+  const [purposeTitle, setPurposeTitle] = useState("");
+  const [purposeMessage, setPurposeMessage] = useState("");
+  const [isDestroySession, setIsDestroySession] = useState(false);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
 
   // Master creation form inputs
@@ -114,12 +146,6 @@ function AdminPage() {
   const [newCompName, setNewCompName] = useState("");
   const [newCompKm, setNewCompKm] = useState("4000");
   const [newCompMonths, setNewCompMonths] = useState("6");
-
-  // News creation form inputs
-  const [newNewsTitle, setNewNewsTitle] = useState("");
-  const [newNewsCategory, setNewNewsCategory] = useState("MAINTENANCE");
-  const [newNewsSummary, setNewNewsSummary] = useState("");
-  const [newNewsContent, setNewNewsContent] = useState("");
 
   // Broadcast push form inputs
   const [broadcastTitle, setBroadcastTitle] = useState("");
@@ -135,24 +161,25 @@ function AdminPage() {
   const refreshAllAdminData = async () => {
     try {
       setLoading(true);
-      const [stats, users, betas, brands, motos, comps, newsRes, broadcasts, sysStatus] = await Promise.all([
-        fetchAdminDashboard().catch(() => null),
-        fetchAdminUsers().catch(() => []),
-        fetchBetaRegistrations().catch(() => []),
-        fetchAdminBrands().catch(() => []),
-        fetchAdminMotorcycles().catch(() => []),
-        fetchAdminComponents().catch(() => []),
-        fetchNewsArticles({ limit: 50 }).catch(() => ({ articles: [], total: 0 })),
-        fetchAdminBroadcasts().catch(() => []),
-        fetchAdminSystemStatus().catch(() => null),
-      ]);
+      const [stats, users, betas, brands, motos, comps, newsRes, broadcasts, sysStatus] =
+        await Promise.all([
+          fetchAdminDashboard().catch(() => null),
+          fetchAdminUsers().catch(() => []),
+          fetchBetaRegistrations().catch(() => []),
+          fetchAdminBrands().catch(() => []),
+          fetchAdminMotorcycles().catch(() => []),
+          fetchAdminComponents().catch(() => []),
+          fetchAdminNewsArticles().catch(() => []),
+          fetchAdminBroadcasts().catch(() => []),
+          fetchAdminSystemStatus().catch(() => null),
+        ]);
       setAdminStats(stats);
       setAdminUsers(users);
       setBetaRegistrations(betas);
       setAdminBrands(brands);
       setAdminMotorcycles(motos);
       setAdminComponents(comps);
-      setAdminNews(newsRes.articles);
+      setAdminNews(newsRes);
       setAdminBroadcasts(broadcasts);
       if (sysStatus) {
         setSystemStatus(sysStatus);
@@ -160,6 +187,10 @@ function AdminPage() {
         setStatusTitle(sysStatus.title);
         setStatusMessage(sysStatus.message);
         setStatusIcon(sysStatus.icon);
+        setHasPurpose(Boolean(sysStatus.hasPurpose));
+        setPurposeTitle(sysStatus.purposeTitle || "");
+        setPurposeMessage(sysStatus.purposeMessage || "");
+        setIsDestroySession(Boolean(sysStatus.isDestroySession));
       }
       if (brands.length > 0 && brands[0] && !newMotoBrandId) {
         setNewMotoBrandId(String(brands[0].id));
@@ -179,16 +210,26 @@ function AdminPage() {
         title: statusTitle.trim(),
         message: statusMessage.trim(),
         icon: statusIcon.trim(),
+        hasPurpose,
+        purposeTitle: purposeTitle.trim(),
+        purposeMessage: purposeMessage.trim(),
+        isDestroySession,
       });
       setSystemStatus(updated);
       setIsMaintenance(updated.is_maintenance);
       setStatusTitle(updated.title);
       setStatusMessage(updated.message);
       setStatusIcon(updated.icon);
+      setHasPurpose(Boolean(updated.hasPurpose));
+      setPurposeTitle(updated.purposeTitle || "");
+      setPurposeMessage(updated.purposeMessage || "");
+      setIsDestroySession(Boolean(updated.isDestroySession));
       setNotice(
-        updated.is_maintenance
-          ? "⚠️ System status updated: MAINTENANCE MODE ACTIVE. Non-administrators are blocked from signing in."
-          : "✅ System status updated: OPERATIONAL. All riders can sign in normally."
+        updated.isDestroySession
+          ? "System status saved: Maintenance/Purpose active & mobile session destroy triggered."
+          : updated.is_maintenance
+            ? "System status updated: MAINTENANCE MODE ACTIVE. Non-administrators are blocked from signing in."
+            : "System status updated: OPERATIONAL & health flags saved.",
       );
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Failed to update system maintenance status.");
@@ -245,7 +286,9 @@ function AdminPage() {
           Access Denied
         </h1>
         <p className="text-sm text-muted-foreground">
-          Your current account role is <strong className="text-foreground uppercase">{user?.role || "user"}</strong>. Administrator clearance is required to view or execute commands in this console.
+          Your current account role is{" "}
+          <strong className="text-foreground uppercase">{user?.role || "user"}</strong>.
+          Administrator clearance is required to view or execute commands in this console.
         </p>
         <div className="pt-2">
           {user?.username ? (
@@ -281,7 +324,8 @@ function AdminPage() {
             Administrator Console
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Role: <span className="font-bold uppercase text-primary">{user?.role}</span> · Realtime Control for Roster, Catalog, RBAC, and Push Broadcasts.
+            Role: <span className="font-bold uppercase text-primary">{user?.role}</span> · Realtime
+            Control for Roster, Catalog, RBAC, and Push Broadcasts.
           </p>
         </div>
 
@@ -320,6 +364,8 @@ function AdminPage() {
             ["master", "Master Data CRUD", Database],
             ["news", `News CMS (${adminNews.length})`, FileText],
             ["broadcast", `Push Broadcast (${adminBroadcasts.length})`, Bell],
+            ["support", "Support Inbox", MessageSquare],
+            ["legal", "Privacy & Legal", Scale],
             [
               "maintenance",
               isMaintenance ? "Maintenance (ACTIVE)" : "System Health",
@@ -357,7 +403,10 @@ function AdminPage() {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   {[
                     ["Active Users", adminStats.active_users],
-                    ["Suspended / Deleted", `${adminStats.suspended_users} / ${adminStats.deleted_users}`],
+                    [
+                      "Suspended / Deleted",
+                      `${adminStats.suspended_users} / ${adminStats.deleted_users}`,
+                    ],
                     ["Pending Beta Roster", adminStats.pending_registrations],
                     ["Approved Beta Roster", adminStats.approved_registrations],
                     ["Digital Garages", adminStats.total_garages],
@@ -412,12 +461,12 @@ function AdminPage() {
                         </span>
                       </div>
                       <p className="font-mono text-xs text-muted-foreground">
-                        Play Store: {reg.playstore_email || reg.email} · Phone: {reg.phone || "-"} · City: {reg.city || "-"} · Bike: {reg.motorcycle_brand || "-"} {reg.motorcycle_series || ""}
+                        Play Store: {reg.playstore_email || reg.email} · Phone: {reg.phone || "-"} ·
+                        City: {reg.city || "-"} · Bike: {reg.motorcycle_brand || "-"}{" "}
+                        {reg.motorcycle_series || ""}
                       </p>
                       {reg.notes && (
-                        <p className="text-xs text-muted-foreground/90 italic">
-                          "{reg.notes}"
-                        </p>
+                        <p className="text-xs text-muted-foreground/90 italic">"{reg.notes}"</p>
                       )}
                     </div>
 
@@ -477,7 +526,8 @@ function AdminPage() {
               <div className="space-y-3">
                 {adminUsers.map((u) => {
                   const isSelf =
-                    u.id === user?.id || (user?.email && u.email?.toLowerCase() === user.email.toLowerCase());
+                    u.id === user?.id ||
+                    (user?.email && u.email?.toLowerCase() === user.email.toLowerCase());
 
                   return (
                     <div
@@ -490,7 +540,9 @@ function AdminPage() {
                             {u.username ? `@${u.username}` : u.email || u.phone || u.id}
                           </span>
                           {u.noreg && (
-                            <span className="font-mono text-xs text-primary font-bold">{u.noreg}</span>
+                            <span className="font-mono text-xs text-primary font-bold">
+                              {u.noreg}
+                            </span>
                           )}
                           <span className="rounded border border-border bg-secondary/60 px-2 py-0.5 font-mono text-[10px] uppercase font-bold">
                             Role: {u.role}
@@ -533,9 +585,13 @@ function AdminPage() {
                                 try {
                                   await updateAdminUser(u.id, { role: nextRole });
                                   setAdminUsers(await fetchAdminUsers());
-                                  setNotice(`Updated role for ${u.email || u.username} to ${nextRole}`);
+                                  setNotice(
+                                    `Updated role for ${u.email || u.username} to ${nextRole}`,
+                                  );
                                 } catch (err) {
-                                  setNotice(err instanceof Error ? err.message : "Failed to update role");
+                                  setNotice(
+                                    err instanceof Error ? err.message : "Failed to update role",
+                                  );
                                 }
                               }}
                               className="rounded border border-input bg-secondary/60 px-2.5 py-1.5 font-mono text-xs uppercase text-foreground"
@@ -566,9 +622,13 @@ function AdminPage() {
                                 try {
                                   await updateAdminUser(u.id, { status: nextStatus });
                                   setAdminUsers(await fetchAdminUsers());
-                                  setNotice(`Updated status for ${u.email || u.username} to ${nextStatus}`);
+                                  setNotice(
+                                    `Updated status for ${u.email || u.username} to ${nextStatus}`,
+                                  );
                                 } catch (err) {
-                                  setNotice(err instanceof Error ? err.message : "Failed to update status");
+                                  setNotice(
+                                    err instanceof Error ? err.message : "Failed to update status",
+                                  );
                                 }
                               }}
                               className="rounded border border-input bg-secondary/60 px-2.5 py-1.5 font-mono text-xs uppercase text-foreground"
@@ -599,7 +659,9 @@ function AdminPage() {
                                   setAdminUsers(await fetchAdminUsers());
                                   setNotice("User soft-deleted and bearer sessions revoked.");
                                 } catch (err) {
-                                  setNotice(err instanceof Error ? err.message : "Failed to delete user");
+                                  setNotice(
+                                    err instanceof Error ? err.message : "Failed to delete user",
+                                  );
                                 }
                               }}
                               className="inline-flex items-center gap-1 rounded border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 font-mono text-xs uppercase text-destructive hover:bg-destructive/20"
@@ -658,9 +720,7 @@ function AdminPage() {
                     >
                       <span>
                         {b.name}{" "}
-                        {!b.is_active && (
-                          <span className="text-muted-foreground">(Archived)</span>
-                        )}
+                        {!b.is_active && <span className="text-muted-foreground">(Archived)</span>}
                       </span>
                       <div className="flex items-center gap-2">
                         <button
@@ -736,18 +796,30 @@ function AdminPage() {
                       onChange={(e) => setNewMotoTransmission(e.target.value)}
                       className="rounded border border-input bg-secondary/40 px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
                     >
-                      <option value="matic" className="bg-background">matic</option>
-                      <option value="manual" className="bg-background">manual</option>
+                      <option value="matic" className="bg-background">
+                        matic
+                      </option>
+                      <option value="manual" className="bg-background">
+                        manual
+                      </option>
                     </select>
                     <select
                       value={newMotoCategory}
                       onChange={(e) => setNewMotoCategory(e.target.value)}
                       className="rounded border border-input bg-secondary/40 px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
                     >
-                      <option value="scooter" className="bg-background">scooter</option>
-                      <option value="sport" className="bg-background">sport</option>
-                      <option value="naked" className="bg-background">naked</option>
-                      <option value="touring" className="bg-background">touring</option>
+                      <option value="scooter" className="bg-background">
+                        scooter
+                      </option>
+                      <option value="sport" className="bg-background">
+                        sport
+                      </option>
+                      <option value="naked" className="bg-background">
+                        naked
+                      </option>
+                      <option value="touring" className="bg-background">
+                        touring
+                      </option>
                     </select>
                     <input
                       type="number"
@@ -875,105 +947,15 @@ function AdminPage() {
             </div>
           )}
 
-          {/* TAB 5: NEWS CMS */}
+          {/* TAB 5: NEWS CMS (WYSIWYG + COMPRESSED MEDIA + PUSH) */}
           {activeSubTab === "news" && (
-            <div className="grid gap-6 lg:grid-cols-3">
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (!newNewsTitle.trim() || !newNewsContent.trim()) return;
-                  await createAdminNewsArticle({
-                    title: newNewsTitle.trim(),
-                    category: newNewsCategory,
-                    summary: newNewsSummary.trim() || newNewsTitle.trim(),
-                    content: newNewsContent.trim(),
-                    is_highlight: false,
-                  });
-                  setNewNewsTitle("");
-                  setNewNewsSummary("");
-                  setNewNewsContent("");
-                  const res = await fetchNewsArticles({ limit: 50 });
-                  setAdminNews(res.articles);
-                  setNotice("News article published to riders.");
-                }}
-                className="hud-card space-y-3 p-5"
-              >
-                <h3 className="font-display text-lg font-bold uppercase">
-                  Publish News Article
-                </h3>
-                <input
-                  type="text"
-                  required
-                  value={newNewsTitle}
-                  onChange={(e) => setNewNewsTitle(e.target.value)}
-                  placeholder="Article headline"
-                  className="w-full rounded border border-input bg-secondary/40 px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
-                />
-                <input
-                  type="text"
-                  value={newNewsCategory}
-                  onChange={(e) => setNewNewsCategory(e.target.value)}
-                  placeholder="Category (MAINTENANCE, SAFETY, PRODUCT)"
-                  className="w-full rounded border border-input bg-secondary/40 px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
-                />
-                <textarea
-                  rows={2}
-                  value={newNewsSummary}
-                  onChange={(e) => setNewNewsSummary(e.target.value)}
-                  placeholder="Short summary"
-                  className="w-full rounded border border-input bg-secondary/40 px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
-                />
-                <textarea
-                  rows={5}
-                  required
-                  value={newNewsContent}
-                  onChange={(e) => setNewNewsContent(e.target.value)}
-                  placeholder="Full article body (Markdown supported)..."
-                  className="w-full rounded border border-input bg-secondary/40 px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
-                />
-                <button type="submit" className="btn-primary w-full">
-                  Publish Article
-                </button>
-              </form>
-
-              <div className="space-y-3 lg:col-span-2">
-                {adminNews.length === 0 ? (
-                  <div className="hud-card p-12 text-center text-muted-foreground">
-                    No articles published yet.
-                  </div>
-                ) : (
-                  adminNews.map((art) => (
-                    <div
-                      key={art.id}
-                      className="hud-card flex items-center justify-between gap-4 p-5"
-                    >
-                      <div>
-                        <span className="font-mono text-[10px] uppercase text-primary font-bold">
-                          {art.category} · {art.author_name}
-                        </span>
-                        <h4 className="font-display text-lg font-bold text-foreground">{art.title}</h4>
-                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                          {art.summary}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await deleteAdminNewsArticle(art.id);
-                          const res = await fetchNewsArticles({ limit: 50 });
-                          setAdminNews(res.articles);
-                          setNotice("Article deleted.");
-                        }}
-                        className="rounded border border-destructive/40 bg-destructive/10 p-2 text-destructive hover:bg-destructive/20"
-                        title="Delete article"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+            <NewsCmsTab
+              articles={adminNews}
+              onReload={async () => {
+                setAdminNews(await fetchAdminNewsArticles().catch(() => []));
+              }}
+              onNotice={setNotice}
+            />
           )}
 
           {/* TAB 6: PUSH BROADCAST CMS */}
@@ -985,7 +967,8 @@ function AdminPage() {
                     Push Notification Broadcast CMS
                   </h3>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Broadcast push notifications to all REVV mobile app riders or target specific users via Firebase Cloud Messaging & Realtime SSE.
+                    Broadcast push notifications to all REVV mobile app riders or target specific
+                    users via Firebase Cloud Messaging & Realtime SSE.
                   </p>
                 </div>
                 <button
@@ -1104,7 +1087,9 @@ function AdminPage() {
                   <div className="space-y-2">
                     <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
                       <span>In-App Deep Link / Target Route</span>
-                      <span className="text-[10px] text-primary font-bold uppercase tracking-wider">Predefined Only</span>
+                      <span className="text-[10px] text-primary font-bold uppercase tracking-wider">
+                        Predefined Only
+                      </span>
                     </label>
                     <select
                       value={broadcastDeepLink}
@@ -1112,7 +1097,9 @@ function AdminPage() {
                       className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2.5 font-mono text-xs text-foreground focus:border-primary focus:outline-none"
                     >
                       <optgroup label="Core Navigation Screens">
-                        <option value="notifications">🔔 Notifications Screen (Default Inbox)</option>
+                        <option value="notifications">
+                          🔔 Notifications Screen (Default Inbox)
+                        </option>
                         <option value="feed">📰 Rider Community Feed</option>
                         <option value="community">👥 Motorcycle Clubs & Community</option>
                         <option value="garage">🔧 Digital Garage & Telemetry Fleet</option>
@@ -1123,7 +1110,10 @@ function AdminPage() {
                         <optgroup label="Motorcycle News Articles">
                           {adminNews.map((article) => (
                             <option key={article.slug} value={`news/${article.slug}`}>
-                              📖 News: {article.title.length > 55 ? `${article.title.slice(0, 52)}...` : article.title}
+                              📖 News:{" "}
+                              {article.title.length > 55
+                                ? `${article.title.slice(0, 52)}...`
+                                : article.title}
                             </option>
                           ))}
                         </optgroup>
@@ -1144,7 +1134,9 @@ function AdminPage() {
                     </select>
                     <p className="font-mono text-[11px] text-muted-foreground flex items-center justify-between pt-0.5">
                       <span>Selected Route Target:</span>
-                      <code className="text-primary font-bold">{broadcastDeepLink || "notifications"}</code>
+                      <code className="text-primary font-bold">
+                        {broadcastDeepLink || "notifications"}
+                      </code>
                     </p>
                   </div>
 
@@ -1165,7 +1157,8 @@ function AdminPage() {
                           title: broadcastTitle.trim(),
                           body: broadcastBody.trim(),
                           target_type: broadcastTargetType,
-                          target_user_id: broadcastTargetType === "user" ? broadcastTargetUserId : undefined,
+                          target_user_id:
+                            broadcastTargetType === "user" ? broadcastTargetUserId : undefined,
                           data: {
                             route: routeTarget,
                             link: routeTarget,
@@ -1210,7 +1203,8 @@ function AdminPage() {
                     Live Device Push Preview
                   </h4>
                   <p className="text-xs text-muted-foreground">
-                    Real-time rendering of how riders will experience this alert in the mobile notification drawer:
+                    Real-time rendering of how riders will experience this alert in the mobile
+                    notification drawer:
                   </p>
 
                   <div className="mx-auto max-w-sm rounded-2xl border border-border/80 bg-[#0B0F14] p-4 shadow-xl">
@@ -1287,6 +1281,12 @@ function AdminPage() {
             </div>
           )}
 
+          {/* SUPPORT TICKETS INBOX */}
+          {activeSubTab === "support" && <SupportInboxTab onNotice={setNotice} />}
+
+          {/* PRIVACY & GLOBAL COMPLIANCE CMS */}
+          {activeSubTab === "legal" && <LegalCmsTab onNotice={setNotice} />}
+
           {/* TAB 7: SYSTEM HEALTH & MAINTENANCE CONTROL */}
           {activeSubTab === "maintenance" && (
             <div className="space-y-6">
@@ -1296,7 +1296,7 @@ function AdminPage() {
                   "rounded-2xl border p-6 transition-colors",
                   isMaintenance
                     ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
-                    : "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                    : "border-emerald-500/40 bg-emerald-500/10 text-emerald-200",
                 )}
               >
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -1306,7 +1306,7 @@ function AdminPage() {
                         "rounded-xl p-3 shrink-0",
                         isMaintenance
                           ? "bg-amber-500/20 text-amber-400"
-                          : "bg-emerald-500/20 text-emerald-400"
+                          : "bg-emerald-500/20 text-emerald-400",
                       )}
                     >
                       {isMaintenance ? (
@@ -1323,7 +1323,7 @@ function AdminPage() {
                         <span
                           className={cn(
                             "inline-block size-2 rounded-full",
-                            isMaintenance ? "bg-amber-400 animate-pulse" : "bg-emerald-400"
+                            isMaintenance ? "bg-amber-400 animate-pulse" : "bg-emerald-400",
                           )}
                         />
                       </div>
@@ -1347,7 +1347,7 @@ function AdminPage() {
                       "inline-flex items-center gap-2.5 rounded-xl px-5 py-3 font-mono text-xs font-bold uppercase tracking-wider shadow-lg transition-all active:scale-95 shrink-0",
                       isMaintenance
                         ? "bg-amber-500 hover:bg-amber-400 text-black shadow-amber-500/20"
-                        : "bg-secondary border border-border hover:bg-secondary/80 text-foreground"
+                        : "bg-secondary border border-border hover:bg-secondary/80 text-foreground",
                     )}
                   >
                     <Power className="size-4" />
@@ -1364,7 +1364,8 @@ function AdminPage() {
                       Maintenance Screen Configuration
                     </h4>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Customize the dynamic title, description, and icon broadcast to mobile and web clients.
+                      Customize the dynamic title, description, and icon broadcast to mobile and web
+                      clients.
                     </p>
                   </div>
 
@@ -1440,7 +1441,7 @@ function AdminPage() {
                             "flex items-center gap-2 rounded-lg border p-2.5 text-xs font-mono transition-all",
                             statusIcon === val
                               ? "border-primary bg-primary/20 text-primary font-bold shadow-sm"
-                              : "border-border/60 bg-secondary/20 text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
+                              : "border-border/60 bg-secondary/20 text-muted-foreground hover:bg-secondary/40 hover:text-foreground",
                           )}
                         >
                           <IconComponent className="size-4 shrink-0" />
@@ -1448,6 +1449,71 @@ function AdminPage() {
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Remote Purpose Dialog & Force Logout (30s Mobile Health Trigger) */}
+                  <div className="space-y-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
+                    <label className="flex cursor-pointer items-center justify-between gap-3">
+                      <div>
+                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground block">
+                          Custom Purpose Notice (`hasPurpose`)
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          Displays a modal popup inside active mobile sessions every 30s health
+                          poll.
+                        </span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={hasPurpose}
+                        onChange={(e) => setHasPurpose(e.target.checked)}
+                        className="size-5 accent-primary"
+                      />
+                    </label>
+
+                    <div className="space-y-1.5">
+                      <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+                        Purpose Title (`purposeTitle`)
+                      </label>
+                      <input
+                        type="text"
+                        value={purposeTitle}
+                        onChange={(e) => setPurposeTitle(e.target.value)}
+                        placeholder="e.g. Important Security Update"
+                        className="w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+                        Purpose Message (`purposeMessage`)
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={purposeMessage}
+                        onChange={(e) => setPurposeMessage(e.target.value)}
+                        placeholder="Message shown inside mobile purpose popup…"
+                        className="w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none"
+                      />
+                    </div>
+
+                    <label className="flex cursor-pointer items-start justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3">
+                      <div>
+                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-destructive block">
+                          Destroy Mobile Sessions (`isDestroySession`)
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          Forces active mobile riders to log out and clears cached local
+                          credentials.
+                        </span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={isDestroySession}
+                        onChange={(e) => setIsDestroySession(e.target.checked)}
+                        className="mt-1 size-5 accent-destructive"
+                      />
+                    </label>
                   </div>
 
                   {/* Save Button */}
@@ -1483,7 +1549,8 @@ function AdminPage() {
                       Live Mobile & Web Client Preview
                     </h4>
                     <p className="text-xs text-muted-foreground">
-                      Real-time simulation of how riders experience the health checker block on opening the app:
+                      Real-time simulation of how riders experience the health checker block on
+                      opening the app:
                     </p>
                   </div>
 
@@ -1500,7 +1567,9 @@ function AdminPage() {
 
                     {/* Logo */}
                     <div className="pt-2">
-                      <span className="font-display font-black tracking-widest text-lg text-primary">REVV</span>
+                      <span className="font-display font-black tracking-widest text-lg text-primary">
+                        REVV
+                      </span>
                       <p className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">
                         Digital Cockpit
                       </p>
@@ -1544,7 +1613,8 @@ function AdminPage() {
                   </div>
 
                   <p className="text-center font-mono text-[10px] text-muted-foreground">
-                    Status endpoint: <code className="text-primary font-bold">GET /health</code> & <code className="text-primary font-bold">GET /api/v1/health</code>
+                    Status endpoint: <code className="text-primary font-bold">GET /health</code> &{" "}
+                    <code className="text-primary font-bold">GET /api/v1/health</code>
                   </p>
                 </div>
               </div>
@@ -1553,5 +1623,804 @@ function AdminPage() {
         </>
       )}
     </div>
+  );
+}
+
+function NewsCmsTab({
+  articles,
+  onReload,
+  onNotice,
+}: {
+  articles: NewsArticle[];
+  onReload: () => Promise<void>;
+  onNotice: (msg: string | null) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("EDITORIAL");
+  const [authorName, setAuthorName] = useState("REVV Editorial");
+  const [readingMinutes, setReadingMinutes] = useState(4);
+  const [summary, setSummary] = useState("");
+  const [content, setContent] = useState("");
+  const [coverUrl, setCoverUrl] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [isHighlight, setIsHighlight] = useState(false);
+  const [highImportance, setHighImportance] = useState(false);
+
+  const resetForm = () => {
+    setEditingId(null);
+    setTitle("");
+    setCategory("EDITORIAL");
+    setAuthorName("REVV Editorial");
+    setReadingMinutes(4);
+    setSummary("");
+    setContent("");
+    setCoverUrl("");
+    setThumbnailUrl("");
+    setIsHighlight(false);
+    setHighImportance(false);
+  };
+
+  const selectForEdit = (article: NewsArticle) => {
+    setEditingId(article.id);
+    setTitle(article.title);
+    setCategory(article.category || "EDITORIAL");
+    setAuthorName(article.author_name || "REVV Editorial");
+    setReadingMinutes(article.reading_time_minutes || 3);
+    setSummary(article.summary);
+    setContent(article.content);
+    setCoverUrl(article.cover_image_url || "");
+    setThumbnailUrl(article.thumbnail_url || article.cover_image_url || "");
+    setIsHighlight(Boolean(article.is_highlight));
+    setHighImportance(Boolean(article.high_importance));
+    onNotice(null);
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadingCover(true);
+    onNotice(null);
+    try {
+      const uploaded = await uploadCompressedMedia(file);
+      setCoverUrl(uploaded.url);
+      setThumbnailUrl(uploaded.thumbnail_url);
+      onNotice("Cover & 480px compressed thumbnail uploaded.");
+    } catch (err) {
+      onNotice(err instanceof Error ? err.message : "Cover upload failed");
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !content.trim()) return;
+    setSaving(true);
+    onNotice(null);
+    try {
+      if (editingId) {
+        const res = await updateAdminNewsArticle(editingId, {
+          title: title.trim(),
+          summary: summary.trim() || title.trim(),
+          content: content.trim(),
+          category: category.trim() || "EDITORIAL",
+          author_name: authorName.trim() || "REVV Editorial",
+          cover_image_url: coverUrl || null,
+          thumbnail_url: thumbnailUrl || coverUrl || null,
+          reading_time_minutes: readingMinutes,
+          is_highlight: isHighlight,
+          high_importance: highImportance,
+        });
+        onNotice(
+          res.push_sent_count
+            ? `Article updated & high-importance push delivered to ${res.push_sent_count} devices.`
+            : "News article updated.",
+        );
+      } else {
+        const res = await createAdminNewsArticle({
+          title: title.trim(),
+          summary: summary.trim() || title.trim(),
+          content: content.trim(),
+          category: category.trim() || "EDITORIAL",
+          author_name: authorName.trim() || "REVV Editorial",
+          cover_image_url: coverUrl || null,
+          thumbnail_url: thumbnailUrl || coverUrl || null,
+          reading_time_minutes: readingMinutes,
+          is_highlight: isHighlight,
+          high_importance: highImportance,
+        });
+        onNotice(
+          res.push_sent_count
+            ? `Article published! High-importance push delivered to ${res.push_sent_count} devices.`
+            : "News article published to Newsroom & Mobile.",
+        );
+        resetForm();
+      }
+      await onReload();
+    } catch (err) {
+      onNotice(err instanceof Error ? err.message : "Failed to save article");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+      <div className="hud-card flex flex-col p-5">
+        <div className="flex items-center justify-between border-b border-border/50 pb-3">
+          <h3 className="font-display text-base font-bold uppercase tracking-wide text-foreground">
+            Published ({articles.length})
+          </h3>
+          <button
+            type="button"
+            onClick={resetForm}
+            className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 font-mono text-[11px] font-bold uppercase text-primary-foreground"
+          >
+            <FilePlus2 className="size-3.5" />
+            New
+          </button>
+        </div>
+
+        <div className="mt-4 max-h-[680px] space-y-2.5 overflow-y-auto pr-1">
+          {articles.length === 0 ? (
+            <p className="py-6 text-center text-xs text-muted-foreground">
+              No articles published yet.
+            </p>
+          ) : (
+            articles.map((item) => (
+              <div
+                key={item.id}
+                className={cn(
+                  "rounded-xl border p-3 transition-colors",
+                  editingId === item.id
+                    ? "border-primary bg-primary/10"
+                    : "border-border/60 bg-secondary/30",
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="rounded bg-secondary px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-primary">
+                    {item.category}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {item.high_importance && (
+                      <span
+                        title="High Importance Push Sent"
+                        className="rounded bg-primary/20 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary"
+                      >
+                        PUSH
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => selectForEdit(item)}
+                      className="rounded p-1 text-muted-foreground hover:text-primary"
+                      aria-label="Edit article"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!window.confirm("Delete this news article permanently?")) return;
+                        await deleteAdminNewsArticle(item.id);
+                        if (editingId === item.id) resetForm();
+                        await onReload();
+                        onNotice("Article deleted.");
+                      }}
+                      className="rounded p-1 text-muted-foreground hover:text-destructive"
+                      aria-label="Delete article"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+                </div>
+                <p className="mt-1.5 line-clamp-2 text-sm font-bold text-foreground">
+                  {item.title}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="hud-card space-y-5 p-6">
+        <div className="flex items-center justify-between border-b border-border/50 pb-4">
+          <h3 className="font-display text-xl font-black uppercase tracking-tight text-foreground">
+            {editingId ? "Edit News Dispatch" : "Compose News Dispatch"}
+          </h3>
+          {editingId && (
+            <button
+              type="button"
+              onClick={resetForm}
+              className="font-mono text-xs uppercase text-muted-foreground hover:text-primary"
+            >
+              Cancel Edit
+            </button>
+          )}
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
+              Headline Title *
+            </label>
+            <input
+              required
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. REVV 2.4 Telemetry & Low-Latency Intercom"
+              className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
+              Category
+            </label>
+            <select
+              value={NEWS_CATEGORIES.includes(category) ? category : "CUSTOM"}
+              onChange={(e) => setCategory(e.target.value === "CUSTOM" ? "" : e.target.value)}
+              className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            >
+              {NEWS_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              <option value="CUSTOM">Custom Category…</option>
+            </select>
+            {!NEWS_CATEGORIES.includes(category) && (
+              <input
+                type="text"
+                placeholder="Enter custom category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value.toUpperCase())}
+                className="mt-2 w-full rounded-lg border border-input bg-secondary/40 px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+              />
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
+                Author
+              </label>
+              <input
+                type="text"
+                value={authorName}
+                onChange={(e) => setAuthorName(e.target.value)}
+                className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
+                Read Mins
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={readingMinutes}
+                onChange={(e) => setReadingMinutes(Number(e.target.value) || 3)}
+                className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border/60 bg-secondary/30 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-mono text-xs font-bold uppercase text-foreground">
+                Cover Image &amp; Auto-Compressed Thumbnail
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Canvas-compressed (1280px WebP/JPEG cover + 480px card thumbnail for mobile RAM).
+              </p>
+            </div>
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-secondary/60 px-3 py-2 text-xs font-semibold text-foreground hover:border-primary">
+              {uploadingCover ? (
+                <Loader2 className="size-4 animate-spin text-primary" />
+              ) : (
+                <ImagePlus className="size-4 text-primary" />
+              )}
+              Upload Cover
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleCoverUpload}
+              />
+            </label>
+          </div>
+          {coverUrl && (
+            <div className="mt-3 flex items-center gap-4">
+              <img
+                src={resolveMediaUrl(thumbnailUrl || coverUrl) ?? undefined}
+                alt="Cover preview"
+                className="h-16 w-28 rounded-lg border border-border object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setCoverUrl("");
+                  setThumbnailUrl("");
+                }}
+                className="text-xs font-semibold text-destructive hover:underline"
+              >
+                Remove Cover
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
+            Summary *
+          </label>
+          <textarea
+            required
+            rows={2}
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+            placeholder="Concise summary displayed on Feed carousel and Newsroom cards…"
+            className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
+            Article Body (WYSIWYG — Bold, Italic, Underline, Quote &amp; Captioned Images) *
+          </label>
+          <RichTextEditor
+            value={content}
+            onChange={setContent}
+            placeholder="Compose rich article body. Click Embed Image to upload compressed photos with 'Image : caption'…"
+          />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-border/60 bg-secondary/30 p-3.5">
+            <span className="text-sm font-semibold text-foreground">Feature as Highlight</span>
+            <input
+              type="checkbox"
+              checked={isHighlight}
+              onChange={(e) => setIsHighlight(e.target.checked)}
+              className="size-5 accent-primary"
+            />
+          </label>
+
+          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-primary/40 bg-primary/10 p-3.5">
+            <div className="flex items-center gap-2">
+              <Megaphone className="size-4 shrink-0 text-primary" />
+              <div>
+                <span className="block text-sm font-bold text-foreground">
+                  High Importance Push
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  Send mobile push notification to active riders
+                </span>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={highImportance}
+              onChange={(e) => setHighImportance(e.target.checked)}
+              className="size-5 accent-primary"
+            />
+          </label>
+        </div>
+
+        <div className="flex justify-end">
+          <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50">
+            {saving ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+            {editingId ? "Update Dispatch" : "Publish Dispatch"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function SupportInboxTab({ onNotice }: { onNotice: (msg: string | null) => void }) {
+  const [tickets, setTickets] = useState<SupportTicketItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [sendingId, setSendingId] = useState<string | null>(null);
+
+  const loadTickets = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetchAdminSupportTickets({ page, limit: 15, status: statusFilter });
+      setTickets(res.tickets);
+      setTotalPages(res.totalPages);
+    } catch (err) {
+      onNotice(err instanceof Error ? err.message : "Failed to load tickets");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, statusFilter, onNotice]);
+
+  useEffect(() => {
+    void loadTickets();
+  }, [loadTickets]);
+
+  const handleReply = async (ticketId: string) => {
+    const reply = (replyDrafts[ticketId] || "").trim();
+    if (!reply) return;
+    setSendingId(ticketId);
+    onNotice(null);
+    try {
+      const res = await replyAdminSupportTicket(ticketId, reply, "Replied");
+      onNotice(
+        `Reply saved for ${res.ticket.reference_code}. Push delivered to ${res.push_sent_count} device(s).`,
+      );
+      setReplyDrafts((prev) => ({ ...prev, [ticketId]: "" }));
+      await loadTickets();
+    } catch (err) {
+      onNotice(err instanceof Error ? err.message : "Failed to send reply");
+    } finally {
+      setSendingId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="hud-card flex flex-wrap items-center justify-between gap-3 p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          {["ALL", "Open", "Replied", "Closed"].map((st) => (
+            <button
+              key={st}
+              type="button"
+              onClick={() => {
+                setStatusFilter(st);
+                setPage(1);
+              }}
+              className={cn(
+                "rounded-lg px-3.5 py-1.5 font-mono text-xs font-bold uppercase transition-colors",
+                statusFilter === st
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border bg-secondary/40 text-muted-foreground hover:border-primary hover:text-foreground",
+              )}
+            >
+              {st}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void loadTickets()}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary/40 px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary"
+        >
+          <RefreshCw className="size-3.5" />
+          Refresh
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="hud-card flex items-center justify-center gap-2 py-12">
+          <RefreshCw className="size-4 animate-spin text-primary" />
+          <span className="text-sm text-muted-foreground">Loading support tickets…</span>
+        </div>
+      ) : tickets.length === 0 ? (
+        <div className="hud-card py-12 text-center text-sm text-muted-foreground">
+          No support tickets in this view.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {tickets.map((t) => (
+            <div key={t.id} className="hud-card space-y-4 p-6">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded bg-primary/15 px-2.5 py-1 font-mono text-xs font-bold text-primary">
+                    {t.reference_code}
+                  </span>
+                  <span className="rounded bg-secondary px-2.5 py-1 font-mono text-xs font-semibold uppercase text-foreground">
+                    {t.status}
+                  </span>
+                </div>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {new Date(t.created_at).toLocaleString()}
+                </span>
+              </div>
+
+              <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-3">
+                <span>
+                  Rider: <strong className="text-foreground">{t.reporter_name}</strong>
+                </span>
+                <span>
+                  Email: <strong className="text-foreground">{t.reporter_email || "—"}</strong>
+                </span>
+                <span>
+                  Phone: <strong className="text-foreground">{t.reporter_phone || "—"}</strong>
+                </span>
+              </div>
+
+              <p className="rounded-lg border border-border/60 bg-secondary/30 p-3.5 text-sm leading-relaxed text-foreground">
+                {t.message}
+              </p>
+
+              {t.admin_reply && (
+                <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-sm text-foreground">
+                  <span className="block font-mono text-[11px] font-bold uppercase text-emerald-400">
+                    Admin Reply Sent
+                  </span>
+                  <p className="mt-1">{t.admin_reply}</p>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="text"
+                  placeholder="Write reply (triggers immediate mobile push + in-app notification)…"
+                  value={replyDrafts[t.id] ?? ""}
+                  onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [t.id]: e.target.value }))}
+                  className="flex-1 rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                />
+                <button
+                  type="button"
+                  disabled={sendingId === t.id || !(replyDrafts[t.id] ?? "").trim()}
+                  onClick={() => void handleReply(t.id)}
+                  className="btn-primary px-5 py-2.5 text-sm disabled:opacity-50"
+                >
+                  {sendingId === t.id ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Send className="size-4" />
+                  )}
+                  Reply &amp; Push
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="rounded-lg border border-border bg-secondary/40 px-4 py-2 text-xs font-semibold text-foreground disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <span className="font-mono text-xs text-muted-foreground">
+                Page {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="rounded-lg border border-border bg-secondary/40 px-4 py-2 text-xs font-semibold text-foreground disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LegalCmsTab({ onNotice }: { onNotice: (msg: string | null) => void }) {
+  const [docs, setDocs] = useState<LegalDocumentItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [slug, setSlug] = useState("privacy-policy");
+  const [title, setTitle] = useState("");
+  const [jurisdictions, setJurisdictions] = useState("Global · EU GDPR · US CCPA/CPRA");
+  const [version, setVersion] = useState("1.0");
+  const [sortOrder, setSortOrder] = useState(10);
+  const [isPublished, setIsPublished] = useState(true);
+  const [contentHtml, setContentHtml] = useState("");
+
+  const applyDoc = (doc: LegalDocumentItem) => {
+    setSlug(doc.slug);
+    setTitle(doc.title);
+    setJurisdictions(doc.jurisdictions);
+    setVersion(doc.version);
+    setSortOrder(doc.sort_order);
+    setIsPublished(doc.is_published);
+    setContentHtml(doc.content_html);
+  };
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const list = await fetchAdminLegalDocuments();
+        if (!active) return;
+        setDocs(list);
+        if (list.length > 0) {
+          const matched = list.find((d) => d.slug === "privacy-policy") ?? list[0];
+          if (matched) applyDoc(matched);
+        }
+      } catch (err) {
+        if (active) onNotice(err instanceof Error ? err.message : "Failed to load legal documents");
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [onNotice]);
+
+  const handleNewSlug = () => {
+    const raw = window.prompt("Enter document slug (e.g. cookie-notice):", "");
+    if (!raw) return;
+    const clean = raw
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, "-");
+    if (!clean) return;
+    setSlug(clean);
+    setTitle("New Compliance Notice");
+    setJurisdictions("Global · EU GDPR · US CCPA/CPRA");
+    setVersion("1.0");
+    setSortOrder(50);
+    setIsPublished(true);
+    setContentHtml("<h2>Overview</h2><p>Enter policy details…</p>");
+    onNotice(null);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    onNotice(null);
+    try {
+      const saved = await upsertAdminLegalDocument(slug, {
+        title,
+        content_html: contentHtml,
+        jurisdictions,
+        version,
+        is_published: isPublished,
+        sort_order: sortOrder,
+      });
+      setDocs((prev) => {
+        const idx = prev.findIndex((d) => d.slug === saved.slug);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = saved;
+          return next;
+        }
+        return [...prev, saved];
+      });
+      onNotice(`Saved "${saved.title}" (${saved.slug}).`);
+    } catch (err) {
+      onNotice(err instanceof Error ? err.message : "Failed to save legal document");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="hud-card flex items-center justify-center gap-2 py-12">
+        <RefreshCw className="size-4 animate-spin text-primary" />
+        <span className="text-sm text-muted-foreground">Loading legal compliance documents…</span>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSave} className="hud-card space-y-5 p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 pb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {docs.map((doc) => (
+            <button
+              key={doc.slug}
+              type="button"
+              onClick={() => {
+                applyDoc(doc);
+                onNotice(null);
+              }}
+              className={cn(
+                "rounded-lg px-3.5 py-2 font-mono text-xs font-bold uppercase transition-colors",
+                slug === doc.slug
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border bg-secondary/40 text-muted-foreground hover:border-primary hover:text-foreground",
+              )}
+            >
+              {doc.slug}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={handleNewSlug}
+            className="inline-flex items-center gap-1 rounded-lg border border-dashed border-border px-3 py-2 font-mono text-xs font-semibold text-foreground hover:border-primary"
+          >
+            <FilePlus2 className="size-3.5 text-primary" />
+            Add Document
+          </button>
+        </div>
+
+        <Link
+          to="/privacy"
+          className="font-mono text-xs font-semibold text-primary hover:underline"
+        >
+          View Public /privacy →
+        </Link>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="sm:col-span-2">
+          <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
+            Document Title *
+          </label>
+          <input
+            required
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
+            Version
+          </label>
+          <input
+            type="text"
+            value={version}
+            onChange={(e) => setVersion(e.target.value)}
+            className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
+            Jurisdictions (GDPR / CCPA / Global)
+          </label>
+          <input
+            type="text"
+            value={jurisdictions}
+            onChange={(e) => setJurisdictions(e.target.value)}
+            className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          />
+        </div>
+        <label className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border border-border bg-secondary/30 px-3 py-2">
+          <span className="font-mono text-xs font-semibold uppercase text-foreground">
+            Published
+          </span>
+          <input
+            type="checkbox"
+            checked={isPublished}
+            onChange={(e) => setIsPublished(e.target.checked)}
+            className="size-5 accent-primary"
+          />
+        </label>
+      </div>
+
+      <div>
+        <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
+          Policy HTML Content (WYSIWYG) *
+        </label>
+        <RichTextEditor value={contentHtml} onChange={setContentHtml} />
+      </div>
+
+      <div className="flex justify-end">
+        <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50">
+          {saving ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <CheckCircle2 className="size-4" />
+          )}
+          Save Compliance Document
+        </button>
+      </div>
+    </form>
   );
 }
