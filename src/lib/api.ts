@@ -1529,6 +1529,16 @@ export interface SystemStatusConfig {
 
 export type AdminSystemStatusRecord = SystemStatusConfig;
 
+export interface SupportTicketMessageItem {
+  id: string;
+  ticket_id: string;
+  sender_id?: string | null;
+  sender_role: "user" | "admin" | string;
+  sender_name?: string | null;
+  message: string;
+  created_at: string;
+}
+
 export interface SupportTicketItem {
   id: string;
   user_id: string;
@@ -1544,6 +1554,8 @@ export interface SupportTicketItem {
   admin_reply?: string | null;
   replied_at?: string | null;
   created_at: string;
+  can_user_reply?: boolean;
+  messages?: SupportTicketMessageItem[];
 }
 
 export interface LegalDocumentItem {

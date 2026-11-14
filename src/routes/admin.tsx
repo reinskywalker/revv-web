@@ -2146,17 +2146,53 @@ function SupportInboxTab({ onNotice }: { onNotice: (msg: string | null) => void 
                 </span>
               </div>
 
-              <p className="rounded-lg border border-border/60 bg-secondary/30 p-3.5 text-sm leading-relaxed text-foreground">
-                {t.message}
-              </p>
-
-              {t.admin_reply && (
-                <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-sm text-foreground">
-                  <span className="block font-mono text-[11px] font-bold uppercase text-emerald-400">
-                    Admin Reply Sent
-                  </span>
-                  <p className="mt-1">{t.admin_reply}</p>
+              {t.messages && t.messages.length > 0 ? (
+                <div className="space-y-2.5">
+                  {t.messages.map((m) => {
+                    const isAdmin = m.sender_role.toLowerCase() === "admin";
+                    return (
+                      <div
+                        key={m.id}
+                        className={cn(
+                          "rounded-lg border p-3.5 text-sm leading-relaxed text-foreground",
+                          isAdmin
+                            ? "border-emerald-500/40 bg-emerald-500/10"
+                            : "border-border/60 bg-secondary/30",
+                        )}
+                      >
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <span
+                            className={cn(
+                              "font-mono text-[11px] font-bold uppercase",
+                              isAdmin ? "text-emerald-400" : "text-primary",
+                            )}
+                          >
+                            {isAdmin ? m.sender_name || "Support Team (Admin)" : m.sender_name || t.reporter_name}
+                          </span>
+                          <span className="font-mono text-[11px] text-muted-foreground">
+                            {new Date(m.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="whitespace-pre-wrap">{m.message}</p>
+                      </div>
+                    );
+                  })}
                 </div>
+              ) : (
+                <>
+                  <p className="rounded-lg border border-border/60 bg-secondary/30 p-3.5 text-sm leading-relaxed text-foreground">
+                    {t.message}
+                  </p>
+
+                  {t.admin_reply && (
+                    <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-sm text-foreground">
+                      <span className="block font-mono text-[11px] font-bold uppercase text-emerald-400">
+                        Admin Reply Sent
+                      </span>
+                      <p className="mt-1">{t.admin_reply}</p>
+                    </div>
+                  )}
+                </>
               )}
 
               <div className="flex flex-col gap-2 sm:flex-row">
