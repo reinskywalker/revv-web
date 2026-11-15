@@ -61,11 +61,13 @@ export interface RiderProfile {
   date_of_birth?: string | null;
   bio?: string | null;
   city?: string | null;
+  country?: string | null;
   job?: string | null;
   account_visibility?: string | null;
   show_motorcycle_count?: boolean | null;
   show_garage_details?: boolean | null;
   show_city?: boolean | null;
+  show_country?: boolean | null;
   show_job?: boolean | null;
 }
 
@@ -823,11 +825,16 @@ export interface PublicProfileResponse {
   banner_url: string | null;
   bio: string | null;
   city: string | null;
+  country?: string | null;
   job: string | null;
-  account_visibility: "PUBLIC" | "PRIVATE";
+  account_visibility: "PUBLIC" | "PRIVATE" | "CUSTOM";
   is_friend: boolean;
   has_pending_request: boolean;
   is_private: boolean;
+  total_distance_km?: number | null;
+  max_speed_kmh?: number | null;
+  show_city?: boolean | null;
+  show_country?: boolean | null;
   motorcycle_count: number | null;
   garage: PublicProfileGarageItem[] | null;
   posts: FeedPostItem[] | null;

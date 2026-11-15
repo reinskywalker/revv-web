@@ -19,6 +19,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import { RiderOverviewPanel } from "@/components/profile/RiderOverviewPanel";
 import {
   cancelFriendRequest,
   checkUsernameAvailability,
@@ -106,7 +107,7 @@ function ProfilePage() {
             bio: myProf.bio || null,
             city: myProf.city || null,
             job: myProf.job || null,
-            account_visibility: (myProf.account_visibility as "PUBLIC" | "PRIVATE") || "PUBLIC",
+            account_visibility: (myProf.account_visibility as "PUBLIC" | "PRIVATE" | "CUSTOM") || "PUBLIC",
             is_friend: true,
             has_pending_request: false,
             is_private: false,
@@ -541,12 +542,6 @@ function ProfilePage() {
                 {profile.job}
               </span>
             )}
-            {profile.motorcycle_count !== null && (
-              <span className="flex items-center gap-1.5">
-                <Gauge className="size-3.5 text-primary" />
-                {profile.motorcycle_count} Motorcycle{profile.motorcycle_count === 1 ? "" : "s"}
-              </span>
-            )}
           </div>
 
           {profile.bio && (
@@ -684,6 +679,9 @@ function ProfilePage() {
         )}
       </div>
 
+      {/* Rider Overview */}
+      <RiderOverviewPanel profile={profile} />
+
       {/* Private Account Warning (Mobile Permission Rule) */}
       {profile.is_private ? (
         <div className="rounded-2xl border border-border/80 bg-card/60 p-12 text-center space-y-4">
@@ -691,7 +689,7 @@ function ProfilePage() {
             <Lock className="size-7" />
           </div>
           <h3 className="font-display text-xl font-bold uppercase tracking-wide">
-            This Account is Private
+            Garage (Hidden)
           </h3>
           <p className="max-w-md mx-auto text-sm text-muted-foreground">
             Add <span className="text-foreground font-semibold">@{profile.username}</span> as a friend to inspect their Digital Garage motorcycles and ride posts.
@@ -712,7 +710,9 @@ function ProfilePage() {
               )}
             >
               <Wrench className="size-4" />
-              Digital Garage ({profile.garage?.length || 0})
+              {profile.garage === null
+                ? "Garage (Hidden)"
+                : `Digital Garage (${profile.garage.length})`}
             </button>
             <button
               type="button"
@@ -731,7 +731,17 @@ function ProfilePage() {
 
           {activeTab === "garage" && (
             <div className="space-y-4">
-              {!profile.garage || profile.garage.length === 0 ? (
+              {profile.garage === null ? (
+                <div className="rounded-xl border border-border/80 bg-card/60 p-10 text-center space-y-2">
+                  <Lock className="size-6 mx-auto text-muted-foreground" />
+                  <p className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
+                    Garage (Hidden)
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    This rider hides their motorcycles from public view.
+                  </p>
+                </div>
+              ) : profile.garage.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
                   No motorcycles added to garage yet.
                 </div>
