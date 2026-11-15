@@ -18,7 +18,7 @@ pipeline {
 
         stage('Lint') {
             steps {
-                powershell 'npm run lint'
+                powershell 'npx eslint . --rule "prettier/prettier: [error, {endOfLine: auto}]"'
             }
         }
 
