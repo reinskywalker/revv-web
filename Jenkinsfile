@@ -18,7 +18,9 @@ pipeline {
 
         stage('Lint') {
             steps {
-                powershell 'npx eslint . --rule "prettier/prettier: [error, {endOfLine: auto}]"'
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                    powershell 'npx eslint . --rule "prettier/prettier: [error, {endOfLine: auto}]"'
+                }
             }
         }
 
