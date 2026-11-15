@@ -2,15 +2,11 @@ pipeline {
     agent any
 
     parameters {
-        booleanParam(name: 'SKIP_INSTALL', defaultValue: false, description: 'Skip npm ci')
         booleanParam(name: 'DEPLOY_VERCEL', defaultValue: false, description: 'Deploy to Vercel production after build')
     }
 
     stages {
         stage('Install Dependencies') {
-            when {
-                expression { return !params.SKIP_INSTALL }
-            }
             steps {
                 powershell 'npm ci'
             }
