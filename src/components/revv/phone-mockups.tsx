@@ -96,8 +96,8 @@ export function FeedPhone() {
             Pre-Touring Checklist
           </p>
           <p className="mt-0.5 line-clamp-2 text-[0.45rem] leading-snug text-muted-foreground">
-            Long-haul highway and mountain stages push brake fluid temperatures, tire pressures,
-            and drive chains far harder than the city commute.
+            Long-haul highway and mountain stages push brake fluid temperatures, tire pressures, and
+            drive chains far harder than the city commute.
           </p>
         </div>
         <div className="mt-1 flex items-center gap-1">

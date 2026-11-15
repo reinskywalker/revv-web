@@ -4,11 +4,13 @@ import {
   Bell,
   Check,
   CheckCheck,
+  Compass,
   FileText,
   Home,
   LayoutDashboard,
   LogOut,
   Menu,
+  MessageSquare,
   ShieldCheck,
   Trash2,
   User,
@@ -48,20 +50,30 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     }
     let active = true;
     const load = async () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
       try {
         const list = await fetchMyNotifications();
         if (active && Array.isArray(list)) {
           setNotifications(list);
         }
       } catch {
-        // ignore
+        // ignore transient poll errors
       }
     };
-    load();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void load();
+      }
+    };
+    void load();
     const timer = setInterval(load, 20000);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       active = false;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [isAuthenticated]);
 
@@ -74,32 +86,36 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
       );
       markNotificationAsRead(notif.id).catch(() => {});
     }
-    if (notif.notif_type === "direct_message") {
-      setNotifications((prev) => prev.filter((item) => item.id !== notif.id));
-      deleteNotificationById(notif.id).catch(() => {});
-    }
-    const customData = notif.payload?.custom_data || {};
+    const customData = notif.payload?.["custom_data"] as Record<string, unknown> | undefined;
     const rawRoute = String(
-      notif.payload?.route ||
-        notif.payload?.link ||
-        customData?.route ||
-        customData?.link ||
+      notif.payload?.["route"] ||
+        notif.payload?.["link"] ||
+        customData?.["route"] ||
+        customData?.["link"] ||
         "",
-    ).trim();
+    )
+      .trim()
+      .replace(/^\/+/, "");
     setNotifOpen(false);
+    if (notif.notif_type === "direct_message" || rawRoute.startsWith("chat/")) {
+      navigate({ to: "/messages" });
+      return;
+    }
     if (rawRoute.startsWith("news/")) {
       navigate({ to: "/news" });
+    } else if (rawRoute.startsWith("communities") || rawRoute.startsWith("events")) {
+      navigate({ to: "/rides" });
     } else if (rawRoute.startsWith("profile/")) {
       const targetUser = rawRoute.replace(/^profile\//, "").trim();
       if (targetUser) {
-        navigate({ to: `/id/${encodeURIComponent(targetUser)}` as any });
+        navigate({ to: "/id/$username", params: { username: targetUser } });
       }
     } else if (rawRoute === "garage") {
       navigate({ to: "/garage" });
     } else if (rawRoute === "feed") {
       navigate({ to: "/" });
     } else if (notif.notif_type !== "admin_broadcast" && notif.actor_username) {
-      navigate({ to: `/id/${encodeURIComponent(notif.actor_username)}` as any });
+      navigate({ to: "/id/$username", params: { username: notif.actor_username } });
     }
   };
 
@@ -125,9 +141,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     return <div className="min-h-screen bg-background text-foreground antialiased">{children}</div>;
   }
 
-  const isAdministrator =
-    user?.role?.toLowerCase() === "administrator" ||
-    user?.role?.toLowerCase() === "moderator";
+  const isAdministrator = user?.role?.toLowerCase() === "administrator";
 
   const myProfilePath = user?.username ? `/id/${encodeURIComponent(user.username)}` : "/id/me";
 
@@ -137,6 +151,16 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
       to: "/",
       icon: Home,
       exact: true,
+    },
+    {
+      label: "Rides & Clubs",
+      to: "/rides",
+      icon: Compass,
+    },
+    {
+      label: "Crew & Chat",
+      to: "/messages",
+      icon: MessageSquare,
     },
     {
       label: "News",
@@ -168,6 +192,8 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
   const isDashboardPage =
     currentPath.startsWith("/id") ||
     currentPath === "/garage" ||
+    currentPath === "/rides" ||
+    currentPath === "/messages" ||
     currentPath === "/admin";
 
   return (
@@ -345,9 +371,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
         <nav className="flex-1 space-y-1.5 px-3 py-6 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const active = item.exact
-              ? currentPath === item.to
-              : currentPath.startsWith(item.to);
+            const active = item.exact ? currentPath === item.to : currentPath.startsWith(item.to);
             return (
               <Link
                 key={item.label}
@@ -359,7 +383,12 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
                     : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground",
                 )}
               >
-                <Icon className={cn("size-4 shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+                <Icon
+                  className={cn(
+                    "size-4 shrink-0",
+                    active ? "text-primary" : "text-muted-foreground",
+                  )}
+                />
                 <span>{item.label}</span>
               </Link>
             );
@@ -398,9 +427,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
                   </div>
                   <div className="flex items-center gap-1 truncate font-mono text-[11px] text-muted-foreground">
                     <span>@{user.username}</span>
-                    {isAdministrator && (
-                      <ShieldCheck className="size-3 text-primary inline" />
-                    )}
+                    {isAdministrator && <ShieldCheck className="size-3 text-primary inline" />}
                   </div>
                 </div>
               </Link>
@@ -408,11 +435,17 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
               <button
                 type="button"
                 onClick={logout}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary/30 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-lg border border-border bg-secondary/30 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
               >
                 <LogOut className="size-3.5" />
                 Sign Out
               </button>
+              <Link
+                to="/privacy"
+                className="block text-center font-mono text-[11px] uppercase tracking-wider text-muted-foreground/80 hover:text-primary"
+              >
+                Privacy &amp; Legal
+              </Link>
             </div>
           ) : (
             <div className="space-y-2">
@@ -437,7 +470,12 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
 
       {/* Main Content Area with Smooth Route Fade-in */}
       <main className="flex-1 min-w-0 overflow-y-auto">
-        <div className={cn("animate-fade-in", isDashboardPage && "p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto")}>
+        <div
+          className={cn(
+            "animate-fade-in",
+            isDashboardPage && "p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto",
+          )}
+        >
           {children}
         </div>
       </main>
@@ -520,7 +558,9 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
                           className="block size-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(238,75,62,0.8)]"
                         />
                       ) : (
-                        <Check className="size-3.5 text-emerald-400" title="Read" />
+                        <span title="Read">
+                          <Check className="size-3.5 text-emerald-400" />
+                        </span>
                       )}
                     </div>
                     <div className="min-w-0 flex-1 space-y-1">

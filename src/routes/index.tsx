@@ -23,6 +23,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
 import { SiteFooter, SiteHeader } from "@/components/revv/chrome";
 import { FeedPhone, NavPhone, ProfilePhone } from "@/components/revv/phone-mockups";
 import { Wordmark } from "@/components/revv/wordmark";
@@ -41,6 +42,7 @@ import {
   fetchFriends,
   likeFeedPost,
   rejectFriendRequest,
+  resolveMediaUrl,
   searchRiders,
   sendFriendRequest,
   unlikeFeedPost,
@@ -48,33 +50,12 @@ import {
   type FriendRequestItem,
   type FriendUserItem,
   type PostCommentItem,
+  type RiderProfile,
   type SocialRiderSearchResult,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { formatRelativeTime } from "@/lib/date";
 import { cn } from "@/lib/utils";
-
-function formatRelativeTime(dateInput: string | Date | number): string {
-  const d = new Date(dateInput);
-  const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (diffSec < 10) return "just now";
-  if (diffSec < 60) return `${diffSec}s ago`;
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour}h ago`;
-  const diffDays = Math.floor(diffHour / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) {
-    const w = Math.floor(diffDays / 7);
-    return `${w} ${w === 1 ? "week" : "weeks"} ago`;
-  }
-  if (diffDays < 365) {
-    const m = Math.floor(diffDays / 30);
-    return `${m} ${m === 1 ? "month" : "months"} ago`;
-  }
-  const y = Math.floor(diffDays / 365);
-  return `${y} ${y === 1 ? "year" : "years"} ago`;
-}
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -126,10 +107,16 @@ function HomePage() {
    AUTHENTICATED RIDER HOME (FEED + FRIENDS ROSTER + DEBOUNCED SEARCH)
    ========================================================================== */
 
-function AuthenticatedHome({ user }: { user: any }) {
+function AuthenticatedHome({ user }: { user: RiderProfile | null }) {
   // Feed state
   const [posts, setPosts] = useState<FeedPostItem[]>([]);
   const [loadingFeed, setLoadingFeed] = useState(true);
+  const [feedError, setFeedError] = useState<string | null>(null);
+  const [socialError, setSocialError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<
+    { kind: "post"; postId: string } | { kind: "comment"; postId: string; commentId: string } | null
+  >(null);
+  const [deletingItem, setDeletingItem] = useState(false);
 
   // Status composer state
   const [statusCaption, setStatusCaption] = useState("");
@@ -199,11 +186,12 @@ function AuthenticatedHome({ user }: { user: any }) {
 
   const loadFeed = async () => {
     setLoadingFeed(true);
+    setFeedError(null);
     try {
       const data = await fetchFeedPosts();
       setPosts(data);
-    } catch (e) {
-      console.warn("Failed to load feed:", e);
+    } catch (e: unknown) {
+      setFeedError(e instanceof Error ? e.message : "Could not load crew updates right now.");
     } finally {
       setLoadingFeed(false);
     }
@@ -211,6 +199,7 @@ function AuthenticatedHome({ user }: { user: any }) {
 
   const loadSocial = async () => {
     setLoadingSocial(true);
+    setSocialError(null);
     try {
       const [friendsData, requestsData] = await Promise.allSettled([
         fetchFriends(),
@@ -218,12 +207,14 @@ function AuthenticatedHome({ user }: { user: any }) {
       ]);
       if (friendsData.status === "fulfilled") {
         setFriends(friendsData.value);
+      } else {
+        setSocialError("Could not refresh crew connections.");
       }
       if (requestsData.status === "fulfilled") {
         setRequests(requestsData.value.filter((r) => !r.is_outgoing));
       }
-    } catch (e) {
-      console.warn("Failed to load friends/requests:", e);
+    } catch (e: unknown) {
+      setSocialError(e instanceof Error ? e.message : "Could not refresh crew connections.");
     } finally {
       setLoadingSocial(false);
     }
@@ -242,21 +233,58 @@ function AuthenticatedHome({ user }: { user: any }) {
     try {
       await createStatusPost({
         caption: statusCaption.trim(),
-        bike_label: statusBikeLabel.trim() || undefined,
+        ...(statusBikeLabel.trim() ? { motorcycle_label: statusBikeLabel.trim() } : {}),
         visibility: statusVisibility,
       });
       setStatusCaption("");
       setStatusBikeLabel("");
       await loadFeed();
-    } catch (err: any) {
-      setComposerError(err?.message || "Failed to publish post");
+    } catch (err: unknown) {
+      setComposerError(err instanceof Error ? err.message : "Failed to publish post");
     } finally {
       setPosting(false);
     }
   };
 
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeletingItem(true);
+    try {
+      if (pendingDelete.kind === "post") {
+        await deleteFeedPost(pendingDelete.postId);
+        setPosts((prev) => prev.filter((p) => p.id !== pendingDelete.postId));
+        setActionNotice("Post removed.");
+      } else {
+        await deleteFeedComment(pendingDelete.postId, pendingDelete.commentId);
+        setPostComments((prev) => ({
+          ...prev,
+          [pendingDelete.postId]: (prev[pendingDelete.postId] || []).filter(
+            (c) => c.id !== pendingDelete.commentId,
+          ),
+        }));
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.id === pendingDelete.postId
+              ? { ...p, comment_count: Math.max(0, p.comment_count - 1) }
+              : p,
+          ),
+        );
+        setActionNotice("Comment deleted.");
+      }
+      setTimeout(() => setActionNotice(null), 3000);
+    } catch (err: unknown) {
+      setActionNotice(err instanceof Error ? err.message : "Failed to delete item.");
+    } finally {
+      setDeletingItem(false);
+      setPendingDelete(null);
+    }
+  };
+
   const handleToggleLike = async (post: FeedPostItem) => {
-    const isLiked = post.is_liked_by_me ?? (post as any).viewer_has_liked ?? false;
+    const isLiked =
+      post.is_liked_by_me ??
+      (post as FeedPostItem & { viewer_has_liked?: boolean }).viewer_has_liked ??
+      false;
     // Optimistic update
     setPosts((prev) =>
       prev.map((p) =>
@@ -272,9 +300,7 @@ function AuthenticatedHome({ user }: { user: any }) {
     );
 
     try {
-      const res = isLiked
-        ? await unlikeFeedPost(post.id)
-        : await likeFeedPost(post.id);
+      const res = isLiked ? await unlikeFeedPost(post.id) : await likeFeedPost(post.id);
       // Sync authoritative state from backend
       setPosts((prev) =>
         prev.map((p) =>
@@ -360,8 +386,8 @@ function AuthenticatedHome({ user }: { user: any }) {
           item.id === targetId ? { ...item, friendship_status: "outgoing_request" } : item,
         ),
       );
-    } catch (e: any) {
-      setActionNotice(e?.message || "Failed to send friend request");
+    } catch (e: unknown) {
+      setActionNotice(e instanceof Error ? e.message : "Failed to send friend request");
       setTimeout(() => setActionNotice(null), 3500);
     }
   };
@@ -378,7 +404,9 @@ function AuthenticatedHome({ user }: { user: any }) {
             </h1>
           </div>
           <p className="font-mono text-xs text-muted-foreground mt-1">
-            Welcome back, <span className="font-bold text-foreground">@{user?.username || "rider"}</span>. Road alerts, maintenance logs, and brotherhood chatter.
+            Welcome back,{" "}
+            <span className="font-bold text-foreground">@{user?.username || "rider"}</span>. Road
+            alerts, maintenance logs, and brotherhood chatter.
           </p>
         </div>
 
@@ -429,12 +457,7 @@ function AuthenticatedHome({ user }: { user: any }) {
         {/* ===================================================================
             FEED COLUMN (7 Cols)
             =================================================================== */}
-        <div
-          className={cn(
-            "space-y-6 lg:col-span-7",
-            activeTab !== "feed" && "hidden lg:block",
-          )}
-        >
+        <div className={cn("space-y-6 lg:col-span-7", activeTab !== "feed" && "hidden lg:block")}>
           {/* Status Composer */}
           <form
             onSubmit={handleCreatePost}
@@ -462,9 +485,7 @@ function AuthenticatedHome({ user }: { user: any }) {
               className="w-full rounded-xl border border-border bg-secondary/30 p-3.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none transition-colors"
             />
 
-            {composerError && (
-              <p className="font-mono text-xs text-destructive">{composerError}</p>
-            )}
+            {composerError && <p className="font-mono text-xs text-destructive">{composerError}</p>}
 
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
               <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -481,7 +502,7 @@ function AuthenticatedHome({ user }: { user: any }) {
                   className="rounded-lg border border-border bg-secondary/30 px-3 py-1.5 font-mono text-xs text-foreground focus:border-primary focus:outline-none"
                 >
                   <option value="PUBLIC">Public</option>
-                  <option value="FRIENDS">Friends Only</option>
+                  <option value="FRIENDS_ONLY">Friends Only</option>
                 </select>
               </div>
 
@@ -500,7 +521,23 @@ function AuthenticatedHome({ user }: { user: any }) {
           {loadingFeed ? (
             <div className="rounded-2xl border border-border bg-card/50 p-12 text-center">
               <div className="mx-auto size-7 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <p className="font-mono text-xs text-muted-foreground mt-3">Loading crew updates...</p>
+              <p className="font-mono text-xs text-muted-foreground mt-3">
+                Loading crew updates...
+              </p>
+            </div>
+          ) : feedError ? (
+            <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-8 text-center space-y-3">
+              <p className="font-display text-sm font-bold uppercase text-destructive">
+                Feed Temporarily Unavailable
+              </p>
+              <p className="font-mono text-xs text-muted-foreground">{feedError}</p>
+              <button
+                type="button"
+                onClick={() => void loadFeed()}
+                className="min-h-[44px] rounded-lg bg-primary px-5 py-2 font-display text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90"
+              >
+                Retry
+              </button>
             </div>
           ) : posts.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border p-12 text-center space-y-3 bg-card/30">
@@ -516,140 +553,203 @@ function AuthenticatedHome({ user }: { user: any }) {
             </div>
           ) : (
             <div className="space-y-4">
-              {posts.map((post) => (
-                <article
-                  key={post.id}
-                  className="rounded-2xl border border-border bg-card p-5 space-y-4 shadow-sm hover:border-primary/20 transition-colors"
-                >
-                  {/* Author Header */}
-                  <div className="flex items-center justify-between">
-                    <Link
-                      to={`/id/${encodeURIComponent(post.author_username)}`}
-                      className="group flex items-center gap-3"
-                    >
-                      <div className="flex size-10 items-center justify-center rounded-xl bg-secondary font-display text-sm font-bold text-primary overflow-hidden border border-border">
-                        {post.author_avatar ? (
-                          <img
-                            src={post.author_avatar}
-                            alt={post.author_display_name}
-                            className="size-full object-cover"
-                          />
-                        ) : (
-                          post.author_username.charAt(0).toUpperCase()
+              {posts.map((post) => {
+                const avatarSrc = resolveMediaUrl(post.author_avatar_url || post.author_avatar);
+                const bikeBadge = post.motorcycle_label || post.bike_label;
+                const postImageSrc = resolveMediaUrl(post.image_url);
+                const canDeletePost =
+                  Boolean(user?.id && post.author_id === user.id) ||
+                  user?.role?.toLowerCase() === "administrator" ||
+                  user?.role?.toLowerCase() === "moderator";
+
+                return (
+                  <article
+                    key={post.id}
+                    className="rounded-2xl border border-border bg-card p-5 space-y-4 shadow-sm hover:border-primary/20 transition-colors"
+                  >
+                    {/* Author Header */}
+                    <div className="flex items-center justify-between gap-2">
+                      <Link
+                        to="/id/$username"
+                        params={{ username: post.author_username }}
+                        className="group flex items-center gap-3 min-w-0"
+                      >
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary font-display text-sm font-bold text-primary overflow-hidden border border-border">
+                          {avatarSrc ? (
+                            <img
+                              src={avatarSrc}
+                              alt={post.author_display_name}
+                              loading="lazy"
+                              className="size-full object-cover"
+                            />
+                          ) : (
+                            post.author_username.charAt(0).toUpperCase()
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-display text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate">
+                            {post.author_display_name || post.author_username}
+                          </h4>
+                          <span className="font-mono text-xs text-muted-foreground">
+                            @{post.author_username} · {formatRelativeTime(post.created_at)}
+                          </span>
+                        </div>
+                      </Link>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {bikeBadge && (
+                          <span className="rounded-md border border-border bg-secondary/50 px-2 py-0.5 font-mono text-[10px] font-bold text-primary uppercase">
+                            {bikeBadge}
+                          </span>
                         )}
-                      </div>
-                      <div>
-                        <h4 className="font-display text-sm font-bold text-foreground group-hover:text-primary transition-colors">
-                          {post.author_display_name || post.author_username}
-                        </h4>
-                        <span className="font-mono text-xs text-muted-foreground">
-                          @{post.author_username} · {new Date(post.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </Link>
-
-                    {post.bike_label && (
-                      <span className="rounded-md border border-border bg-secondary/50 px-2 py-0.5 font-mono text-[10px] font-bold text-primary uppercase">
-                        {post.bike_label}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Caption */}
-                  <p className="text-sm text-foreground/95 leading-relaxed font-sans whitespace-pre-line">
-                    {post.caption}
-                  </p>
-
-                  {/* Actions Footer */}
-                  <div className="flex items-center gap-6 border-t border-border/60 pt-3 text-xs font-mono text-muted-foreground">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleLike(post)}
-                      className={cn(
-                        "flex items-center gap-1.5 transition-colors",
-                        (post.is_liked_by_me || post.viewer_has_liked)
-                          ? "text-rose-500 font-bold"
-                          : "hover:text-foreground",
-                      )}
-                    >
-                      <Heart
-                        className={cn(
-                          "size-4",
-                          (post.is_liked_by_me || post.viewer_has_liked) && "fill-rose-500",
-                        )}
-                      />
-                      <span>{post.like_count}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleToggleComments(post.id)}
-                      className="flex items-center gap-1.5 hover:text-foreground transition-colors"
-                    >
-                      <MessageCircle className="size-4" />
-                      <span>{post.comment_count} Comments</span>
-                    </button>
-                  </div>
-
-                  {/* Comments Section */}
-                  {expandedComments[post.id] && (
-                    <div className="space-y-3 border-t border-border/40 pt-3">
-                      <div className="space-y-2">
-                        {(postComments[post.id] || []).map((c) => (
-                          <div
-                            key={c.id}
-                            className="rounded-lg bg-secondary/30 p-2.5 text-xs space-y-1"
+                        {canDeletePost && (
+                          <button
+                            type="button"
+                            onClick={() => setPendingDelete({ kind: "post", postId: post.id })}
+                            aria-label="Delete post"
+                            title="Delete post"
+                            className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
                           >
-                            <div className="flex items-center justify-between">
-                              <Link
-                                to={`/id/${encodeURIComponent(c.author_username)}`}
-                                className="font-mono font-bold text-foreground hover:text-primary transition-colors"
-                              >
-                                @{c.author_username}
-                              </Link>
-                              <span className="font-mono text-[10px] text-muted-foreground">
-                                {formatRelativeTime(c.created_at)}
-                              </span>
-                            </div>
-                            <p className="text-muted-foreground font-sans">
-                              {c.comment || (c as any).comment_text}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="Write a comment..."
-                          value={newCommentText[post.id] || ""}
-                          onChange={(e) =>
-                            setNewCommentText((prev) => ({
-                              ...prev,
-                              [post.id]: e.target.value,
-                            }))
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              void handleAddComment(post.id);
-                            }
-                          }}
-                          className="flex-1 rounded-lg border border-border bg-secondary/40 px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
-                        />
-                        <button
-                          type="button"
-                          disabled={submittingComment[post.id]}
-                          onClick={() => handleAddComment(post.id)}
-                          className="rounded-lg bg-primary px-3 py-1.5 font-display text-xs font-bold uppercase text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
-                        >
-                          Send
-                        </button>
+                            <Trash2 className="size-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
-                  )}
-                </article>
-              ))}
+
+                    {/* Post Media */}
+                    {postImageSrc && (
+                      <div className="overflow-hidden rounded-xl border border-border/60 bg-black/30">
+                        <img
+                          src={postImageSrc}
+                          alt={post.caption || "Ride post media"}
+                          loading="lazy"
+                          className="max-h-96 w-full object-cover"
+                        />
+                      </div>
+                    )}
+
+                    {/* Caption */}
+                    {post.caption && (
+                      <p className="text-sm text-foreground/95 leading-relaxed font-sans whitespace-pre-line">
+                        {post.caption}
+                      </p>
+                    )}
+
+                    {/* Actions Footer */}
+                    <div className="flex items-center gap-6 border-t border-border/60 pt-3 text-xs font-mono text-muted-foreground">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleLike(post)}
+                        className={cn(
+                          "flex items-center gap-1.5 transition-colors",
+                          post.is_liked_by_me || post.viewer_has_liked
+                            ? "text-rose-500 font-bold"
+                            : "hover:text-foreground",
+                        )}
+                      >
+                        <Heart
+                          className={cn(
+                            "size-4",
+                            (post.is_liked_by_me || post.viewer_has_liked) && "fill-rose-500",
+                          )}
+                        />
+                        <span>{post.like_count}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleToggleComments(post.id)}
+                        className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+                      >
+                        <MessageCircle className="size-4" />
+                        <span>{post.comment_count} Comments</span>
+                      </button>
+                    </div>
+
+                    {/* Comments Section */}
+                    {expandedComments[post.id] && (
+                      <div className="space-y-3 border-t border-border/40 pt-3">
+                        <div className="space-y-2">
+                          {(postComments[post.id] || []).map((c) => {
+                            const canDeleteComment =
+                              Boolean(user?.id && c.author_id === user.id) || canDeletePost;
+                            return (
+                              <div
+                                key={c.id}
+                                className="rounded-lg bg-secondary/30 p-2.5 text-xs space-y-1"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <Link
+                                    to="/id/$username"
+                                    params={{ username: c.author_username }}
+                                    className="font-mono font-bold text-foreground hover:text-primary transition-colors"
+                                  >
+                                    @{c.author_username}
+                                  </Link>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono text-[10px] text-muted-foreground">
+                                      {formatRelativeTime(c.created_at)}
+                                    </span>
+                                    {canDeleteComment && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setPendingDelete({
+                                            kind: "comment",
+                                            postId: post.id,
+                                            commentId: c.id,
+                                          })
+                                        }
+                                        aria-label="Delete comment"
+                                        className="rounded p-1 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+                                      >
+                                        <Trash2 className="size-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                                <p className="text-muted-foreground font-sans">
+                                  {c.comment ||
+                                    (c as PostCommentItem & { comment_text?: string }).comment_text}
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Write a comment..."
+                            value={newCommentText[post.id] || ""}
+                            onChange={(e) =>
+                              setNewCommentText((prev) => ({
+                                ...prev,
+                                [post.id]: e.target.value,
+                              }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void handleAddComment(post.id);
+                              }
+                            }}
+                            className="flex-1 rounded-lg border border-border bg-secondary/40 px-3 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            disabled={submittingComment[post.id]}
+                            onClick={() => handleAddComment(post.id)}
+                            className="rounded-lg bg-primary px-3 py-1.5 font-display text-xs font-bold uppercase text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
+                          >
+                            Send
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
             </div>
           )}
         </div>
@@ -658,10 +758,7 @@ function AuthenticatedHome({ user }: { user: any }) {
             FRIENDS & SEARCH COLUMN (5 Cols)
             =================================================================== */}
         <div
-          className={cn(
-            "space-y-6 lg:col-span-5",
-            activeTab !== "friends" && "hidden lg:block",
-          )}
+          className={cn("space-y-6 lg:col-span-5", activeTab !== "friends" && "hidden lg:block")}
         >
           {/* Friend Search Card (Debounced) */}
           <div className="rounded-2xl border border-border bg-card p-5 space-y-4 shadow-sm">
@@ -713,12 +810,17 @@ function AuthenticatedHome({ user }: { user: any }) {
                         className="flex items-center justify-between rounded-xl border border-border/60 bg-secondary/20 p-2.5 text-xs"
                       >
                         <Link
-                          to={`/id/${encodeURIComponent(r.username)}`}
+                          to="/id/$username"
+                          params={{ username: r.username }}
                           className="flex items-center gap-2.5 overflow-hidden group"
                         >
                           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary font-display text-xs font-bold text-primary overflow-hidden border border-border">
                             {r.avatar_url ? (
-                              <img src={r.avatar_url} alt={r.display_name} className="size-full object-cover" />
+                              <img
+                                src={r.avatar_url}
+                                alt={r.display_name}
+                                className="size-full object-cover"
+                              />
                             ) : (
                               r.username.charAt(0).toUpperCase()
                             )}
@@ -781,12 +883,17 @@ function AuthenticatedHome({ user }: { user: any }) {
                     className="flex items-center justify-between rounded-xl border border-border/80 bg-card p-3 text-xs shadow-xs"
                   >
                     <Link
-                      to={`/id/${encodeURIComponent(req.username)}`}
+                      to="/id/$username"
+                      params={{ username: req.username }}
                       className="flex items-center gap-2.5 overflow-hidden group"
                     >
                       <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary font-display text-xs font-bold text-primary overflow-hidden border border-border">
                         {req.avatar_url ? (
-                          <img src={req.avatar_url} alt={req.display_name} className="size-full object-cover" />
+                          <img
+                            src={req.avatar_url}
+                            alt={req.display_name}
+                            className="size-full object-cover"
+                          />
                         ) : (
                           req.username.charAt(0).toUpperCase()
                         )}
@@ -830,10 +937,31 @@ function AuthenticatedHome({ user }: { user: any }) {
                 <Users className="size-4 text-primary" />
                 Your Crew & Friends
               </h3>
-              <span className="rounded-md border border-border bg-secondary/50 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
-                {friends.length} Friends
-              </span>
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/messages"
+                  className="font-mono text-[11px] font-semibold uppercase text-primary hover:underline"
+                >
+                  Messages →
+                </Link>
+                <span className="rounded-md border border-border bg-secondary/50 px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                  {friends.length} Friends
+                </span>
+              </div>
             </div>
+
+            {socialError && (
+              <div className="flex items-center justify-between rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 font-mono text-[11px] text-destructive">
+                <span>{socialError}</span>
+                <button
+                  type="button"
+                  onClick={() => void loadSocial()}
+                  className="underline uppercase"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
 
             {loadingSocial ? (
               <div className="py-6 text-center">
@@ -853,7 +981,8 @@ function AuthenticatedHome({ user }: { user: any }) {
                 {friends.map((friend) => (
                   <Link
                     key={friend.friend_id}
-                    to={`/id/${encodeURIComponent(friend.username)}`}
+                    to="/id/$username"
+                    params={{ username: friend.username }}
                     className="flex items-center justify-between rounded-xl border border-border/50 bg-secondary/15 p-2.5 transition hover:border-primary/40 hover:bg-secondary/30 group"
                   >
                     <div className="flex items-center gap-3 overflow-hidden">
@@ -888,6 +1017,20 @@ function AuthenticatedHome({ user }: { user: any }) {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title={pendingDelete?.kind === "post" ? "Delete Post?" : "Delete Comment?"}
+        message={
+          pendingDelete?.kind === "post"
+            ? "This post and its replies will be permanently removed from the crew feed."
+            : "This comment will be permanently removed from the post."
+        }
+        confirmLabel="Delete"
+        busy={deletingItem}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }
@@ -1047,8 +1190,9 @@ function MarketingLandingPage() {
               Maintain your machine like a pro.
             </h2>
             <p className="mt-5 text-base leading-relaxed text-muted-foreground">
-              Keep a complete service ledger for every bike in your stable. Track oil change intervals,
-              brake pad thickness, tire wear, and valve adjustments with automated alerts before ride day.
+              Keep a complete service ledger for every bike in your stable. Track oil change
+              intervals, brake pad thickness, tire wear, and valve adjustments with automated alerts
+              before ride day.
             </p>
             <div className="mt-8">
               <Link to="/register" className="btn-primary">
@@ -1086,8 +1230,8 @@ function MarketingLandingPage() {
               Built for motorcycle cockpits.
             </h2>
             <p className="mt-5 text-base leading-relaxed text-muted-foreground">
-              High-contrast night HUD, multi-waypoint canyon routing, and coffee-stop pause/resume without
-              splitting your ride stats into fragmented trips.
+              High-contrast night HUD, multi-waypoint canyon routing, and coffee-stop pause/resume
+              without splitting your ride stats into fragmented trips.
             </p>
           </div>
         </div>

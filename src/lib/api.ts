@@ -2,6 +2,10 @@
  * REVV- Web API Client
  * Connects to REVV Backend services (News, Auth/OTP, Profile, Garage, Feed, Admin Console, Beta Registrations)
  */
+import { compressImageFile, renderCanvasBlob } from "./image-compress";
+import { sanitizeRichHtml } from "./html-sanitizer";
+
+export { compressImageFile, sanitizeRichHtml };
 
 export interface NewsArticle {
   id: string;
@@ -69,6 +73,8 @@ export interface RiderProfile {
   show_city?: boolean | null;
   show_country?: boolean | null;
   show_job?: boolean | null;
+  privacy_country?: string | null;
+  privacy_saved_routes?: string | null;
 }
 
 export interface GarageMotorcycle {
@@ -123,14 +129,17 @@ export interface FeedPostItem {
   author_username: string;
   author_display_name: string;
   author_avatar_url?: string | null;
+  author_avatar?: string | null;
   post_type: string;
   caption?: string | null;
-  image_url: string;
+  image_url?: string | null;
   motorcycle_label?: string | null;
-  metadata: Record<string, unknown>;
+  bike_label?: string | null;
+  metadata?: Record<string, unknown>;
   visibility: string;
   like_count: number;
   is_liked_by_me: boolean;
+  viewer_has_liked?: boolean;
   created_at: string;
   comment_count: number;
 }
@@ -260,11 +269,7 @@ export const SEED_NEWS_ARTICLES: NewsArticle[] = [
 ];
 
 export function getApiBaseUrl(): string {
-  const win = typeof window !== "undefined" ? (window as { __REVV_API_URL__?: string }) : undefined;
-  if (win?.__REVV_API_URL__) {
-    return win.__REVV_API_URL__;
-  }
-  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  const envUrl = import.meta.env["VITE_API_BASE_URL"];
   if (envUrl && envUrl.trim().length > 0) {
     return envUrl.trim().replace(/\/+$/, "");
   }
@@ -389,11 +394,11 @@ export async function requestOtp(identifier: string): Promise<{
   const payload: Record<string, string> = {};
 
   if (cleanId.includes("@")) {
-    payload.email = cleanId;
+    payload["email"] = cleanId;
   } else if (/^\+?\d{10,}$/.test(cleanId.replace(/[\s-]/g, ""))) {
-    payload.phone = cleanId.replace(/[\s-]/g, "");
+    payload["phone"] = cleanId.replace(/[\s-]/g, "");
   } else {
-    payload.identifier = cleanId;
+    payload["identifier"] = cleanId;
   }
 
   try {
@@ -424,14 +429,12 @@ export async function requestOtp(identifier: string): Promise<{
     }
 
     if (!res.ok) {
-      if (res.status === 503) {
-        return {
-          success: true,
-          message: "Development mode: SMS/Email service is in local test mode.",
-          otpEcho: body?.data?.otp ?? "123456",
-        };
-      }
-      const msg = body?.meta?.message || body?.message || "Failed to request OTP code.";
+      const msg =
+        body?.meta?.message ||
+        body?.message ||
+        (res.status === 503
+          ? "Verification service is temporarily unavailable. Please try again shortly."
+          : "Failed to request OTP code.");
       throw new AuthApiError(msg, res.status);
     }
 
@@ -457,6 +460,29 @@ export async function requestOtp(identifier: string): Promise<{
 /**
  * Sign in with OTP via revv-backend /api/v1/auth/sign-in
  */
+function extractTokenPair(rawTokens: unknown): { accessToken: string; refreshToken: string } {
+  if (Array.isArray(rawTokens)) {
+    return {
+      accessToken: typeof rawTokens[0] === "string" ? rawTokens[0] : "",
+      refreshToken: typeof rawTokens[1] === "string" ? rawTokens[1] : "",
+    };
+  }
+  if (rawTokens && typeof rawTokens === "object") {
+    const obj = rawTokens as Record<string, unknown>;
+    return {
+      accessToken:
+        (typeof obj["access_token"] === "string" ? obj["access_token"] : undefined) ??
+        (typeof obj["accessToken"] === "string" ? obj["accessToken"] : undefined) ??
+        "",
+      refreshToken:
+        (typeof obj["refresh_token"] === "string" ? obj["refresh_token"] : undefined) ??
+        (typeof obj["refreshToken"] === "string" ? obj["refreshToken"] : undefined) ??
+        "",
+    };
+  }
+  return { accessToken: "", refreshToken: "" };
+}
+
 export async function signInWithOtp(
   identifier: string,
   otp: string,
@@ -475,11 +501,11 @@ export async function signInWithOtp(
   const payload: Record<string, string> = { otp: cleanOtp };
 
   if (cleanId.includes("@")) {
-    payload.email = cleanId;
+    payload["email"] = cleanId;
   } else if (/^\+?\d{10,}$/.test(cleanId.replace(/[\s-]/g, ""))) {
-    payload.phone = cleanId.replace(/[\s-]/g, "");
+    payload["phone"] = cleanId.replace(/[\s-]/g, "");
   } else {
-    payload.identifier = cleanId;
+    payload["identifier"] = cleanId;
   }
 
   try {
@@ -514,16 +540,7 @@ export async function signInWithOtp(
       throw new AuthApiError(msg, res.status);
     }
 
-    const rawTokens: any = body?.data ?? body;
-    let accessToken = "";
-    let refreshToken = "";
-    if (Array.isArray(rawTokens)) {
-      accessToken = rawTokens[0] || "";
-      refreshToken = rawTokens[1] || "";
-    } else if (rawTokens && typeof rawTokens === "object") {
-      accessToken = rawTokens.access_token || rawTokens.accessToken || "";
-      refreshToken = rawTokens.refresh_token || rawTokens.refreshToken || "";
-    }
+    const { accessToken, refreshToken } = extractTokenPair(body?.data ?? body);
 
     const tokens: AuthTokens = {
       access_token: accessToken,
@@ -656,7 +673,9 @@ export function checkUrlForAuthTokens(): {
   return { token: null, refreshToken: null, username: null };
 }
 
-async function tryRefreshSession(): Promise<string | null> {
+let refreshInFlight: Promise<string | null> | null = null;
+
+async function performRefreshSession(): Promise<string | null> {
   if (typeof window === "undefined") return null;
   const session = getSavedSession();
   const refreshToken = session.refreshToken;
@@ -676,16 +695,7 @@ async function tryRefreshSession(): Promise<string | null> {
       return null;
     }
     const body = await res.json().catch(() => null);
-    const rawTokens: any = body?.data ?? body;
-    let accessToken = "";
-    let refreshTokenNew = "";
-    if (Array.isArray(rawTokens)) {
-      accessToken = rawTokens[0] || "";
-      refreshTokenNew = rawTokens[1] || "";
-    } else if (rawTokens && typeof rawTokens === "object") {
-      accessToken = rawTokens.access_token || rawTokens.accessToken || "";
-      refreshTokenNew = rawTokens.refresh_token || rawTokens.refreshToken || "";
-    }
+    const { accessToken, refreshToken: refreshTokenNew } = extractTokenPair(body?.data ?? body);
 
     if (accessToken) {
       localStorage.setItem("revv_access_token", accessToken);
@@ -700,10 +710,46 @@ async function tryRefreshSession(): Promise<string | null> {
   return null;
 }
 
+export async function tryRefreshSession(): Promise<string | null> {
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+  refreshInFlight = performRefreshSession().finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
+}
+
+export async function logoutSession(): Promise<void> {
+  const session = getSavedSession();
+  const refreshToken = session.refreshToken;
+  const accessToken = session.token;
+  clearSavedSession();
+  if (typeof window === "undefined" || (!refreshToken && !accessToken)) {
+    return;
+  }
+  try {
+    await fetch(`${getApiBaseUrl()}/auth/logout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify(refreshToken ? { refresh_token: refreshToken } : {}),
+    });
+  } catch {
+    // Best-effort revocation; local tokens are already cleared.
+  }
+}
+
 /**
- * Authenticated request helper with automatic 401 refresh retry
+ * Authenticated request helper returning full envelope with single-flight 401 refresh retry
  */
-export async function authRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function authRequestRaw<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<ApiResponse<T>> {
   const baseUrl = getApiBaseUrl();
   const session = getSavedSession();
   let token = session.token;
@@ -738,13 +784,27 @@ export async function authRequest<T>(path: string, options: RequestInit = {}): P
     }
   }
 
-  const body = await res.json().catch(() => null);
+  const body = (await res.json().catch(() => null)) as ApiResponse<T> | null;
   if (!res.ok) {
-    const msg = body?.meta?.message || body?.message || `Request failed (${res.status})`;
+    const msg =
+      body?.meta?.message ||
+      (body as { message?: string } | null)?.message ||
+      `Request failed (${res.status})`;
     throw new AuthApiError(msg, res.status);
   }
 
-  return body?.data as T;
+  return (body ?? {
+    meta: { status: "success", message: "" },
+    data: undefined as T,
+  }) as ApiResponse<T>;
+}
+
+/**
+ * Authenticated request helper with automatic 401 refresh retry
+ */
+export async function authRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const body = await authRequestRaw<T>(path, options);
+  return body.data as T;
 }
 
 /**
@@ -827,7 +887,7 @@ export interface PublicProfileResponse {
   city: string | null;
   country?: string | null;
   job: string | null;
-  account_visibility: "PUBLIC" | "PRIVATE" | "CUSTOM";
+  account_visibility: "PUBLIC" | "FRIENDS_ONLY" | "PRIVATE" | "CUSTOM";
   is_friend: boolean;
   has_pending_request: boolean;
   is_private: boolean;
@@ -835,6 +895,11 @@ export interface PublicProfileResponse {
   max_speed_kmh?: number | null;
   show_city?: boolean | null;
   show_country?: boolean | null;
+  show_job?: boolean | null;
+  show_motorcycle_count?: boolean | null;
+  show_garage_details?: boolean | null;
+  privacy_country?: string | null;
+  privacy_saved_routes?: string | null;
   motorcycle_count: number | null;
   garage: PublicProfileGarageItem[] | null;
   posts: FeedPostItem[] | null;
@@ -893,7 +958,9 @@ export async function rejectFriendRequest(requestId: string): Promise<void> {
 export async function searchRiders(query: string): Promise<SocialRiderSearchResult[]> {
   const clean = query.trim();
   if (!clean) return [];
-  return authRequest<SocialRiderSearchResult[]>(`/friends/search?q=${encodeURIComponent(clean)}`);
+  return authRequest<SocialRiderSearchResult[]>(
+    `/riders/social-search?q=${encodeURIComponent(clean)}`,
+  );
 }
 
 export function getGoogleOAuthUrl(): string {
@@ -914,7 +981,9 @@ export async function fetchPublicProfile(identifier: string): Promise<PublicProf
 
   if (session.token) {
     try {
-      const res = await authRequest<any>(`/users/${encodeURIComponent(clean)}/profile`);
+      const res = await authRequest<
+        PublicProfileResponse & { garage_details?: PublicProfileGarageItem[] | null }
+      >(`/users/${encodeURIComponent(clean)}/profile`);
       if (res) {
         if (!res.garage && res.garage_details) {
           res.garage = res.garage_details;
@@ -937,7 +1006,8 @@ export async function fetchPublicProfile(identifier: string): Promise<PublicProf
           bio: myProf.bio || null,
           city: myProf.city || null,
           job: myProf.job || null,
-          account_visibility: myProf.account_visibility || "PUBLIC",
+          account_visibility:
+            (myProf.account_visibility as PublicProfileResponse["account_visibility"]) || "PUBLIC",
           is_friend: true,
           has_pending_request: false,
           is_private: false,
@@ -993,10 +1063,18 @@ export async function updateMyProfile(payload: {
   last_name?: string;
   bio?: string;
   city?: string;
+  country?: string;
   job?: string;
   avatar_url?: string;
   banner_url?: string;
   account_visibility?: string;
+  show_motorcycle_count?: boolean;
+  show_garage_details?: boolean;
+  show_city?: boolean;
+  show_country?: boolean;
+  show_job?: boolean;
+  privacy_country?: string;
+  privacy_saved_routes?: string;
 }): Promise<RiderProfile> {
   return authRequest<RiderProfile>("/me", {
     method: "PATCH",
@@ -1028,50 +1106,6 @@ export async function checkUsernameAvailability(username: string): Promise<{
   } catch {
     return { available: true };
   }
-}
-
-export async function compressImageFile(
-  file: File,
-  maxDimension = 2048,
-  quality = 0.82,
-): Promise<File> {
-  if (typeof window === "undefined" || !file.type.startsWith("image/")) return file;
-  return new Promise((resolve) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      let { width, height } = img;
-      if (width > maxDimension || height > maxDimension) {
-        if (width > height) {
-          height = Math.round((height * maxDimension) / width);
-          width = maxDimension;
-        } else {
-          width = Math.round((width * maxDimension) / height);
-          height = maxDimension;
-        }
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return resolve(file);
-      ctx.drawImage(img, 0, 0, width, height);
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) return resolve(file);
-          const compressedFile = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
-            type: "image/jpeg",
-          });
-          resolve(compressedFile);
-        },
-        "image/jpeg",
-        quality,
-      );
-    };
-    img.onerror = () => resolve(file);
-    img.src = url;
-  });
 }
 
 export async function uploadProfileAvatar(file: File): Promise<{ url: string; path: string }> {
@@ -1155,10 +1189,16 @@ export async function createStatusPost(payload: {
   caption: string;
   visibility?: string;
   motorcycle_label?: string;
+  bike_label?: string;
 }): Promise<FeedPostItem> {
+  const normVis = payload.visibility === "FRIENDS" ? "FRIENDS_ONLY" : payload.visibility;
   return authRequest<FeedPostItem>("/feed/status", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      caption: payload.caption,
+      visibility: normVis,
+      motorcycle_label: payload.motorcycle_label ?? payload.bike_label,
+    }),
   });
 }
 
@@ -1296,7 +1336,7 @@ export async function updateAdminBrand(
   payload: { name?: string; is_active?: boolean },
 ): Promise<MasterBrandItem> {
   return authRequest<MasterBrandItem>(`/admin/master/brands/${id}`, {
-    method: "PUT",
+    method: "PATCH",
     body: JSON.stringify(payload),
   });
 }
@@ -1400,7 +1440,7 @@ export interface WebNotificationItem {
   notif_type: string;
   title: string;
   body: string;
-  payload?: Record<string, any> | null;
+  payload?: Record<string, unknown> | null;
   is_read: boolean;
   created_at: string;
 }
@@ -1664,8 +1704,6 @@ export async function fetchAdminSupportTickets(params?: {
   limit?: number;
   status?: string;
 }): Promise<{ tickets: SupportTicketItem[]; total: number; totalPages: number }> {
-  const baseUrl = getApiBaseUrl();
-  const { token } = getSavedSession();
   const q = new URLSearchParams({
     page: String(params?.page ?? 1),
     limit: String(params?.limit ?? 20),
@@ -1673,16 +1711,7 @@ export async function fetchAdminSupportTickets(params?: {
   if (params?.status && params.status !== "ALL") {
     q.set("status", params.status);
   }
-  const res = await fetch(`${baseUrl}/admin/support/tickets?${q.toString()}`, {
-    headers: {
-      Accept: "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-  const body = (await res.json().catch(() => null)) as ApiResponse<SupportTicketItem[]> | null;
-  if (!res.ok || !body) {
-    throw new AuthApiError(body?.meta?.message || "Failed to load support tickets", res.status);
-  }
+  const body = await authRequestRaw<SupportTicketItem[]>(`/admin/support/tickets?${q.toString()}`);
   const meta = (body.results as { total?: number; total_pages?: number } | undefined) ?? {};
   return {
     tickets: body.data ?? [],
@@ -1739,47 +1768,11 @@ export async function upsertAdminLegalDocument(
   });
 }
 
-async function renderCanvasBlob(
-  img: HTMLImageElement,
-  maxDimension: number,
-  quality: number,
-): Promise<{ blob: Blob; mime: string; ext: string }> {
-  const ratio = Math.min(1, maxDimension / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
-  const width = Math.max(1, Math.round((img.naturalWidth || 1) * ratio));
-  const height = Math.max(1, Math.round((img.naturalHeight || 1) * ratio));
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("Canvas context unavailable");
-  }
-  ctx.drawImage(img, 0, 0, width, height);
-
-  const tryEncode = (mime: string, q: number) =>
-    new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), mime, q));
-
-  const webp = await tryEncode("image/webp", quality);
-  if (webp && webp.type === "image/webp" && webp.size > 0) {
-    return { blob: webp, mime: "image/webp", ext: "webp" };
-  }
-  const jpeg = await tryEncode("image/jpeg", quality);
-  if (jpeg && jpeg.size > 0) {
-    return { blob: jpeg, mime: "image/jpeg", ext: "jpg" };
-  }
-  throw new Error("Failed to compress image");
-}
-
 export async function uploadCompressedMedia(file: File): Promise<{
   url: string;
   thumbnail_url: string;
   size: number;
 }> {
-  const { token } = getSavedSession();
-  if (!token) {
-    throw new AuthApiError("Sign in as Administrator before uploading media", 401);
-  }
-
   const objectUrl = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -1796,104 +1789,19 @@ export async function uploadCompressedMedia(file: File): Promise<{
     form.append("file", mainAsset.blob, `image.${mainAsset.ext}`);
     form.append("thumbnail", thumbAsset.blob, `thumb.${thumbAsset.ext}`);
 
-    const res = await fetch(`${getApiBaseUrl()}/media`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    const body = (await res.json().catch(() => null)) as ApiResponse<{
+    const data = await authRequest<{
       url: string;
       thumbnail_url: string;
       size: number;
-    }> | null;
-
-    if (!res.ok || !body?.data?.url) {
-      throw new AuthApiError(body?.meta?.message || "Media upload failed", res.status);
+    }>("/media", {
+      method: "POST",
+      body: form,
+    });
+    if (!data?.url) {
+      throw new AuthApiError("Media upload failed", 500);
     }
-    return body.data;
+    return data;
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
-}
-
-const ALLOWED_TAGS = new Set([
-  "p",
-  "br",
-  "strong",
-  "b",
-  "em",
-  "i",
-  "u",
-  "blockquote",
-  "h2",
-  "h3",
-  "ul",
-  "ol",
-  "li",
-  "figure",
-  "img",
-  "figcaption",
-  "a",
-  "div",
-]);
-
-export function sanitizeRichHtml(rawHtml: string): string {
-  if (!rawHtml) return "";
-  if (typeof window === "undefined" || typeof DOMParser === "undefined") {
-    return rawHtml
-      .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "")
-      .replace(/\son\w+=(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
-  }
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(`<div>${rawHtml}</div>`, "text/html");
-  const root = doc.body.firstElementChild;
-  if (!root) return "";
-
-  const cleanNode = (node: Node): void => {
-    const children = Array.from(node.childNodes);
-    for (const child of children) {
-      if (child.nodeType === Node.ELEMENT_NODE) {
-        const el = child as HTMLElement;
-        const tag = el.tagName.toLowerCase();
-        if (!ALLOWED_TAGS.has(tag)) {
-          if (tag === "script" || tag === "style" || tag === "iframe" || tag === "object") {
-            el.remove();
-            continue;
-          }
-          const frag = doc.createDocumentFragment();
-          while (el.firstChild) frag.appendChild(el.firstChild);
-          cleanNode(frag);
-          el.replaceWith(frag);
-          continue;
-        }
-
-        for (const attr of Array.from(el.attributes)) {
-          const name = attr.name.toLowerCase();
-          const val = attr.value.trim();
-          const keepHref = tag === "a" && name === "href" && /^https?:\/\//i.test(val);
-          const keepSrc =
-            tag === "img" &&
-            name === "src" &&
-            (/^https?:\/\//i.test(val) || val.startsWith("/uploads/"));
-          const keepAlt = tag === "img" && name === "alt";
-          if (!keepHref && !keepSrc && !keepAlt) {
-            el.removeAttribute(attr.name);
-          }
-        }
-        if (tag === "a") {
-          el.setAttribute("rel", "noopener noreferrer");
-          el.setAttribute("target", "_blank");
-        }
-        if (tag === "img") {
-          el.setAttribute("loading", "lazy");
-        }
-        cleanNode(el);
-      }
-    }
-  };
-
-  cleanNode(root);
-  return root.innerHTML;
 }

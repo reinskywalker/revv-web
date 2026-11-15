@@ -21,7 +21,7 @@ export default defineConfig({
       server: { entry: "server" },
     }),
     nitro({
-      preset: process.env.NITRO_PRESET || "vercel",
+      preset: process.env["NITRO_PRESET"] || "vercel",
     }),
     viteReact(),
     tailwindcss(),

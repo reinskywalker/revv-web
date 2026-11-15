@@ -43,9 +43,12 @@ describe("REVV Web Auth & Session Management", () => {
 
   it("extracts OAuth tokens from URL query parameters and cleans up history", () => {
     // Setup window location search
-    const fakeUrl = "http://localhost:3000/login?access_token=oauth-access-token&refresh_token=oauth-refresh-token&username=scobby_rider";
+    const fakeUrl =
+      "http://localhost:3000/login?access_token=oauth-access-token&refresh_token=oauth-refresh-token&username=scobby_rider";
     delete (window as unknown as { location: unknown }).location;
-    window.location = new URL(fakeUrl) as unknown as Location;
+    (window as unknown as { location: Location }).location = new URL(
+      fakeUrl,
+    ) as unknown as Location;
 
     const session = checkUrlForAuthTokens();
     expect(session).not.toBeNull();

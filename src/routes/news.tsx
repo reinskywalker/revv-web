@@ -49,6 +49,7 @@ export const Route = createFileRoute("/news")({
 export function NewsPage() {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLiveBackend, setIsLiveBackend] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -56,20 +57,30 @@ export function NewsPage() {
 
   const loadArticles = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetchNewsArticles({ page: 1, limit: 30 });
       setArticles(res.articles);
       setIsLiveBackend(!res.fromFallback);
     } catch (err) {
-      console.error("Error loading news articles:", err);
+      setLoadError(err instanceof Error ? err.message : "Could not load news dispatches.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadArticles();
+    void loadArticles();
   }, []);
+
+  useEffect(() => {
+    if (!activeArticle) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActiveArticle(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [activeArticle]);
 
   const categories = [
     "ALL",
@@ -194,8 +205,25 @@ export function NewsPage() {
             </div>
           )}
 
+          {/* Error State */}
+          {!loading && loadError && (
+            <div className="mt-12 flex flex-col items-center rounded-2xl border border-destructive/40 bg-destructive/10 px-6 py-12 text-center">
+              <p className="font-display text-xl font-bold uppercase text-destructive">
+                Unable to Reach News Desk
+              </p>
+              <p className="mt-2 max-w-md text-sm text-panel-muted">{loadError}</p>
+              <button
+                type="button"
+                onClick={() => void loadArticles()}
+                className="mt-5 min-h-[44px] rounded-lg bg-primary px-5 py-2.5 font-display text-sm font-bold uppercase tracking-wide text-primary-foreground hover:bg-primary/90"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
           {/* Empty State */}
-          {!loading && filteredArticles.length === 0 && (
+          {!loading && !loadError && filteredArticles.length === 0 && (
             <div className="mt-12 flex flex-col items-center rounded-2xl border border-dashed border-panel-border bg-panel-card px-6 py-20 text-center">
               <div className="flex size-16 items-center justify-center rounded-xl bg-panel">
                 <Wrench className="size-7 text-primary" strokeWidth={2} />
@@ -354,8 +382,16 @@ export function NewsPage() {
 
       {/* Article Modal */}
       {activeArticle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
-          <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-[#141A20] p-6 text-foreground shadow-2xl md:p-10">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setActiveArticle(null)}
+        >
+          <div
+            className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-[#141A20] p-6 text-foreground shadow-2xl md:p-10"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               onClick={() => setActiveArticle(null)}
               className="absolute right-5 top-5 rounded-lg border border-border/80 bg-secondary/50 p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"

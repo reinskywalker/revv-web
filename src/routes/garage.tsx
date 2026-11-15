@@ -1,17 +1,23 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Bike,
+  Camera,
   Check,
   ChevronRight,
   Gauge,
   Loader2,
+  Pencil,
   Plus,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Trash2,
   Wrench,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
+import { EditBikeModal, UpdateOdometerModal } from "@/components/garage/GarageBikeModals";
+import { GarageMaintenancePanel } from "@/components/garage/GarageMaintenancePanel";
 import {
   addGarageMotorcycle,
   deleteGarageMotorcycle,
@@ -22,6 +28,11 @@ import {
   type MasterMotorcycleItem,
   updateGarageMotorcycle,
 } from "@/lib/api";
+import {
+  fetchMasterComponentsPublic,
+  uploadGarageBikeImage,
+  type MasterComponentItemPublic,
+} from "@/lib/api-rider";
 import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/garage")({
@@ -30,7 +41,8 @@ export const Route = createFileRoute("/garage")({
       { title: "Digital Garage — REVV Motorsport Web" },
       {
         name: "description",
-        content: "Manage your motorcycle fleet, odometer, maintenance specs and machine telemetry on REVV.",
+        content:
+          "Manage your motorcycle fleet, odometer, maintenance specs and machine telemetry on REVV.",
       },
     ],
   }),
@@ -41,9 +53,20 @@ function GaragePage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [garage, setGarage] = useState<GarageMotorcycle[]>([]);
   const [masterCatalog, setMasterCatalog] = useState<MasterMotorcycleItem[]>([]);
+  const [masterComponents, setMasterComponents] = useState<MasterComponentItemPublic[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const [editingBike, setEditingBike] = useState<GarageMotorcycle | null>(null);
+  const [odometerBike, setOdometerBike] = useState<GarageMotorcycle | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<GarageMotorcycle | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [expandedMaintId, setExpandedMaintId] = useState<string | null>(null);
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const [photoTargetId, setPhotoTargetId] = useState<string | null>(null);
 
   // Form state
   const [selectedMasterBikeId, setSelectedMasterBikeId] = useState<string>("");
@@ -56,41 +79,36 @@ function GaragePage() {
   const [bikeCategory, setBikeCategory] = useState("scooter");
   const [bikePrimary, setBikePrimary] = useState(false);
 
+  const loadGarageData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setLoadError(null);
+      const [gar, masters, comps] = await Promise.all([
+        fetchMyGarage(),
+        fetchMasterMotorcycles().catch(() => []),
+        fetchMasterComponentsPublic().catch(() => []),
+      ]);
+      setGarage(gar);
+      setMasterCatalog(masters);
+      setMasterComponents(comps);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to load Digital Garage.";
+      setLoadError(msg);
+      setNotice({ type: "error", message: msg });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated && !authLoading) {
       setLoading(false);
       return;
     }
-
-    let isMounted = true;
-    const loadGarageData = async () => {
-      try {
-        setLoading(true);
-        const [gar, masters] = await Promise.all([
-          fetchMyGarage(),
-          fetchMasterMotorcycles().catch(() => []),
-        ]);
-        if (isMounted) {
-          setGarage(gar);
-          setMasterCatalog(masters);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setNotice({
-            type: "error",
-            message: err instanceof Error ? err.message : "Failed to load Digital Garage.",
-          });
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    loadGarageData();
-    return () => {
-      isMounted = false;
-    };
-  }, [isAuthenticated, authLoading]);
+    if (isAuthenticated) {
+      void loadGarageData();
+    }
+  }, [isAuthenticated, authLoading, loadGarageData]);
 
   const handleAddMotorcycle = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,11 +118,11 @@ function GaragePage() {
       const masterId = selectedMasterBikeId ? Number(selectedMasterBikeId) : null;
       await addGarageMotorcycle({
         master_motorcycle_id: masterId,
-        brand_manual: masterId ? undefined : bikeBrandManual.trim(),
-        series_manual: masterId ? undefined : bikeSeriesManual.trim(),
-        nickname: bikeNickname.trim() || undefined,
+        ...(!masterId && bikeBrandManual.trim() ? { brand_manual: bikeBrandManual.trim() } : {}),
+        ...(!masterId && bikeSeriesManual.trim() ? { series_manual: bikeSeriesManual.trim() } : {}),
+        ...(bikeNickname.trim() ? { nickname: bikeNickname.trim() } : {}),
         current_mileage: Number(bikeMileage) || 0,
-        plate_number: bikePlate.trim() || undefined,
+        ...(bikePlate.trim() ? { plate_number: bikePlate.trim() } : {}),
         transmission: bikeTransmission,
         category: bikeCategory,
         is_primary: bikePrimary,
@@ -132,30 +150,6 @@ function GaragePage() {
     }
   };
 
-  const handleUpdateKm = async (bike: GarageMotorcycle) => {
-    const nextKm = window.prompt(
-      `Update odometer mileage for ${bike.nickname || bike.series_name || bike.name} (km):`,
-      String(bike.current_mileage),
-    );
-    if (!nextKm) return;
-    const parsed = Number(nextKm);
-    if (Number.isNaN(parsed) || parsed < 0) {
-      setNotice({ type: "error", message: "Please enter a valid positive mileage." });
-      return;
-    }
-    try {
-      await updateGarageMotorcycle(bike.id, { current_mileage: parsed });
-      const refreshed = await fetchMyGarage();
-      setGarage(refreshed);
-      setNotice({ type: "success", message: `Odometer updated to ${parsed.toLocaleString()} km.` });
-    } catch (err) {
-      setNotice({
-        type: "error",
-        message: err instanceof Error ? err.message : "Failed to update mileage.",
-      });
-    }
-  };
-
   const handleSetPrimary = async (bike: GarageMotorcycle) => {
     try {
       await updateGarageMotorcycle(bike.id, { is_primary: true });
@@ -173,21 +167,45 @@ function GaragePage() {
     }
   };
 
-  const handleDeleteBike = async (bike: GarageMotorcycle) => {
-    const confirmed = window.confirm(
-      `Remove ${bike.nickname || bike.series_name || bike.name} from your Digital Garage?`,
-    );
-    if (!confirmed) return;
+  const confirmDeleteBike = async () => {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
     try {
-      await deleteGarageMotorcycle(bike.id);
+      await deleteGarageMotorcycle(deleteTarget.id);
       const refreshed = await fetchMyGarage();
       setGarage(refreshed);
+      setDeleteTarget(null);
       setNotice({ type: "success", message: "Motorcycle removed from garage." });
     } catch (err) {
       setNotice({
         type: "error",
         message: err instanceof Error ? err.message : "Failed to delete machine.",
       });
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
+  const handleBikePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    const targetId = photoTargetId;
+    setPhotoTargetId(null);
+    if (!file || !targetId) return;
+    setUploadingPhotoId(targetId);
+    setNotice(null);
+    try {
+      await uploadGarageBikeImage(targetId, file);
+      const refreshed = await fetchMyGarage();
+      setGarage(refreshed);
+      setNotice({ type: "success", message: "Motorcycle photo updated." });
+    } catch (err) {
+      setNotice({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to upload motorcycle photo.",
+      });
+    } finally {
+      setUploadingPhotoId(null);
     }
   };
 
@@ -209,7 +227,8 @@ function GaragePage() {
           Digital Garage Access
         </h1>
         <p className="text-sm text-muted-foreground">
-          Log in with your REVV account to inspect your riding stable, log odometer readings, and sync maintenance telemetry.
+          Log in with your REVV account to inspect your riding stable, log odometer readings, and
+          sync maintenance telemetry.
         </p>
         <div className="pt-2">
           <Link to="/login" className="btn-primary inline-flex items-center gap-2">
@@ -285,10 +304,7 @@ function GaragePage() {
       <div className="grid gap-8 lg:grid-cols-3">
         {/* ADD MOTORCYCLE FORM */}
         <div className="lg:col-span-1">
-          <form
-            onSubmit={handleAddMotorcycle}
-            className="hud-card sticky top-24 space-y-4 p-6"
-          >
+          <form onSubmit={handleAddMotorcycle} className="hud-card sticky top-24 space-y-4 p-6">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-lg font-black uppercase tracking-tight flex items-center gap-2">
                 <Plus className="size-4 text-primary" />
@@ -460,9 +476,27 @@ function GaragePage() {
 
         {/* MOTORCYCLES LIST */}
         <div className="space-y-4 lg:col-span-2">
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => void handleBikePhotoChange(e)}
+          />
           {loading ? (
             <div className="hud-card flex items-center justify-center py-16">
               <Loader2 className="size-8 animate-spin text-primary" />
+            </div>
+          ) : loadError && garage.length === 0 ? (
+            <div className="hud-card p-8 text-center space-y-3 border-destructive/40 bg-destructive/10">
+              <p className="text-sm text-destructive">{loadError}</p>
+              <button
+                type="button"
+                onClick={() => void loadGarageData()}
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-destructive/40 px-5 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10"
+              >
+                <RefreshCw className="size-3.5" /> Retry
+              </button>
             </div>
           ) : garage.length === 0 ? (
             <div className="hud-card p-12 text-center">
@@ -471,7 +505,8 @@ function GaragePage() {
                 No Machines Registered Yet
               </h3>
               <p className="mt-1 text-sm text-muted-foreground max-w-md mx-auto">
-                Your Digital Garage is empty. Use the form on the left to add your motorcycle from the catalog or via manual entry.
+                Your Digital Garage is empty. Use the form on the left to add your motorcycle from
+                the catalog or via manual entry.
               </p>
             </div>
           ) : (
@@ -554,29 +589,72 @@ function GaragePage() {
                         <button
                           type="button"
                           onClick={() => handleSetPrimary(bike)}
-                          className="rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs uppercase text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+                          className="min-h-[40px] rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs uppercase text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
                         >
                           Set Primary
                         </button>
                       )}
                       <button
                         type="button"
-                        onClick={() => handleUpdateKm(bike)}
-                        className="rounded-lg border border-border bg-secondary/50 px-3 py-2 font-mono text-xs font-semibold uppercase text-foreground transition-colors hover:bg-secondary"
+                        onClick={() => setEditingBike(bike)}
+                        className="inline-flex min-h-[40px] items-center gap-1 rounded-lg border border-border bg-secondary/50 px-3 py-2 font-mono text-xs font-semibold uppercase text-foreground transition-colors hover:bg-secondary"
+                      >
+                        <Pencil className="size-3.5" /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={uploadingPhotoId === bike.id}
+                        onClick={() => {
+                          setPhotoTargetId(bike.id);
+                          photoInputRef.current?.click();
+                        }}
+                        className="inline-flex min-h-[40px] items-center gap-1 rounded-lg border border-border bg-secondary/50 px-3 py-2 font-mono text-xs font-semibold uppercase text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
+                      >
+                        <Camera className="size-3.5" />
+                        {uploadingPhotoId === bike.id ? "Uploading…" : "Photo"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOdometerBike(bike)}
+                        className="min-h-[40px] rounded-lg border border-border bg-secondary/50 px-3 py-2 font-mono text-xs font-semibold uppercase text-foreground transition-colors hover:bg-secondary"
                       >
                         Update KM
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDeleteBike(bike)}
-                        className="rounded-lg border border-destructive/30 bg-destructive/10 p-2 text-destructive transition-colors hover:bg-destructive/20"
+                        onClick={() =>
+                          setExpandedMaintId((prev) => (prev === bike.id ? null : bike.id))
+                        }
+                        className={`inline-flex min-h-[40px] items-center gap-1 rounded-lg border px-3 py-2 font-mono text-xs font-semibold uppercase transition-colors ${
+                          expandedMaintId === bike.id
+                            ? "border-primary bg-primary/15 text-primary"
+                            : "border-border bg-secondary/50 text-foreground hover:bg-secondary"
+                        }`}
+                      >
+                        <Wrench className="size-3.5" /> Service
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget(bike)}
+                        className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-destructive/30 bg-destructive/10 p-2 text-destructive transition-colors hover:bg-destructive/20"
                         title="Remove machine from garage"
-                        aria-label="Delete motorcycle"
+                        aria-label={`Delete ${displayName}`}
                       >
                         <Trash2 className="size-4" />
                       </button>
                     </div>
                   </div>
+
+                  {expandedMaintId === bike.id && (
+                    <GarageMaintenancePanel
+                      garageId={bike.id}
+                      currentMileage={bike.current_mileage}
+                      transmissionType={bike.transmission}
+                      masterComponents={masterComponents}
+                      onError={(message) => setNotice({ type: "error", message })}
+                      onNotice={(message) => setNotice({ type: "success", message })}
+                    />
+                  )}
 
                   {/* Telemetry Footer Info */}
                   <div className="mt-4 border-t border-border/40 pt-3 flex items-center justify-between font-mono text-[11px] text-muted-foreground">
@@ -600,6 +678,39 @@ function GaragePage() {
           )}
         </div>
       </div>
+
+      <UpdateOdometerModal
+        bike={odometerBike}
+        onClose={() => setOdometerBike(null)}
+        onUpdated={async (km) => {
+          const refreshed = await fetchMyGarage();
+          setGarage(refreshed);
+          setNotice({ type: "success", message: `Odometer updated to ${km.toLocaleString()} km.` });
+        }}
+        onError={(message) => setNotice({ type: "error", message })}
+      />
+
+      <EditBikeModal
+        bike={editingBike}
+        onClose={() => setEditingBike(null)}
+        onSaved={async () => {
+          const refreshed = await fetchMyGarage();
+          setGarage(refreshed);
+          setNotice({ type: "success", message: "Motorcycle updated." });
+        }}
+        onError={(message) => setNotice({ type: "error", message })}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Remove Motorcycle"
+        message={`Remove ${deleteTarget?.nickname || deleteTarget?.series_name || deleteTarget?.name || "this motorcycle"} from your Digital Garage?`}
+        confirmLabel="Remove Bike"
+        destructive
+        busy={deleteBusy}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void confirmDeleteBike()}
+      />
     </div>
   );
 }

@@ -30,6 +30,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
 import { RichTextEditor } from "@/components/revv/RichTextEditor";
 import {
   type AdminDashboardStats,
@@ -103,6 +104,12 @@ type AdminSubTab =
   | "legal"
   | "maintenance";
 
+type AdminConfirmAction =
+  | { kind: "delete_beta"; reg: BetaRegistrationRow }
+  | { kind: "change_role"; user: AdminUserItem; nextRole: string }
+  | { kind: "change_status"; user: AdminUserItem; nextStatus: string }
+  | { kind: "soft_delete_user"; user: AdminUserItem };
+
 const NEWS_CATEGORIES = ["EDITORIAL", "UPDATE", "SAFETY", "COMMUNITY", "TELEMETRY", "EVENT"];
 
 function AdminPage() {
@@ -110,6 +117,8 @@ function AdminPage() {
   const [activeSubTab, setActiveSubTab] = useState<AdminSubTab>("overview");
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<AdminConfirmAction | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   // Data states
   const [adminStats, setAdminStats] = useState<AdminDashboardStats | null>(null);
@@ -155,8 +164,40 @@ function AdminPage() {
   const [broadcastDeepLink, setBroadcastDeepLink] = useState("notifications");
   const [broadcastIsSending, setBroadcastIsSending] = useState(false);
 
-  const isSuperuser =
-    user?.role?.toLowerCase() === "administrator" || user?.role?.toLowerCase() === "moderator";
+  const isSuperuser = user?.role?.toLowerCase() === "administrator";
+
+  const handleConfirmAction = async () => {
+    if (!pendingConfirm) return;
+    setConfirmBusy(true);
+    try {
+      if (pendingConfirm.kind === "delete_beta") {
+        await deleteBetaRegistration(pendingConfirm.reg.id);
+        setBetaRegistrations(await fetchBetaRegistrations());
+        setNotice("Registration deleted.");
+      } else if (pendingConfirm.kind === "change_role") {
+        await updateAdminUser(pendingConfirm.user.id, { role: pendingConfirm.nextRole });
+        setAdminUsers(await fetchAdminUsers());
+        setNotice(
+          `Updated role for ${pendingConfirm.user.email || pendingConfirm.user.username} to ${pendingConfirm.nextRole}`,
+        );
+      } else if (pendingConfirm.kind === "change_status") {
+        await updateAdminUser(pendingConfirm.user.id, { status: pendingConfirm.nextStatus });
+        setAdminUsers(await fetchAdminUsers());
+        setNotice(
+          `Updated status for ${pendingConfirm.user.email || pendingConfirm.user.username} to ${pendingConfirm.nextStatus}`,
+        );
+      } else if (pendingConfirm.kind === "soft_delete_user") {
+        await deleteAdminUser(pendingConfirm.user.id);
+        setAdminUsers(await fetchAdminUsers());
+        setNotice("User soft-deleted and bearer sessions revoked.");
+      }
+      setPendingConfirm(null);
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Action failed");
+    } finally {
+      setConfirmBusy(false);
+    }
+  };
 
   const refreshAllAdminData = async () => {
     try {
@@ -492,13 +533,7 @@ function AdminPage() {
                       ))}
                       <button
                         type="button"
-                        onClick={async () => {
-                          const ok = window.confirm(`Delete registration for ${reg.full_name}?`);
-                          if (!ok) return;
-                          await deleteBetaRegistration(reg.id);
-                          setBetaRegistrations(await fetchBetaRegistrations());
-                          setNotice("Registration deleted.");
-                        }}
+                        onClick={() => setPendingConfirm({ kind: "delete_beta", reg })}
                         className="rounded border border-destructive/40 bg-destructive/10 p-2 text-destructive hover:bg-destructive/20"
                         title="Delete registration"
                       >
@@ -572,27 +607,11 @@ function AdminPage() {
                           <>
                             <select
                               value={u.role.toLowerCase()}
-                              onChange={async (e) => {
+                              onChange={(e) => {
                                 const nextRole = e.target.value;
                                 if (nextRole === u.role.toLowerCase()) return;
-                                const ok = window.confirm(
-                                  `Are you sure you want to change the role of ${u.email || u.username} to ${nextRole.toUpperCase()}?`,
-                                );
-                                if (!ok) {
-                                  e.target.value = u.role.toLowerCase();
-                                  return;
-                                }
-                                try {
-                                  await updateAdminUser(u.id, { role: nextRole });
-                                  setAdminUsers(await fetchAdminUsers());
-                                  setNotice(
-                                    `Updated role for ${u.email || u.username} to ${nextRole}`,
-                                  );
-                                } catch (err) {
-                                  setNotice(
-                                    err instanceof Error ? err.message : "Failed to update role",
-                                  );
-                                }
+                                e.target.value = u.role.toLowerCase();
+                                setPendingConfirm({ kind: "change_role", user: u, nextRole });
                               }}
                               className="rounded border border-input bg-secondary/60 px-2.5 py-1.5 font-mono text-xs uppercase text-foreground"
                             >
@@ -609,27 +628,11 @@ function AdminPage() {
 
                             <select
                               value={u.status}
-                              onChange={async (e) => {
+                              onChange={(e) => {
                                 const nextStatus = e.target.value;
                                 if (nextStatus === u.status) return;
-                                const ok = window.confirm(
-                                  `Are you sure you want to change status of ${u.email || u.username} to ${nextStatus.toUpperCase()}?`,
-                                );
-                                if (!ok) {
-                                  e.target.value = u.status;
-                                  return;
-                                }
-                                try {
-                                  await updateAdminUser(u.id, { status: nextStatus });
-                                  setAdminUsers(await fetchAdminUsers());
-                                  setNotice(
-                                    `Updated status for ${u.email || u.username} to ${nextStatus}`,
-                                  );
-                                } catch (err) {
-                                  setNotice(
-                                    err instanceof Error ? err.message : "Failed to update status",
-                                  );
-                                }
+                                e.target.value = u.status;
+                                setPendingConfirm({ kind: "change_status", user: u, nextStatus });
                               }}
                               className="rounded border border-input bg-secondary/60 px-2.5 py-1.5 font-mono text-xs uppercase text-foreground"
                             >
@@ -649,21 +652,9 @@ function AdminPage() {
 
                             <button
                               type="button"
-                              onClick={async () => {
-                                const ok = window.confirm(
-                                  `Are you sure you want to soft-delete user ${u.email || u.username}? All active bearer sessions will be immediately invalidated.`,
-                                );
-                                if (!ok) return;
-                                try {
-                                  await deleteAdminUser(u.id);
-                                  setAdminUsers(await fetchAdminUsers());
-                                  setNotice("User soft-deleted and bearer sessions revoked.");
-                                } catch (err) {
-                                  setNotice(
-                                    err instanceof Error ? err.message : "Failed to delete user",
-                                  );
-                                }
-                              }}
+                              onClick={() =>
+                                setPendingConfirm({ kind: "soft_delete_user", user: u })
+                              }
                               className="inline-flex items-center gap-1 rounded border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 font-mono text-xs uppercase text-destructive hover:bg-destructive/20"
                             >
                               <Trash2 className="size-3.5" />
@@ -1622,6 +1613,43 @@ function AdminPage() {
           )}
         </>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingConfirm)}
+        title={
+          pendingConfirm?.kind === "delete_beta"
+            ? "Delete Beta Registration"
+            : pendingConfirm?.kind === "change_role"
+              ? "Change User Role"
+              : pendingConfirm?.kind === "change_status"
+                ? "Change Account Status"
+                : "Soft-Delete User"
+        }
+        message={
+          pendingConfirm?.kind === "delete_beta"
+            ? `Delete registration for ${pendingConfirm.reg.full_name}?`
+            : pendingConfirm?.kind === "change_role"
+              ? `Change role of ${pendingConfirm.user.email || pendingConfirm.user.username} to ${pendingConfirm.nextRole.toUpperCase()}?`
+              : pendingConfirm?.kind === "change_status"
+                ? `Change status of ${pendingConfirm.user.email || pendingConfirm.user.username} to ${pendingConfirm.nextStatus.toUpperCase()}?`
+                : pendingConfirm?.kind === "soft_delete_user"
+                  ? `Soft-delete ${pendingConfirm.user.email || pendingConfirm.user.username}? All active bearer sessions will be immediately invalidated.`
+                  : ""
+        }
+        confirmLabel={
+          pendingConfirm?.kind === "delete_beta"
+            ? "Delete"
+            : pendingConfirm?.kind === "soft_delete_user"
+              ? "Soft Delete"
+              : "Confirm"
+        }
+        destructive={
+          pendingConfirm?.kind === "delete_beta" || pendingConfirm?.kind === "soft_delete_user"
+        }
+        busy={confirmBusy}
+        onCancel={() => setPendingConfirm(null)}
+        onConfirm={() => void handleConfirmAction()}
+      />
     </div>
   );
 }
@@ -1638,6 +1666,8 @@ function NewsCmsTab({
   const [saving, setSaving] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<NewsArticle | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("EDITORIAL");
@@ -1805,13 +1835,7 @@ function NewsCmsTab({
                     </button>
                     <button
                       type="button"
-                      onClick={async () => {
-                        if (!window.confirm("Delete this news article permanently?")) return;
-                        await deleteAdminNewsArticle(item.id);
-                        if (editingId === item.id) resetForm();
-                        await onReload();
-                        onNotice("Article deleted.");
-                      }}
+                      onClick={() => setDeleteTarget(item)}
                       className="rounded p-1 text-muted-foreground hover:text-destructive"
                       aria-label="Delete article"
                     >
@@ -2024,6 +2048,31 @@ function NewsCmsTab({
           </button>
         </div>
       </form>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete News Article"
+        message={`Delete "${deleteTarget?.title ?? "this article"}" permanently?`}
+        confirmLabel="Delete Article"
+        destructive
+        busy={deleteBusy}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          setDeleteBusy(true);
+          try {
+            await deleteAdminNewsArticle(deleteTarget.id);
+            if (editingId === deleteTarget.id) resetForm();
+            setDeleteTarget(null);
+            await onReload();
+            onNotice("Article deleted.");
+          } catch (err) {
+            onNotice(err instanceof Error ? err.message : "Failed to delete article");
+          } finally {
+            setDeleteBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }
@@ -2155,26 +2204,26 @@ function SupportInboxTab({ onNotice }: { onNotice: (msg: string | null) => void 
                     <span>
                       Brand:{" "}
                       <strong className="text-foreground">
-                        {String(t.device_info.brand || t.device_info.manufacturer || "—")}
+                        {String(t.device_info["brand"] || t.device_info["manufacturer"] || "—")}
                       </strong>
                     </span>
                     <span>
                       Series:{" "}
                       <strong className="text-foreground">
-                        {String(t.device_info.series || t.device_info.model || "—")}
+                        {String(t.device_info["series"] || t.device_info["model"] || "—")}
                       </strong>
                     </span>
                     <span>
                       OS:{" "}
                       <strong className="text-foreground">
-                        {String(t.device_info.osVersion || t.device_info.osName || "—")}
+                        {String(t.device_info["osVersion"] || t.device_info["osName"] || "—")}
                       </strong>
                     </span>
                     <span>
                       App:{" "}
                       <strong className="text-foreground">
-                        v{String(t.device_info.appVersion || "0.1.0")} (Build{" "}
-                        {String(t.device_info.buildNumber || "1")})
+                        v{String(t.device_info["appVersion"] || "0.1.0")} (Build{" "}
+                        {String(t.device_info["buildNumber"] || "1")})
                       </strong>
                     </span>
                   </div>
@@ -2202,7 +2251,9 @@ function SupportInboxTab({ onNotice }: { onNotice: (msg: string | null) => void 
                               isAdmin ? "text-emerald-400" : "text-primary",
                             )}
                           >
-                            {isAdmin ? m.sender_name || "Support Team (Admin)" : m.sender_name || t.reporter_name}
+                            {isAdmin
+                              ? m.sender_name || "Support Team (Admin)"
+                              : m.sender_name || t.reporter_name}
                           </span>
                           <span className="font-mono text-[11px] text-muted-foreground">
                             {new Date(m.created_at).toLocaleString()}
@@ -2296,6 +2347,8 @@ function LegalCmsTab({ onNotice }: { onNotice: (msg: string | null) => void }) {
   const [sortOrder, setSortOrder] = useState(10);
   const [isPublished, setIsPublished] = useState(true);
   const [contentHtml, setContentHtml] = useState("");
+  const [addingSlug, setAddingSlug] = useState(false);
+  const [newSlugDraft, setNewSlugDraft] = useState("");
 
   const applyDoc = (doc: LegalDocumentItem) => {
     setSlug(doc.slug);
@@ -2330,14 +2383,15 @@ function LegalCmsTab({ onNotice }: { onNotice: (msg: string | null) => void }) {
     };
   }, [onNotice]);
 
-  const handleNewSlug = () => {
-    const raw = window.prompt("Enter document slug (e.g. cookie-notice):", "");
-    if (!raw) return;
-    const clean = raw
+  const handleCreateSlug = () => {
+    const clean = newSlugDraft
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9-]+/g, "-");
-    if (!clean) return;
+    if (!clean) {
+      onNotice("Please enter a valid slug (letters, numbers, hyphens).");
+      return;
+    }
     setSlug(clean);
     setTitle("New Compliance Notice");
     setJurisdictions("Global · EU GDPR · US CCPA/CPRA");
@@ -2345,6 +2399,8 @@ function LegalCmsTab({ onNotice }: { onNotice: (msg: string | null) => void }) {
     setSortOrder(50);
     setIsPublished(true);
     setContentHtml("<h2>Overview</h2><p>Enter policy details…</p>");
+    setNewSlugDraft("");
+    setAddingSlug(false);
     onNotice(null);
   };
 
@@ -2411,12 +2467,40 @@ function LegalCmsTab({ onNotice }: { onNotice: (msg: string | null) => void }) {
           ))}
           <button
             type="button"
-            onClick={handleNewSlug}
+            onClick={() => setAddingSlug((v) => !v)}
             className="inline-flex items-center gap-1 rounded-lg border border-dashed border-border px-3 py-2 font-mono text-xs font-semibold text-foreground hover:border-primary"
           >
             <FilePlus2 className="size-3.5 text-primary" />
             Add Document
           </button>
+          {addingSlug && (
+            <div className="flex items-center gap-1.5">
+              <input
+                value={newSlugDraft}
+                onChange={(e) => setNewSlugDraft(e.target.value)}
+                placeholder="e.g. cookie-notice"
+                aria-label="New legal document slug"
+                className="min-h-[36px] w-44 rounded-lg border border-border bg-secondary/40 px-2.5 text-xs text-foreground"
+              />
+              <button
+                type="button"
+                onClick={handleCreateSlug}
+                className="min-h-[36px] rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground"
+              >
+                Create
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingSlug(false);
+                  setNewSlugDraft("");
+                }}
+                className="min-h-[36px] rounded-lg border border-border px-2.5 text-xs text-muted-foreground"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
 
         <Link

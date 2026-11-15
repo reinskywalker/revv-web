@@ -73,9 +73,6 @@ export function SiteFooter() {
             <Link to="/privacy" className={navLinkClass}>
               Privacy
             </Link>
-            <Link to="/admin" className={navLinkClass}>
-              Admin
-            </Link>
             <Link to="/login" className={navLinkClass}>
               Sign in
             </Link>

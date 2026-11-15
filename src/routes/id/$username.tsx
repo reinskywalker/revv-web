@@ -13,16 +13,29 @@ import {
   Lock,
   MapPin,
   MessageSquare,
+  Navigation,
+  Route as RouteIcon,
   ShieldAlert,
+  Trash2,
   UserPlus,
   UserX,
   Wrench,
   X,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
+import {
+  ProfileEditorForm,
+  type AccountVisibility,
+  type SavedRoutesVisibility,
+} from "@/components/profile/ProfileEditorForm";
+import { ProfileSavedRoutesTab } from "@/components/profile/ProfileSavedRoutesTab";
+import { ProfileTripsTab } from "@/components/profile/ProfileTripsTab";
 import { RiderOverviewPanel } from "@/components/profile/RiderOverviewPanel";
 import {
   cancelFriendRequest,
   checkUsernameAvailability,
+  deleteProfileAvatar,
+  deleteProfileBanner,
   fetchMyProfile,
   fetchPublicProfile,
   resolveMediaUrl,
@@ -49,8 +62,12 @@ function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"garage" | "posts">("garage");
+  const [activeTab, setActiveTab] = useState<"garage" | "posts" | "routes" | "trips">("garage");
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<
+    "unfriend" | "delete_avatar" | "delete_banner" | null
+  >(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   // Edit profile state (for self)
   const [isEditing, setIsEditing] = useState(false);
@@ -61,9 +78,17 @@ function ProfilePage() {
   const [editMiddleName, setEditMiddleName] = useState("");
   const [editLastName, setEditLastName] = useState("");
   const [editCity, setEditCity] = useState("");
+  const [editCountry, setEditCountry] = useState("");
   const [editJob, setEditJob] = useState("");
   const [editBio, setEditBio] = useState("");
-  const [editVisibility, setEditVisibility] = useState("PUBLIC");
+  const [editVisibility, setEditVisibility] = useState<AccountVisibility>("PUBLIC");
+  const [editShowMotorcycleCount, setEditShowMotorcycleCount] = useState(true);
+  const [editShowGarageDetails, setEditShowGarageDetails] = useState(true);
+  const [editShowCity, setEditShowCity] = useState(true);
+  const [editShowCountry, setEditShowCountry] = useState(true);
+  const [editShowJob, setEditShowJob] = useState(true);
+  const [editPrivacySavedRoutes, setEditPrivacySavedRoutes] =
+    useState<SavedRoutesVisibility>("public");
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -75,6 +100,44 @@ function ProfilePage() {
     (!!user?.username && user.username.toLowerCase() === username.toLowerCase()) ||
     (!!user?.id && user.id === username);
 
+  const syncEditFields = (data: {
+    username?: string | null;
+    first_name?: string | null;
+    middle_name?: string | null;
+    last_name?: string | null;
+    city?: string | null;
+    country?: string | null;
+    job?: string | null;
+    bio?: string | null;
+    account_visibility?: string | null;
+    show_motorcycle_count?: boolean | null;
+    show_garage_details?: boolean | null;
+    show_city?: boolean | null;
+    show_country?: boolean | null;
+    show_job?: boolean | null;
+    privacy_saved_routes?: string | null;
+  }) => {
+    setEditUsername(data.username || "");
+    setEditFirstName(data.first_name || "");
+    setEditMiddleName(data.middle_name || "");
+    setEditLastName(data.last_name || "");
+    setEditCity(data.city || "");
+    setEditCountry(data.country || "");
+    setEditJob(data.job || "");
+    setEditBio(data.bio || "");
+    const vis = (data.account_visibility || "PUBLIC").toUpperCase();
+    setEditVisibility(
+      vis === "PRIVATE" || vis === "CUSTOM" || vis === "FRIENDS_ONLY" ? vis : "PUBLIC",
+    );
+    setEditShowMotorcycleCount(data.show_motorcycle_count ?? true);
+    setEditShowGarageDetails(data.show_garage_details ?? true);
+    setEditShowCity(data.show_city ?? true);
+    setEditShowCountry(data.show_country ?? true);
+    setEditShowJob(data.show_job ?? true);
+    const rVis = (data.privacy_saved_routes || "public").toLowerCase();
+    setEditPrivacySavedRoutes(rVis === "friends" || rVis === "private" ? rVis : "public");
+  };
+
   const loadData = async () => {
     setLoading(true);
     setError(null);
@@ -82,16 +145,9 @@ function ProfilePage() {
       const data = await fetchPublicProfile(username);
       setProfile(data);
       if (isSelf) {
-        setEditUsername(data.username || "");
-        setEditFirstName(data.first_name || "");
-        setEditMiddleName(data.middle_name || "");
-        setEditLastName(data.last_name || "");
-        setEditCity(data.city || "");
-        setEditJob(data.job || "");
-        setEditBio(data.bio || "");
-        setEditVisibility(data.account_visibility || "PUBLIC");
+        syncEditFields(data);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (isSelf) {
         try {
           const myProf = await fetchMyProfile();
@@ -106,8 +162,17 @@ function ProfilePage() {
             banner_url: myProf.banner_url || null,
             bio: myProf.bio || null,
             city: myProf.city || null,
+            country: myProf.country ?? null,
             job: myProf.job || null,
-            account_visibility: (myProf.account_visibility as "PUBLIC" | "PRIVATE" | "CUSTOM") || "PUBLIC",
+            account_visibility:
+              (myProf.account_visibility as PublicProfileResponse["account_visibility"]) ||
+              "PUBLIC",
+            show_motorcycle_count: myProf.show_motorcycle_count ?? null,
+            show_garage_details: myProf.show_garage_details ?? null,
+            show_city: myProf.show_city ?? null,
+            show_country: myProf.show_country ?? null,
+            show_job: myProf.show_job ?? null,
+            privacy_saved_routes: myProf.privacy_saved_routes ?? null,
             is_friend: true,
             has_pending_request: false,
             is_private: false,
@@ -115,20 +180,13 @@ function ProfilePage() {
             garage: null,
             posts: null,
           });
-          setEditUsername(myProf.username || "");
-          setEditFirstName(myProf.first_name || "");
-          setEditMiddleName(myProf.middle_name || "");
-          setEditLastName(myProf.last_name || "");
-          setEditCity(myProf.city || "");
-          setEditJob(myProf.job || "");
-          setEditBio(myProf.bio || "");
-          setEditVisibility(myProf.account_visibility || "PUBLIC");
+          syncEditFields(myProf);
           return;
         } catch {
           // ignore
         }
       }
-      setError(err?.message || "Failed to load rider profile");
+      setError(err instanceof Error ? err.message : "Failed to load rider profile");
     } finally {
       setLoading(false);
     }
@@ -137,6 +195,15 @@ function ProfilePage() {
   useEffect(() => {
     void loadData();
   }, [username]);
+
+  useEffect(() => {
+    if (!previewImage) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPreviewImage(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [previewImage]);
 
   // Debounced username validation when editing
   useEffect(() => {
@@ -168,14 +235,21 @@ function ProfilePage() {
 
   const isDirty = Boolean(
     profile &&
-      (editUsername.trim() !== (profile.username || "").trim() ||
-        editFirstName.trim() !== (profile.first_name || "").trim() ||
-        editMiddleName.trim() !== (profile.middle_name || "").trim() ||
-        editLastName.trim() !== (profile.last_name || "").trim() ||
-        editCity.trim() !== (profile.city || "").trim() ||
-        editJob.trim() !== (profile.job || "").trim() ||
-        editBio.trim() !== (profile.bio || "").trim() ||
-        editVisibility !== (profile.account_visibility || "PUBLIC")),
+    (editUsername.trim() !== (profile.username || "").trim() ||
+      editFirstName.trim() !== (profile.first_name || "").trim() ||
+      editMiddleName.trim() !== (profile.middle_name || "").trim() ||
+      editLastName.trim() !== (profile.last_name || "").trim() ||
+      editCity.trim() !== (profile.city || "").trim() ||
+      editCountry.trim() !== (profile.country || "").trim() ||
+      editJob.trim() !== (profile.job || "").trim() ||
+      editBio.trim() !== (profile.bio || "").trim() ||
+      editVisibility !== (profile.account_visibility || "PUBLIC") ||
+      editShowMotorcycleCount !== (profile.show_motorcycle_count ?? true) ||
+      editShowGarageDetails !== (profile.show_garage_details ?? true) ||
+      editShowCity !== (profile.show_city ?? true) ||
+      editShowCountry !== (profile.show_country ?? true) ||
+      editShowJob !== (profile.show_job ?? true) ||
+      editPrivacySavedRoutes !== (profile.privacy_saved_routes || "public")),
   );
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -184,14 +258,21 @@ function ProfilePage() {
     setIsSaving(true);
     setActionNotice(null);
     try {
-      const payload: Record<string, string | undefined> = {
+      const payload: Parameters<typeof updateMyProfile>[0] = {
         first_name: editFirstName.trim(),
         middle_name: editMiddleName.trim(),
         last_name: editLastName.trim(),
         city: editCity.trim(),
+        country: editCountry.trim(),
         job: editJob.trim(),
         bio: editBio.trim(),
         account_visibility: editVisibility,
+        show_motorcycle_count: editShowMotorcycleCount,
+        show_garage_details: editShowGarageDetails,
+        show_city: editShowCity,
+        show_country: editShowCountry,
+        show_job: editShowJob,
+        privacy_saved_routes: editPrivacySavedRoutes,
       };
       if (profile && editUsername.trim() !== (profile.username || "").trim()) {
         payload.username = editUsername.trim();
@@ -201,8 +282,8 @@ function ProfilePage() {
       setActionNotice("Profile updated successfully");
       await refreshUser();
       await loadData();
-    } catch (err: any) {
-      setActionNotice(err?.message || "Failed to update profile");
+    } catch (err: unknown) {
+      setActionNotice(err instanceof Error ? err.message : "Failed to update profile");
     } finally {
       setIsSaving(false);
     }
@@ -220,8 +301,8 @@ function ProfilePage() {
       setActionNotice("Profile banner updated & synced!");
       await refreshUser();
       await loadData();
-    } catch (err: any) {
-      setActionNotice(err?.message || "Could not upload banner image");
+    } catch (err: unknown) {
+      setActionNotice(err instanceof Error ? err.message : "Could not upload banner image");
     } finally {
       setUploadingBanner(false);
     }
@@ -239,8 +320,8 @@ function ProfilePage() {
       setActionNotice("Profile photo updated & synced!");
       await refreshUser();
       await loadData();
-    } catch (err: any) {
-      setActionNotice(err?.message || "Could not upload profile photo");
+    } catch (err: unknown) {
+      setActionNotice(err instanceof Error ? err.message : "Could not upload profile photo");
     } finally {
       setUploadingAvatar(false);
     }
@@ -252,8 +333,8 @@ function ProfilePage() {
       await sendFriendRequest(profile.id);
       setActionNotice("Friend request sent!");
       await loadData();
-    } catch (err: any) {
-      setActionNotice(err?.message || "Could not send friend request");
+    } catch (err: unknown) {
+      setActionNotice(err instanceof Error ? err.message : "Could not send friend request");
     }
   };
 
@@ -263,20 +344,38 @@ function ProfilePage() {
       await cancelFriendRequest(profile.id);
       setActionNotice("Friend request cancelled");
       await loadData();
-    } catch (err: any) {
-      setActionNotice(err?.message || "Could not cancel request");
+    } catch (err: unknown) {
+      setActionNotice(err instanceof Error ? err.message : "Could not cancel request");
     }
   };
 
-  const handleUnfriend = async () => {
+  const handleUnfriend = () => {
     if (!profile) return;
-    if (!window.confirm(`Unfriend @${profile.username}?`)) return;
+    setConfirmAction("unfriend");
+  };
+
+  const handleConfirmAction = async () => {
+    if (!profile || !confirmAction) return;
+    setConfirmBusy(true);
     try {
-      await unfriendRider(profile.id);
-      setActionNotice("Unfriended successfully");
+      if (confirmAction === "unfriend") {
+        await unfriendRider(profile.id);
+        setActionNotice("Unfriended successfully");
+      } else if (confirmAction === "delete_avatar") {
+        await deleteProfileAvatar();
+        setActionNotice("Profile photo removed");
+        await refreshUser();
+      } else if (confirmAction === "delete_banner") {
+        await deleteProfileBanner();
+        setActionNotice("Profile banner removed");
+        await refreshUser();
+      }
+      setConfirmAction(null);
       await loadData();
-    } catch (err: any) {
-      setActionNotice(err?.message || "Could not unfriend");
+    } catch (err: unknown) {
+      setActionNotice(err instanceof Error ? err.message : "Action failed");
+    } finally {
+      setConfirmBusy(false);
     }
   };
 
@@ -314,10 +413,8 @@ function ProfilePage() {
   }
 
   const displayName =
-    [profile.first_name, profile.middle_name, profile.last_name]
-      .filter(Boolean)
-      .join(" ")
-      .trim() || profile.username;
+    [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(" ").trim() ||
+    profile.username;
   const resolvedBannerUrl = resolveMediaUrl(profile.banner_url);
   const resolvedAvatarUrl = resolveMediaUrl(profile.avatar_url);
 
@@ -362,7 +459,8 @@ function ProfilePage() {
         <div
           onClick={(e) => {
             if ((e.target as HTMLElement).closest("button")) return;
-            if (resolvedBannerUrl) setPreviewImage({ url: resolvedBannerUrl, title: `${displayName} Cover Banner` });
+            if (resolvedBannerUrl)
+              setPreviewImage({ url: resolvedBannerUrl, title: `${displayName} Cover Banner` });
           }}
           className={cn(
             "h-44 sm:h-52 w-full bg-gradient-to-r from-neutral-950 via-secondary/40 to-neutral-900 border-b border-border/80 relative overflow-hidden",
@@ -383,19 +481,32 @@ function ProfilePage() {
           )}
 
           {isSelf && (
-            <button
-              type="button"
-              disabled={uploadingBanner}
-              onClick={() => bannerInputRef.current?.click()}
-              className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/60 backdrop-blur-md px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-white hover:bg-black/80 transition disabled:opacity-50"
-            >
-              {uploadingBanner ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <ImagePlus className="size-3 text-primary" />
+            <div className="absolute top-4 left-4 flex items-center gap-2">
+              <button
+                type="button"
+                disabled={uploadingBanner}
+                onClick={() => bannerInputRef.current?.click()}
+                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-white/20 bg-black/60 backdrop-blur-md px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-white hover:bg-black/80 transition disabled:opacity-50"
+              >
+                {uploadingBanner ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <ImagePlus className="size-3 text-primary" />
+                )}
+                {uploadingBanner ? "Uploading..." : "Change Banner"}
+              </button>
+              {resolvedBannerUrl && (
+                <button
+                  type="button"
+                  title="Remove Banner"
+                  aria-label="Remove banner image"
+                  onClick={() => setConfirmAction("delete_banner")}
+                  className="inline-flex size-9 items-center justify-center rounded-full border border-white/20 bg-black/60 backdrop-blur-md text-destructive hover:bg-black/80 transition"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
               )}
-              {uploadingBanner ? "Uploading..." : "Change Banner"}
-            </button>
+            </div>
           )}
 
           <div className="absolute top-4 right-4 flex items-center gap-2">
@@ -413,7 +524,12 @@ function ProfilePage() {
                 </>
               ) : (
                 <>
-                  <Lock className="size-3" /> Private Profile
+                  <Lock className="size-3" />{" "}
+                  {profile.account_visibility === "FRIENDS_ONLY"
+                    ? "Friends Only"
+                    : profile.account_visibility === "CUSTOM"
+                      ? "Custom Privacy"
+                      : "Private Profile"}
                 </>
               )}
             </span>
@@ -428,7 +544,10 @@ function ProfilePage() {
               <div
                 onClick={() => {
                   if (resolvedAvatarUrl) {
-                    setPreviewImage({ url: resolvedAvatarUrl, title: `${displayName} Profile Photo` });
+                    setPreviewImage({
+                      url: resolvedAvatarUrl,
+                      title: `${displayName} Profile Photo`,
+                    });
                   } else if (isSelf) {
                     avatarInputRef.current?.click();
                   }
@@ -447,21 +566,38 @@ function ProfilePage() {
                   profile.username.charAt(0).toUpperCase()
                 )}
                 {isSelf && (
-                  <button
-                    type="button"
-                    title="Change Profile Photo"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      avatarInputRef.current?.click();
-                    }}
-                    className="absolute bottom-1 right-1 p-1.5 rounded-full bg-black/70 hover:bg-black text-white transition border border-white/20"
-                  >
-                    {uploadingAvatar ? (
-                      <Loader2 className="size-3.5 animate-spin text-white" />
-                    ) : (
-                      <Camera className="size-3.5 text-white" />
+                  <div className="absolute bottom-1 right-1 flex items-center gap-1">
+                    {resolvedAvatarUrl && (
+                      <button
+                        type="button"
+                        title="Remove Profile Photo"
+                        aria-label="Remove profile photo"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmAction("delete_avatar");
+                        }}
+                        className="p-1.5 rounded-full bg-black/70 hover:bg-black text-destructive transition border border-white/20"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
                     )}
-                  </button>
+                    <button
+                      type="button"
+                      title="Change Profile Photo"
+                      aria-label="Change profile photo"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        avatarInputRef.current?.click();
+                      }}
+                      className="p-1.5 rounded-full bg-black/70 hover:bg-black text-white transition border border-white/20"
+                    >
+                      {uploadingAvatar ? (
+                        <Loader2 className="size-3.5 animate-spin text-white" />
+                      ) : (
+                        <Camera className="size-3.5 text-white" />
+                      )}
+                    </button>
+                  </div>
                 )}
               </div>
               <div className="space-y-1">
@@ -477,9 +613,7 @@ function ProfilePage() {
                   )}
                   */}
                 </div>
-                <p className="font-mono text-sm text-primary font-bold">
-                  @{profile.username}
-                </p>
+                <p className="font-mono text-sm text-primary font-bold">@{profile.username}</p>
               </div>
             </div>
 
@@ -530,18 +664,27 @@ function ProfilePage() {
 
           {/* Bio & Details */}
           <div className="mt-6 flex flex-wrap gap-4 text-xs font-mono text-muted-foreground">
-            {profile.city && (
-              <span className="flex items-center gap-1.5">
-                <MapPin className="size-3.5 text-primary" />
-                {profile.city}
-              </span>
-            )}
-            {profile.job && (
-              <span className="flex items-center gap-1.5">
-                <Wrench className="size-3.5 text-primary" />
-                {profile.job}
-              </span>
-            )}
+            {(profile.account_visibility !== "CUSTOM" || profile.show_city !== false) &&
+              profile.city && (
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="size-3.5 text-primary" />
+                  {profile.city}
+                </span>
+              )}
+            {(profile.account_visibility !== "CUSTOM" || profile.show_country !== false) &&
+              profile.country && (
+                <span className="flex items-center gap-1.5">
+                  <Globe className="size-3.5 text-primary" />
+                  {profile.country}
+                </span>
+              )}
+            {(profile.account_visibility !== "CUSTOM" || profile.show_job !== false) &&
+              profile.job && (
+                <span className="flex items-center gap-1.5">
+                  <Wrench className="size-3.5 text-primary" />
+                  {profile.job}
+                </span>
+              )}
           </div>
 
           {profile.bio && (
@@ -560,7 +703,7 @@ function ProfilePage() {
             <h4 className="font-display text-sm font-bold uppercase tracking-wider text-primary">
               Edit Rider Profile Information
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
               <div className="sm:col-span-2 space-y-1">
                 <label className="font-mono text-muted-foreground uppercase">
                   Username (@handle)
@@ -572,14 +715,14 @@ function ProfilePage() {
                     onChange={(e) => setEditUsername(e.target.value)}
                     placeholder="rider_handle"
                     className={cn(
-                      "w-full rounded-lg border bg-secondary/50 px-3 py-2 text-foreground focus:outline-none",
+                      "w-full min-h-[44px] rounded-xl border bg-secondary/50 px-3 py-2 text-foreground focus:outline-none",
                       usernameError
                         ? "border-destructive focus:border-destructive"
                         : "border-border focus:border-primary",
                     )}
                   />
                   {checkingUsername && (
-                    <Loader2 className="size-4 animate-spin text-muted-foreground absolute right-3 top-2.5" />
+                    <Loader2 className="size-4 animate-spin text-muted-foreground absolute right-3 top-3" />
                   )}
                 </div>
                 {usernameError && (
@@ -592,7 +735,7 @@ function ProfilePage() {
                   type="text"
                   value={editFirstName}
                   onChange={(e) => setEditFirstName(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-secondary/50 px-3 py-2 text-foreground focus:border-primary focus:outline-none"
+                  className="w-full min-h-[44px] rounded-xl border border-border bg-secondary/50 px-3 py-2 text-foreground focus:border-primary focus:outline-none"
                 />
               </div>
               <div className="space-y-1">
@@ -601,80 +744,44 @@ function ProfilePage() {
                   type="text"
                   value={editLastName}
                   onChange={(e) => setEditLastName(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-secondary/50 px-3 py-2 text-foreground focus:border-primary focus:outline-none"
+                  className="w-full min-h-[44px] rounded-xl border border-border bg-secondary/50 px-3 py-2 text-foreground focus:border-primary focus:outline-none"
                 />
-              </div>
-              <div className="space-y-1">
-                <label className="font-mono text-muted-foreground uppercase">City</label>
-                <input
-                  type="text"
-                  value={editCity}
-                  onChange={(e) => setEditCity(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-secondary/50 px-3 py-2 text-foreground focus:border-primary focus:outline-none"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="font-mono text-muted-foreground uppercase">Occupation / Job</label>
-                <input
-                  type="text"
-                  value={editJob}
-                  onChange={(e) => setEditJob(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-secondary/50 px-3 py-2 text-foreground focus:border-primary focus:outline-none"
-                />
-              </div>
-              <div className="sm:col-span-2 space-y-1">
-                <label className="font-mono text-muted-foreground uppercase">Bio</label>
-                <textarea
-                  rows={2}
-                  value={editBio}
-                  onChange={(e) => setEditBio(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-secondary/50 px-3 py-2 text-foreground focus:border-primary focus:outline-none"
-                />
-              </div>
-              <div className="sm:col-span-2 space-y-1">
-                <label className="font-mono text-muted-foreground uppercase">Account Visibility</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer font-sans">
-                    <input
-                      type="radio"
-                      name="visibility"
-                      value="PUBLIC"
-                      checked={editVisibility === "PUBLIC"}
-                      onChange={() => setEditVisibility("PUBLIC")}
-                      className="text-primary"
-                    />
-                    <span>Public (anyone can view garage & posts)</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer font-sans">
-                    <input
-                      type="radio"
-                      name="visibility"
-                      value="PRIVATE"
-                      checked={editVisibility === "PRIVATE"}
-                      onChange={() => setEditVisibility("PRIVATE")}
-                      className="text-primary"
-                    />
-                    <span>Private (only accepted friends can view garage & posts)</span>
-                  </label>
-                </div>
               </div>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="rounded-lg border border-border px-4 py-2 font-mono text-xs uppercase"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSaving || !isDirty || !!usernameError || checkingUsername}
-                className="rounded-lg bg-primary px-5 py-2 font-display text-xs font-bold uppercase tracking-wider text-primary-foreground disabled:opacity-50"
-              >
-                {isSaving ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
+
+            <ProfileEditorForm
+              displayName={editMiddleName}
+              onDisplayNameChange={setEditMiddleName}
+              city={editCity}
+              onCityChange={setEditCity}
+              country={editCountry}
+              onCountryChange={setEditCountry}
+              job={editJob}
+              onJobChange={setEditJob}
+              bio={editBio}
+              onBioChange={setEditBio}
+              visibility={editVisibility}
+              onVisibilityChange={setEditVisibility}
+              showMotorcycleCount={editShowMotorcycleCount}
+              onShowMotorcycleCountChange={setEditShowMotorcycleCount}
+              showGarageDetails={editShowGarageDetails}
+              onShowGarageDetailsChange={setEditShowGarageDetails}
+              showCity={editShowCity}
+              onShowCityChange={setEditShowCity}
+              showCountry={editShowCountry}
+              onShowCountryChange={setEditShowCountry}
+              showJob={editShowJob}
+              onShowJobChange={setEditShowJob}
+              privacySavedRoutes={editPrivacySavedRoutes}
+              onPrivacySavedRoutesChange={setEditPrivacySavedRoutes}
+              saving={isSaving}
+              onCancel={() => setIsEditing(false)}
+              onSave={() => {
+                void handleSaveProfile({
+                  preventDefault: () => {},
+                } as React.FormEvent);
+              }}
+            />
           </form>
         )}
       </div>
@@ -692,7 +799,8 @@ function ProfilePage() {
             Garage (Hidden)
           </h3>
           <p className="max-w-md mx-auto text-sm text-muted-foreground">
-            Add <span className="text-foreground font-semibold">@{profile.username}</span> as a friend to inspect their Digital Garage motorcycles and ride posts.
+            Add <span className="text-foreground font-semibold">@{profile.username}</span> as a
+            friend to inspect their Digital Garage motorcycles and ride posts.
           </p>
         </div>
       ) : (
@@ -727,6 +835,34 @@ function ProfilePage() {
               <MessageSquare className="size-4" />
               Ride Posts ({profile.posts?.length || 0})
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("routes")}
+              className={cn(
+                "inline-flex items-center gap-2 border-b-2 px-6 py-3 font-display text-sm font-bold uppercase tracking-wider transition-colors",
+                activeTab === "routes"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <RouteIcon className="size-4" />
+              Saved Routes
+            </button>
+            {isSelf && (
+              <button
+                type="button"
+                onClick={() => setActiveTab("trips")}
+                className={cn(
+                  "inline-flex items-center gap-2 border-b-2 px-6 py-3 font-display text-sm font-bold uppercase tracking-wider transition-colors",
+                  activeTab === "trips"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Navigation className="size-4" />
+                Trips
+              </button>
+            )}
           </div>
 
           {activeTab === "garage" && (
@@ -765,9 +901,7 @@ function ProfilePage() {
                           {bike.series_name}
                         </h4>
                         {bike.nickname && (
-                          <p className="font-sans text-xs italic text-primary">
-                            "{bike.nickname}"
-                          </p>
+                          <p className="font-sans text-xs italic text-primary">"{bike.nickname}"</p>
                         )}
                       </div>
 
@@ -821,15 +955,22 @@ function ProfilePage() {
                         <span className="font-mono text-xs text-muted-foreground">
                           {new Date(post.created_at).toLocaleDateString()}
                         </span>
-                        {post.bike_label && (
+                        {(post.motorcycle_label || post.bike_label) && (
                           <span className="rounded bg-secondary/80 px-2 py-0.5 font-mono text-[10px] text-primary border border-border">
-                            {post.bike_label}
+                            {post.motorcycle_label || post.bike_label}
                           </span>
                         )}
                       </div>
                       <p className="text-sm text-foreground/90 leading-relaxed font-sans">
                         {post.caption}
                       </p>
+                      {post.image_url && (
+                        <img
+                          src={resolveMediaUrl(post.image_url) || undefined}
+                          alt="Ride post attachment"
+                          className="max-h-72 rounded-xl border border-border object-cover"
+                        />
+                      )}
                       <div className="flex items-center gap-4 pt-1 font-mono text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Heart className="size-3.5 text-rose-500 fill-rose-500/20" />
@@ -846,6 +987,16 @@ function ProfilePage() {
               )}
             </div>
           )}
+
+          {activeTab === "routes" && (
+            <ProfileSavedRoutesTab
+              userId={profile.id}
+              isSelf={isSelf}
+              isPrivateAccount={profile.is_private}
+            />
+          )}
+
+          {isSelf && activeTab === "trips" && <ProfileTripsTab />}
         </div>
       )}
       {/* Fullscreen Lightbox Image Preview */}
@@ -864,8 +1015,9 @@ function ProfilePage() {
               </span>
               <button
                 type="button"
+                aria-label="Close image preview"
                 onClick={() => setPreviewImage(null)}
-                className="p-1 rounded-full bg-white/10 hover:bg-white/20 transition text-white"
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition text-white"
               >
                 <X className="size-5" />
               </button>
@@ -878,6 +1030,29 @@ function ProfilePage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(confirmAction)}
+        title={
+          confirmAction === "delete_avatar"
+            ? "Remove Profile Photo"
+            : confirmAction === "delete_banner"
+              ? "Remove Banner Image"
+              : "Unfriend Rider"
+        }
+        message={
+          confirmAction === "delete_avatar"
+            ? "Remove your current profile photo?"
+            : confirmAction === "delete_banner"
+              ? "Remove your profile banner image?"
+              : `Unfriend @${profile.username}? They will no longer see friends-only garage or feed details.`
+        }
+        confirmLabel={confirmAction === "unfriend" ? "Unfriend" : "Remove"}
+        destructive
+        busy={confirmBusy}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => void handleConfirmAction()}
+      />
     </div>
   );
 }

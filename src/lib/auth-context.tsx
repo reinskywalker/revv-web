@@ -1,16 +1,10 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import {
   checkUrlForAuthTokens,
   clearSavedSession,
   fetchMyProfile,
   getSavedSession,
+  logoutSession,
   saveAuthSession,
   type AuthTokens,
   type RiderProfile,
@@ -42,8 +36,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const prof = await fetchMyProfile();
       setUser(prof);
       return prof;
-    } catch (err: any) {
-      if (err?.statusCode === 401) {
+    } catch (err: unknown) {
+      if (
+        typeof err === "object" &&
+        err !== null &&
+        "statusCode" in err &&
+        (err as { statusCode?: unknown }).statusCode === 401
+      ) {
         clearSavedSession();
         setUser(null);
       }
@@ -51,35 +50,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = useCallback(
-    async (tokens: AuthTokens, username?: string) => {
-      saveAuthSession(
-        tokens.access_token,
-        tokens.refresh_token,
-        username,
-      );
-      try {
-        const prof = await fetchMyProfile();
-        setUser(prof);
-      } catch {
-        // Fallback: minimal profile from username
-        if (username) {
-          setUser({
-            id: "",
-            username,
-            name: username,
-            role: "member",
-            is_phone_verified: false,
-            is_email_verified: false,
-          });
-        }
+  const login = useCallback(async (tokens: AuthTokens, username?: string) => {
+    saveAuthSession(tokens.access_token, tokens.refresh_token, username);
+    try {
+      const prof = await fetchMyProfile();
+      setUser(prof);
+    } catch {
+      // Fallback: minimal profile from username
+      if (username) {
+        setUser({
+          id: "",
+          username,
+          name: username,
+          role: "member",
+          is_phone_verified: false,
+          is_email_verified: false,
+        });
       }
-    },
-    [],
-  );
+    }
+  }, []);
 
   const logout = useCallback(() => {
-    clearSavedSession();
+    void logoutSession();
     setUser(null);
   }, []);
 

@@ -21,10 +21,12 @@ describe("App routing", () => {
     expect(router.matchRoutes("/news").at(-1)?.routeId).toBe("/news");
   });
 
-  it("matches dedicated application routes (/garage, /admin)", () => {
+  it("matches dedicated application routes (/garage, /rides, /messages, /admin)", () => {
     const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
 
     expect(router.matchRoutes("/garage").at(-1)?.routeId).toBe("/garage");
+    expect(router.matchRoutes("/rides").at(-1)?.routeId).toBe("/rides");
+    expect(router.matchRoutes("/messages").at(-1)?.routeId).toBe("/messages");
     expect(router.matchRoutes("/admin").at(-1)?.routeId).toBe("/admin");
   });
 

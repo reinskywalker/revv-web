@@ -1,14 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  ArrowRight,
-  Check,
-  Loader2,
-  MapPin,
-  ShieldCheck,
-  Smartphone,
-  Wrench,
-} from "lucide-react";
+import { ArrowRight, Check, Loader2, MapPin, ShieldCheck, Smartphone, Wrench } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/revv/chrome";
 import { AuthApiError, submitBetaRegistration } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -82,15 +74,15 @@ function RegisterPage() {
       const res = await submitBetaRegistration({
         full_name: fullName.trim(),
         email: email.trim(),
-        playstore_email: (playstoreEmail.trim() || email.trim()),
-        phone: phone.trim() || undefined,
-        city: city.trim() || undefined,
-        motorcycle_brand: motorcycleBrand.trim() || undefined,
-        motorcycle_series: motorcycleSeries.trim() || undefined,
-        riding_style: ridingStyle || undefined,
-        referral_source: referralSource.trim() || undefined,
-        notes: notes.trim() || undefined,
-        website: website || undefined,
+        playstore_email: playstoreEmail.trim() || email.trim(),
+        ...(phone.trim() ? { phone: phone.trim() } : {}),
+        ...(city.trim() ? { city: city.trim() } : {}),
+        ...(motorcycleBrand.trim() ? { motorcycle_brand: motorcycleBrand.trim() } : {}),
+        ...(motorcycleSeries.trim() ? { motorcycle_series: motorcycleSeries.trim() } : {}),
+        ...(ridingStyle ? { riding_style: ridingStyle } : {}),
+        ...(referralSource.trim() ? { referral_source: referralSource.trim() } : {}),
+        ...(notes.trim() ? { notes: notes.trim() } : {}),
+        ...(website ? { website } : {}),
       });
       setSubmittedData(res);
     } catch (err) {
@@ -114,9 +106,7 @@ function RegisterPage() {
             <ShieldCheck className="size-4" />
             Closed Beta Roster
           </span>
-          <h1 className="display-heading mt-4 text-4xl sm:text-5xl">
-            Join the Closed Beta
-          </h1>
+          <h1 className="display-heading mt-4 text-4xl sm:text-5xl">Join the Closed Beta</h1>
           <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
             Register your rider profile and Google Play email for early access to the REVV Android
             companion, turn-by-turn HUD navigation, group intercom, and Digital Garage.
@@ -131,9 +121,7 @@ function RegisterPage() {
             <p className="mt-5 font-mono text-xs uppercase tracking-[0.25em] text-primary">
               Registration Recorded · Status: {submittedData.status.toUpperCase()}
             </p>
-            <h2 className="display-heading mt-2 text-3xl">
-              You're on the REVV Beta Roster
-            </h2>
+            <h2 className="display-heading mt-2 text-3xl">You're on the REVV Beta Roster</h2>
             <p className="mt-3 max-w-xl text-base leading-relaxed text-muted-foreground">
               We've logged your application under{" "}
               <span className="font-semibold text-foreground">{email.trim()}</span>. Once the

@@ -13,9 +13,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as GarageRouteImport } from './routes/garage'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as NewsRouteImport } from './routes/news'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as RidesRouteImport } from './routes/rides'
 import { Route as IdUsernameRouteImport } from './routes/id/$username'
 
 const IndexRoute = IndexRouteImport.update({
@@ -38,6 +40,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MessagesRoute = MessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const NewsRoute = NewsRouteImport.update({
   id: '/news',
   path: '/news',
@@ -53,6 +60,11 @@ const RegisterRoute = RegisterRouteImport.update({
   path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RidesRoute = RidesRouteImport.update({
+  id: '/rides',
+  path: '/rides',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IdUsernameRoute = IdUsernameRouteImport.update({
   id: '/id/$username',
   path: '/id/$username',
@@ -64,9 +76,11 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/garage': typeof GarageRoute
   '/login': typeof LoginRoute
+  '/messages': typeof MessagesRoute
   '/news': typeof NewsRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
+  '/rides': typeof RidesRoute
   '/id/$username': typeof IdUsernameRoute
 }
 export interface FileRoutesByTo {
@@ -74,9 +88,11 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/garage': typeof GarageRoute
   '/login': typeof LoginRoute
+  '/messages': typeof MessagesRoute
   '/news': typeof NewsRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
+  '/rides': typeof RidesRoute
   '/id/$username': typeof IdUsernameRoute
 }
 export interface FileRoutesById {
@@ -85,9 +101,11 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/garage': typeof GarageRoute
   '/login': typeof LoginRoute
+  '/messages': typeof MessagesRoute
   '/news': typeof NewsRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
+  '/rides': typeof RidesRoute
   '/id/$username': typeof IdUsernameRoute
 }
 export interface FileRouteTypes {
@@ -97,9 +115,11 @@ export interface FileRouteTypes {
     | '/admin'
     | '/garage'
     | '/login'
+    | '/messages'
     | '/news'
     | '/privacy'
     | '/register'
+    | '/rides'
     | '/id/$username'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -107,9 +127,11 @@ export interface FileRouteTypes {
     | '/admin'
     | '/garage'
     | '/login'
+    | '/messages'
     | '/news'
     | '/privacy'
     | '/register'
+    | '/rides'
     | '/id/$username'
   id:
     | '__root__'
@@ -117,9 +139,11 @@ export interface FileRouteTypes {
     | '/admin'
     | '/garage'
     | '/login'
+    | '/messages'
     | '/news'
     | '/privacy'
     | '/register'
+    | '/rides'
     | '/id/$username'
   fileRoutesById: FileRoutesById
 }
@@ -128,9 +152,11 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   GarageRoute: typeof GarageRoute
   LoginRoute: typeof LoginRoute
+  MessagesRoute: typeof MessagesRoute
   NewsRoute: typeof NewsRoute
   PrivacyRoute: typeof PrivacyRoute
   RegisterRoute: typeof RegisterRoute
+  RidesRoute: typeof RidesRoute
   IdUsernameRoute: typeof IdUsernameRoute
 }
 
@@ -164,6 +190,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/messages': {
+      id: '/messages'
+      path: '/messages'
+      fullPath: '/messages'
+      preLoaderRoute: typeof MessagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/news': {
       id: '/news'
       path: '/news'
@@ -185,6 +218,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rides': {
+      id: '/rides'
+      path: '/rides'
+      fullPath: '/rides'
+      preLoaderRoute: typeof RidesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/id/$username': {
       id: '/id/$username'
       path: '/id/$username'
@@ -200,9 +240,11 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   GarageRoute: GarageRoute,
   LoginRoute: LoginRoute,
+  MessagesRoute: MessagesRoute,
   NewsRoute: NewsRoute,
   PrivacyRoute: PrivacyRoute,
   RegisterRoute: RegisterRoute,
+  RidesRoute: RidesRoute,
   IdUsernameRoute: IdUsernameRoute,
 }
 export const routeTree = rootRouteImport

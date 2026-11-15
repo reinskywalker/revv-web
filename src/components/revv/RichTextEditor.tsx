@@ -10,6 +10,7 @@ import {
   Quote,
   Underline,
 } from "lucide-react";
+import { sanitizeRichHtml } from "@/lib/html-sanitizer";
 import { uploadCompressedMedia } from "@/lib/api";
 
 interface RichTextEditorProps {
@@ -38,20 +39,30 @@ export function RichTextEditor({
   const [sourceMode, setSourceMode] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pendingCaption, setPendingCaption] = useState("");
+  const [showCaptionInput, setShowCaptionInput] = useState(false);
 
   // Sync external value into contentEditable only when focus is outside so cursor position is preserved.
   useEffect(() => {
     const el = editorRef.current;
     if (!el || sourceMode) return;
-    if (document.activeElement !== el && el.innerHTML !== value) {
-      el.innerHTML = value || "";
+    const clean = sanitizeRichHtml(value || "");
+    if (document.activeElement !== el && el.innerHTML !== clean) {
+      el.innerHTML = clean;
     }
   }, [value, sourceMode]);
 
   const syncFromEditor = () => {
     if (editorRef.current) {
-      onChange(editorRef.current.innerHTML);
+      onChange(sanitizeRichHtml(editorRef.current.innerHTML));
     }
+  };
+
+  const toggleSourceMode = () => {
+    if (sourceMode) {
+      onChange(sanitizeRichHtml(value || ""));
+    }
+    setSourceMode((prev) => !prev);
   };
 
   const execFormat = (command: string, arg?: string) => {
@@ -66,21 +77,20 @@ export function RichTextEditor({
     e.target.value = "";
     if (!file) return;
 
-    const rawCaption = window.prompt("Optional image caption (e.g. Tire inspection setup):", "");
-    if (rawCaption === null) return;
-
     setUploadingImage(true);
     setUploadError(null);
     try {
       const uploaded = await uploadCompressedMedia(file);
-      const caption = rawCaption.trim();
+      const caption = pendingCaption.trim();
+      setPendingCaption("");
+      setShowCaptionInput(false);
       const figcaptionHtml = caption
         ? `<figcaption>Image : ${escapeHtmlAttr(caption)}</figcaption>`
         : "";
       const figureHtml = `<figure><img src="${escapeHtmlAttr(uploaded.url)}" alt="${escapeHtmlAttr(caption || "REVV dispatch image")}" />${figcaptionHtml}</figure><p><br/></p>`;
 
       if (sourceMode) {
-        onChange(`${value}${figureHtml}`);
+        onChange(sanitizeRichHtml(`${value}${figureHtml}`));
       } else {
         editorRef.current?.focus();
         document.execCommand("insertHTML", false, figureHtml);
@@ -139,7 +149,7 @@ export function RichTextEditor({
           <button
             type="button"
             disabled={uploadingImage}
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setShowCaptionInput((prev) => !prev)}
             className="inline-flex items-center gap-1.5 rounded-lg border border-panel-border bg-panel-card px-2.5 py-1.5 text-xs font-semibold text-panel-fg transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
           >
             {uploadingImage ? (
@@ -160,7 +170,7 @@ export function RichTextEditor({
 
         <button
           type="button"
-          onClick={() => setSourceMode((prev) => !prev)}
+          onClick={toggleSourceMode}
           className={[
             "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider transition-colors",
             sourceMode
@@ -172,6 +182,36 @@ export function RichTextEditor({
           {sourceMode ? "Visual" : "HTML"}
         </button>
       </div>
+
+      {showCaptionInput && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-panel-border bg-panel/60 px-3 py-2 text-xs">
+          <input
+            type="text"
+            value={pendingCaption}
+            onChange={(e) => setPendingCaption(e.target.value)}
+            placeholder="Optional image caption (e.g. Tire inspection setup)"
+            className="min-w-[200px] flex-1 rounded-lg border border-panel-border bg-panel-card px-2.5 py-1.5 text-xs text-panel-fg focus:border-primary focus:outline-none"
+          />
+          <button
+            type="button"
+            disabled={uploadingImage}
+            onClick={() => fileInputRef.current?.click()}
+            className="rounded-lg bg-primary px-3 py-1.5 font-mono text-[11px] font-bold uppercase text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            Choose Photo
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPendingCaption("");
+              setShowCaptionInput(false);
+            }}
+            className="rounded-lg border border-panel-border px-2.5 py-1.5 font-mono text-[11px] uppercase text-panel-muted hover:text-panel-fg"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {uploadError && (
         <div className="border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-xs text-destructive">

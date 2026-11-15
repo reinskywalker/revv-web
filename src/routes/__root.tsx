@@ -77,28 +77,28 @@ const jsonLdWebsite = {
     {
       "@type": "WebSite",
       "@id": "https://revv.asteralabs.digital/#website",
-      "url": "https://revv.asteralabs.digital",
-      "name": "REVV- Web",
-      "description":
+      url: "https://revv.asteralabs.digital",
+      name: "REVV- Web",
+      description:
         "Friendly Neighborhood Riding Companion: turn-by-turn navigation, rider feed, communities, group voice intercom, and digital garage.",
-      "publisher": {
+      publisher: {
         "@type": "Organization",
-        "name": "REVV",
-        "url": "https://revv.asteralabs.digital",
+        name: "REVV",
+        url: "https://revv.asteralabs.digital",
       },
     },
     {
       "@type": "SoftwareApplication",
       "@id": "https://revv.asteralabs.digital/#app",
-      "name": "REVV- Web",
-      "operatingSystem": "Web, iOS, Android",
-      "applicationCategory": "NavigationApplication, SocialNetworkingApplication",
-      "offers": {
+      name: "REVV- Web",
+      operatingSystem: "Web, iOS, Android",
+      applicationCategory: "NavigationApplication, SocialNetworkingApplication",
+      offers: {
         "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD",
+        price: "0",
+        priceCurrency: "USD",
       },
-      "description":
+      description:
         "REVV connects motorcycle riders with turn-by-turn HUD navigation, real-time group intercom, rider feeds, club coordination, and digital garage telemetry.",
     },
   ],

@@ -7,6 +7,7 @@ interface RiderOverviewPanelProps {
 
 export function RiderOverviewPanel({ profile }: RiderOverviewPanelProps) {
   if (profile.is_private) {
+    const scopeLabel = profile.account_visibility === "FRIENDS_ONLY" ? "Friends Only" : "Private";
     return (
       <section className="rounded-2xl border border-border/80 bg-card/60 p-6 flex items-center gap-4">
         <div className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30">
@@ -14,22 +15,27 @@ export function RiderOverviewPanel({ profile }: RiderOverviewPanelProps) {
         </div>
         <div>
           <h3 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
-            Rider Overview (Hidden)
+            Rider Overview ({scopeLabel})
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            This account is private. Add as a friend to view rider overview statistics and garage details.
+            This account is restricted ({scopeLabel.toLowerCase()}). Connect as friends to view
+            rider statistics and garage details.
           </p>
         </div>
       </section>
     );
   }
 
-  const primaryBike =
-    profile.garage?.find((b) => b.is_primary) ??
-    (profile.garage && profile.garage.length === 1 ? profile.garage[0] : undefined);
+  const isGarageHidden =
+    profile.garage === null ||
+    (profile.account_visibility === "CUSTOM" && profile.show_garage_details === false);
+  const primaryBike = isGarageHidden
+    ? undefined
+    : (profile.garage?.find((b) => b.is_primary) ??
+      (profile.garage && profile.garage.length === 1 ? profile.garage[0] : undefined));
   const primaryBikeLabel = primaryBike
     ? [primaryBike.brand_name, primaryBike.series_name].filter(Boolean).join(" ")
-    : profile.garage === null
+    : isGarageHidden
       ? "Hidden"
       : "No primary bike";
 
@@ -48,9 +54,7 @@ export function RiderOverviewPanel({ profile }: RiderOverviewPanelProps) {
     },
     {
       label: "Home Base",
-      value: isCustomHiddenCountry
-        ? "Hidden"
-        : profile.country?.trim() || "Not set",
+      value: isCustomHiddenCountry ? "Hidden" : profile.country?.trim() || "Not set",
       icon: ShieldCheck,
     },
     {

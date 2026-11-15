@@ -10,10 +10,7 @@ export function Wordmark({
 }) {
   return (
     <span
-      className={cn(
-        "font-display inline-flex items-baseline font-black tracking-tight",
-        className,
-      )}
+      className={cn("font-display inline-flex items-baseline font-black tracking-tight", className)}
     >
       <span className="uppercase">REVV</span>
       <span
