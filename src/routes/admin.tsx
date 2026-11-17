@@ -135,7 +135,7 @@ function AdminPage() {
   const [isMaintenance, setIsMaintenance] = useState(false);
   const [statusTitle, setStatusTitle] = useState("Under Scheduled Maintenance");
   const [statusMessage, setStatusMessage] = useState(
-    "Kami sedang melakukan peningkatan performa dan perawatan server REVV. Mohon tunggu beberapa saat.",
+    "We are performing scheduled maintenance and performance upgrades on REVV servers. Please wait a few moments.",
   );
   const [statusIcon, setStatusIcon] = useState("wrench");
   const [hasPurpose, setHasPurpose] = useState(false);
@@ -1065,7 +1065,7 @@ function AdminPage() {
                       Message Body
                     </label>
                     <textarea
-                      placeholder="Tulis pesan notifikasi lengkap yang akan muncul di notification drawer mobile..."
+                      placeholder="Write the full notification message that will appear in the mobile notification drawer..."
                       value={broadcastBody}
                       onChange={(e) => setBroadcastBody(e.target.value)}
                       rows={3}
@@ -1340,7 +1340,7 @@ function AdminPage() {
                       rows={4}
                       value={statusMessage}
                       onChange={(e) => setStatusMessage(e.target.value)}
-                      placeholder="Kami sedang melakukan peningkatan performa server. Mohon tunggu beberapa saat..."
+                      placeholder="We are currently performing server upgrades and maintenance. Please check back shortly..."
                       className="w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2.5 font-sans text-sm text-foreground focus:border-primary focus:outline-none"
                     />
                   </div>
@@ -1542,7 +1542,7 @@ function AdminPage() {
                       </h5>
                       <p className="text-[11px] leading-relaxed text-white/70 line-clamp-4">
                         {statusMessage.trim() ||
-                          "Kami sedang melakukan peningkatan performa dan perawatan server REVV."}
+                          "We are performing scheduled maintenance and performance upgrades on REVV servers."}
                       </p>
                     </div>
 
