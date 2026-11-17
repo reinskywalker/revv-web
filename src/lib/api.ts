@@ -1479,10 +1479,6 @@ export interface SystemHealthStatus {
   title: string;
   message: string;
   icon: string;
-  hasPurpose?: boolean;
-  purposeTitle?: string;
-  purposeMessage?: string;
-  isDestroySession?: boolean;
   server_time?: string;
   isDown?: boolean;
 }
@@ -1507,10 +1503,6 @@ export async function fetchSystemHealth(): Promise<SystemHealthStatus> {
             title: body.data.title || "Under Scheduled Maintenance",
             message: body.data.message || "REVV is currently undergoing maintenance.",
             icon: body.data.icon || "wrench",
-            hasPurpose: Boolean(body.data.hasPurpose),
-            purposeTitle: body.data.purposeTitle || "",
-            purposeMessage: body.data.purposeMessage || "",
-            isDestroySession: Boolean(body.data.isDestroySession),
           };
         }
       }
@@ -1530,10 +1522,6 @@ export async function fetchSystemHealth(): Promise<SystemHealthStatus> {
       title: data.title || "Under Scheduled Maintenance",
       message: data.message || "REVV is currently undergoing maintenance.",
       icon: data.icon || "wrench",
-      hasPurpose: Boolean(data.hasPurpose),
-      purposeTitle: data.purposeTitle || "",
-      purposeMessage: data.purposeMessage || "",
-      isDestroySession: Boolean(data.isDestroySession),
       server_time: data.server_time,
     };
   } catch {
@@ -1563,10 +1551,6 @@ export interface SystemStatusConfig {
   title: string;
   message: string;
   icon: string;
-  hasPurpose: boolean;
-  purposeTitle: string;
-  purposeMessage: string;
-  isDestroySession: boolean;
   updated_by?: string | null;
   updated_at?: string;
 }
@@ -1634,10 +1618,6 @@ export async function updateAdminSystemStatus(payload: {
   title?: string;
   message?: string;
   icon?: string;
-  hasPurpose?: boolean;
-  purposeTitle?: string;
-  purposeMessage?: string;
-  isDestroySession?: boolean;
 }): Promise<SystemStatusConfig> {
   return authRequest<SystemStatusConfig>("/admin/system/status", {
     method: "PUT",

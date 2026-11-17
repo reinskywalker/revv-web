@@ -138,10 +138,6 @@ function AdminPage() {
     "We are performing scheduled maintenance and performance upgrades on REVV servers. Please wait a few moments.",
   );
   const [statusIcon, setStatusIcon] = useState("wrench");
-  const [hasPurpose, setHasPurpose] = useState(false);
-  const [purposeTitle, setPurposeTitle] = useState("");
-  const [purposeMessage, setPurposeMessage] = useState("");
-  const [isDestroySession, setIsDestroySession] = useState(false);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
 
   // Master creation form inputs
@@ -228,10 +224,6 @@ function AdminPage() {
         setStatusTitle(sysStatus.title);
         setStatusMessage(sysStatus.message);
         setStatusIcon(sysStatus.icon);
-        setHasPurpose(Boolean(sysStatus.hasPurpose));
-        setPurposeTitle(sysStatus.purposeTitle || "");
-        setPurposeMessage(sysStatus.purposeMessage || "");
-        setIsDestroySession(Boolean(sysStatus.isDestroySession));
       }
       if (brands.length > 0 && brands[0] && !newMotoBrandId) {
         setNewMotoBrandId(String(brands[0].id));
@@ -253,26 +245,16 @@ function AdminPage() {
         title: statusTitle.trim(),
         message: statusMessage.trim(),
         icon: statusIcon.trim(),
-        hasPurpose,
-        purposeTitle: purposeTitle.trim(),
-        purposeMessage: purposeMessage.trim(),
-        isDestroySession,
       });
       setSystemStatus(updated);
       setIsMaintenance(updated.is_maintenance);
       setStatusTitle(updated.title);
       setStatusMessage(updated.message);
       setStatusIcon(updated.icon);
-      setHasPurpose(Boolean(updated.hasPurpose));
-      setPurposeTitle(updated.purposeTitle || "");
-      setPurposeMessage(updated.purposeMessage || "");
-      setIsDestroySession(Boolean(updated.isDestroySession));
       setNotice(
-        updated.isDestroySession
-          ? "System status saved: Maintenance/Purpose active & mobile session destroy triggered."
-          : updated.is_maintenance
-            ? "System status updated: MAINTENANCE MODE ACTIVE. Non-administrators are blocked from signing in."
-            : "System status updated: OPERATIONAL & health flags saved.",
+        updated.is_maintenance
+          ? "System status updated: MAINTENANCE MODE ACTIVE. Non-administrators are blocked from signing in."
+          : "System status updated: OPERATIONAL.",
       );
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Failed to update system maintenance status.");
@@ -1376,71 +1358,6 @@ function AdminPage() {
                         </button>
                       ))}
                     </div>
-                  </div>
-
-                  {/* Remote Purpose Dialog & Force Logout (30s Mobile Health Trigger) */}
-                  <div className="space-y-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
-                    <label className="flex cursor-pointer items-center justify-between gap-3">
-                      <div>
-                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground block">
-                          Custom Purpose Notice (`hasPurpose`)
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">
-                          Displays a modal popup inside active mobile sessions every 30s health
-                          poll.
-                        </span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={hasPurpose}
-                        onChange={(e) => setHasPurpose(e.target.checked)}
-                        className="size-5 accent-primary"
-                      />
-                    </label>
-
-                    <div className="space-y-1.5">
-                      <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
-                        Purpose Title (`purposeTitle`)
-                      </label>
-                      <input
-                        type="text"
-                        value={purposeTitle}
-                        onChange={(e) => setPurposeTitle(e.target.value)}
-                        placeholder="e.g. Important Security Update"
-                        className="w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
-                        Purpose Message (`purposeMessage`)
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={purposeMessage}
-                        onChange={(e) => setPurposeMessage(e.target.value)}
-                        placeholder="Message shown inside mobile purpose popup…"
-                        className="w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2 font-sans text-sm text-foreground focus:border-primary focus:outline-none"
-                      />
-                    </div>
-
-                    <label className="flex cursor-pointer items-start justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3">
-                      <div>
-                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-destructive block">
-                          Destroy Mobile Sessions (`isDestroySession`)
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">
-                          Forces active mobile riders to log out and clears cached local
-                          credentials.
-                        </span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={isDestroySession}
-                        onChange={(e) => setIsDestroySession(e.target.checked)}
-                        className="mt-1 size-5 accent-destructive"
-                      />
-                    </label>
                   </div>
 
                   {/* Save / Disable Button */}
