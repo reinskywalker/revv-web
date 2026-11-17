@@ -243,11 +243,13 @@ function AdminPage() {
     }
   };
 
-  const handleSaveSystemStatus = async () => {
+  const handleSaveSystemStatus = async (overrideMaintenance?: boolean) => {
     setIsSavingStatus(true);
+    const nextMaintenance =
+      typeof overrideMaintenance === "boolean" ? overrideMaintenance : isMaintenance;
     try {
       const updated = await updateAdminSystemStatus({
-        is_maintenance: isMaintenance,
+        is_maintenance: nextMaintenance,
         title: statusTitle.trim(),
         message: statusMessage.trim(),
         icon: statusIcon.trim(),
@@ -1281,72 +1283,6 @@ function AdminPage() {
           {/* TAB 7: SYSTEM HEALTH & MAINTENANCE CONTROL */}
           {activeSubTab === "maintenance" && (
             <div className="space-y-6">
-              {/* Status Header Banner */}
-              <div
-                className={cn(
-                  "rounded-2xl border p-6 transition-colors",
-                  isMaintenance
-                    ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
-                    : "border-emerald-500/40 bg-emerald-500/10 text-emerald-200",
-                )}
-              >
-                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                  <div className="flex items-start gap-3.5">
-                    <div
-                      className={cn(
-                        "rounded-xl p-3 shrink-0",
-                        isMaintenance
-                          ? "bg-amber-500/20 text-amber-400"
-                          : "bg-emerald-500/20 text-emerald-400",
-                      )}
-                    >
-                      {isMaintenance ? (
-                        <AlertTriangle className="size-6" />
-                      ) : (
-                        <CheckCircle2 className="size-6" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold uppercase tracking-wider">
-                          {isMaintenance ? "MAINTENANCE MODE ACTIVE" : "SYSTEM OPERATIONAL"}
-                        </span>
-                        <span
-                          className={cn(
-                            "inline-block size-2 rounded-full",
-                            isMaintenance ? "bg-amber-400 animate-pulse" : "bg-emerald-400",
-                          )}
-                        />
-                      </div>
-                      <h3 className="font-display text-xl font-black uppercase tracking-tight text-white mt-1">
-                        {isMaintenance
-                          ? "User Logins Gated · Administrator Bypass Only"
-                          : "Normal Traffic Permitted · All Services Online"}
-                      </h3>
-                      <p className="mt-1 text-xs opacity-90 max-w-2xl leading-relaxed">
-                        {isMaintenance
-                          ? "Non-administrator accounts are blocked from requesting OTP or authenticating via Google OAuth. Mobile and web splash screens display the custom maintenance message below."
-                          : "All riders can sign in seamlessly via OTP or Google OAuth. Health checker returns status OK."}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsMaintenance(!isMaintenance)}
-                    className={cn(
-                      "inline-flex items-center gap-2.5 rounded-xl px-5 py-3 font-mono text-xs font-bold uppercase tracking-wider shadow-lg transition-all active:scale-95 shrink-0",
-                      isMaintenance
-                        ? "bg-amber-500 hover:bg-amber-400 text-black shadow-amber-500/20"
-                        : "bg-secondary border border-border hover:bg-secondary/80 text-foreground",
-                    )}
-                  >
-                    <Power className="size-4" />
-                    <span>{isMaintenance ? "Turn Maintenance OFF" : "Turn Maintenance ON"}</span>
-                  </button>
-                </div>
-              </div>
-
               <div className="grid gap-6 lg:grid-cols-2">
                 {/* Configuration Form Card */}
                 <div className="hud-card space-y-5 p-6">
@@ -1507,21 +1443,39 @@ function AdminPage() {
                     </label>
                   </div>
 
-                  {/* Save Button */}
+                  {/* Save / Disable Button */}
                   <div className="pt-2">
-                    <button
-                      type="button"
-                      disabled={isSavingStatus}
-                      onClick={handleSaveSystemStatus}
-                      className="btn-primary flex w-full items-center justify-center gap-2 py-3"
-                    >
-                      {isSavingStatus ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Send className="size-4" />
-                      )}
-                      <span>{isSavingStatus ? "Updating Status…" : "Apply System Status"}</span>
-                    </button>
+                    {systemStatus?.is_maintenance ? (
+                      <button
+                        type="button"
+                        disabled={isSavingStatus}
+                        onClick={() => void handleSaveSystemStatus(false)}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-black shadow-lg shadow-amber-500/20 transition-all hover:bg-amber-400 active:scale-[0.99] disabled:opacity-60"
+                      >
+                        {isSavingStatus ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Power className="size-4" />
+                        )}
+                        <span>
+                          {isSavingStatus ? "Updating Status…" : "Disable Maintenance Screen"}
+                        </span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isSavingStatus}
+                        onClick={() => void handleSaveSystemStatus()}
+                        className="btn-primary flex w-full items-center justify-center gap-2 py-3"
+                      >
+                        {isSavingStatus ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Send className="size-4" />
+                        )}
+                        <span>{isSavingStatus ? "Updating Status…" : "Apply System Status"}</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Metadata info */}
