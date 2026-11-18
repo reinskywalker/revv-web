@@ -29,6 +29,9 @@ export function SiteHeader() {
           <Link to="/" className={navLinkClass} activeProps={{ className: "text-foreground" }}>
             Home
           </Link>
+          <Link to="/leaderboard" className={navLinkClass} activeProps={{ className: "text-foreground" }}>
+            Leaderboard
+          </Link>
           <Link to="/news" className={navLinkClass} activeProps={{ className: "text-foreground" }}>
             News
           </Link>
@@ -63,6 +66,9 @@ export function SiteFooter() {
           <div className="flex flex-wrap gap-5">
             <Link to="/" className={navLinkClass}>
               Home
+            </Link>
+            <Link to="/leaderboard" className={navLinkClass}>
+              Leaderboard
             </Link>
             <Link to="/news" className={navLinkClass}>
               News

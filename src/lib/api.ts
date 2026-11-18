@@ -1785,3 +1785,220 @@ export async function uploadCompressedMedia(file: File): Promise<{
     URL.revokeObjectURL(objectUrl);
   }
 }
+
+// ============================================================================
+// LEADERBOARD, ADMIN ANALYTICS & ADMIN TRIP RECORDS
+// ============================================================================
+
+export interface LeaderboardEntry {
+  rank: number;
+  user_id: string;
+  username: string;
+  display_name: string;
+  avatar_url?: string | null;
+  city?: string | null;
+  country?: string | null;
+  primary_bike?: string | null;
+  total_distance_km: number;
+  total_trips: number;
+  total_duration_seconds: number;
+  avg_speed_kmh: number;
+  max_speed_kmh: number;
+  refreshed_at: string;
+}
+
+export interface LeaderboardResponse {
+  snapshot_date: string;
+  refreshed_at: string;
+  next_refresh_wib: string;
+  entries: LeaderboardEntry[];
+}
+
+export async function fetchPublicLeaderboard(): Promise<LeaderboardResponse> {
+  const res = await fetch(`${getApiBaseUrl()}/leaderboard`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    throw new AuthApiError("Failed to load leaderboard", res.status);
+  }
+  const payload: ApiResponse<LeaderboardResponse> = await res.json();
+  return payload.data;
+}
+
+export async function adminRefreshLeaderboard(): Promise<LeaderboardResponse> {
+  return authRequest<LeaderboardResponse>("/admin/leaderboard/refresh", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export interface DailyAnalyticsSeriesItem {
+  day: string;
+  new_users: number;
+  active_riders: number;
+  trips_count: number;
+  distance_km: number;
+}
+
+export interface AnalyticsBucketItem {
+  label: string;
+  count: number;
+  distance_km: number;
+}
+
+export interface HourlyActivityItem {
+  hour_wib: number;
+  trips_count: number;
+}
+
+export interface UserTelemetryMetricItem {
+  id: string;
+  username: string;
+  display_name: string;
+  email?: string | null;
+  role: string;
+  status: string;
+  last_login_at?: string | null;
+  last_active_at?: string | null;
+  login_count: number;
+  session_count: number;
+  last_platform?: string | null;
+  last_app_version?: string | null;
+  last_device_model?: string | null;
+  total_trips: number;
+  total_distance_km: number;
+  max_speed_kmh: number;
+  created_at: string;
+}
+
+export interface AdminAnalyticsResponse {
+  summary: {
+    total_users: number;
+    active_24h: number;
+    active_7d: number;
+    active_30d: number;
+    dau_mau_pct: number;
+    new_users_7d: number;
+    new_users_30d: number;
+    total_trips: number;
+    total_distance_km: number;
+    total_duration_hours: number;
+    avg_trip_distance_km: number;
+    avg_trip_duration_min: number;
+    avg_speed_kmh: number;
+    max_speed_kmh: number;
+    total_clubs: number;
+    total_posts: number;
+  };
+  daily_series: DailyAnalyticsSeriesItem[];
+  distance_buckets: AnalyticsBucketItem[];
+  hourly_distribution: HourlyActivityItem[];
+  top_brands: Array<{ brand: string; count: number }>;
+  user_metrics: UserTelemetryMetricItem[];
+}
+
+export async function fetchAdminAnalytics(): Promise<AdminAnalyticsResponse> {
+  return authRequest<AdminAnalyticsResponse>("/admin/analytics");
+}
+
+export interface AdminTripRecordItem {
+  id: string;
+  user_id: string;
+  username: string;
+  display_name: string;
+  avatar_url?: string | null;
+  title: string;
+  status: string;
+  visibility: string;
+  start_time: string;
+  end_time?: string | null;
+  total_distance_km: number;
+  total_duration_seconds: number;
+  avg_speed_kmh: number;
+  max_speed_kmh: number;
+  origin_name?: string | null;
+  destination_name?: string | null;
+  max_lean_deg: number;
+  points_count: number;
+  created_at: string;
+}
+
+export interface AdminTripsPaginatedResponse {
+  items: AdminTripRecordItem[];
+  total: number;
+  page: number;
+  limit: number;
+  has_more: boolean;
+}
+
+export interface AdminRiderTripGroup {
+  user_id: string;
+  username: string;
+  display_name: string;
+  avatar_url?: string | null;
+  total_trips: number;
+  total_distance_km: number;
+  total_duration_seconds: number;
+  avg_speed_kmh: number;
+  max_speed_kmh: number;
+  last_trip_at?: string | null;
+  trips: AdminTripRecordItem[];
+}
+
+export interface AdminRiderTripsPaginatedResponse {
+  items: AdminRiderTripGroup[];
+  total: number;
+  page: number;
+  limit: number;
+  has_more: boolean;
+}
+
+export interface AdminTripDetailRecord {
+  id: string;
+  user_id: string;
+  username: string;
+  display_name: string;
+  avatar_url?: string | null;
+  title: string;
+  status: string;
+  visibility: string;
+  start_time: string;
+  end_time?: string | null;
+  total_distance_km: number;
+  total_duration_seconds: number;
+  avg_speed_kmh: number;
+  max_speed_kmh: number;
+  polyline_points: unknown;
+  telemetry_data: Record<string, unknown>;
+  created_at: string;
+}
+
+export async function fetchAdminTrips(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}): Promise<AdminTripsPaginatedResponse> {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.search?.trim()) qs.set("search", params.search.trim());
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return authRequest<AdminTripsPaginatedResponse>(`/admin/trips${suffix}`);
+}
+
+export async function fetchAdminTripsByRider(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}): Promise<AdminRiderTripsPaginatedResponse> {
+  const qs = new URLSearchParams();
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.search?.trim()) qs.set("search", params.search.trim());
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return authRequest<AdminRiderTripsPaginatedResponse>(`/admin/trips/riders${suffix}`);
+}
+
+export async function fetchAdminTripDetail(tripId: string): Promise<AdminTripDetailRecord> {
+  return authRequest<AdminTripDetailRecord>(`/admin/trips/${encodeURIComponent(tripId)}`);
+}

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
+  BarChart3,
   Bell,
   Check,
   CheckCheck,
@@ -9,10 +10,12 @@ import {
   Home,
   LayoutDashboard,
   LogOut,
+  MapPin,
   Menu,
   MessageSquare,
   ShieldCheck,
   Trash2,
+  Trophy,
   User,
   Wrench,
   X,
@@ -163,6 +166,11 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
       icon: MessageSquare,
     },
     {
+      label: "Leaderboard",
+      to: "/leaderboard",
+      icon: Trophy,
+    },
+    {
       label: "News",
       to: "/news",
       icon: FileText,
@@ -180,6 +188,16 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     ...(isAdministrator
       ? [
           {
+            label: "Analytics",
+            to: "/analytics",
+            icon: BarChart3,
+          },
+          {
+            label: "Trip Records",
+            to: "/trip-records",
+            icon: MapPin,
+          },
+          {
             label: "Admin Console",
             to: "/admin",
             icon: LayoutDashboard,
@@ -194,6 +212,9 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     currentPath === "/garage" ||
     currentPath === "/rides" ||
     currentPath === "/messages" ||
+    currentPath === "/leaderboard" ||
+    currentPath === "/analytics" ||
+    currentPath === "/trip-records" ||
     currentPath === "/admin";
 
   return (

@@ -11,13 +11,16 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as GarageRouteImport } from './routes/garage'
+import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as NewsRouteImport } from './routes/news'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as RidesRouteImport } from './routes/rides'
+import { Route as TripRecordsRouteImport } from './routes/trip-records'
 import { Route as IdUsernameRouteImport } from './routes/id/$username'
 
 const IndexRoute = IndexRouteImport.update({
@@ -30,9 +33,19 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AnalyticsRoute = AnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GarageRoute = GarageRouteImport.update({
   id: '/garage',
   path: '/garage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeaderboardRoute = LeaderboardRouteImport.update({
+  id: '/leaderboard',
+  path: '/leaderboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -65,6 +78,11 @@ const RidesRoute = RidesRouteImport.update({
   path: '/rides',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TripRecordsRoute = TripRecordsRouteImport.update({
+  id: '/trip-records',
+  path: '/trip-records',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IdUsernameRoute = IdUsernameRouteImport.update({
   id: '/id/$username',
   path: '/id/$username',
@@ -74,38 +92,47 @@ const IdUsernameRoute = IdUsernameRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/analytics': typeof AnalyticsRoute
   '/garage': typeof GarageRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/news': typeof NewsRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/rides': typeof RidesRoute
+  '/trip-records': typeof TripRecordsRoute
   '/id/$username': typeof IdUsernameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/analytics': typeof AnalyticsRoute
   '/garage': typeof GarageRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/news': typeof NewsRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/rides': typeof RidesRoute
+  '/trip-records': typeof TripRecordsRoute
   '/id/$username': typeof IdUsernameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/analytics': typeof AnalyticsRoute
   '/garage': typeof GarageRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/news': typeof NewsRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/rides': typeof RidesRoute
+  '/trip-records': typeof TripRecordsRoute
   '/id/$username': typeof IdUsernameRoute
 }
 export interface FileRouteTypes {
@@ -113,50 +140,62 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/analytics'
     | '/garage'
+    | '/leaderboard'
     | '/login'
     | '/messages'
     | '/news'
     | '/privacy'
     | '/register'
     | '/rides'
+    | '/trip-records'
     | '/id/$username'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/admin'
+    | '/analytics'
     | '/garage'
+    | '/leaderboard'
     | '/login'
     | '/messages'
     | '/news'
     | '/privacy'
     | '/register'
     | '/rides'
+    | '/trip-records'
     | '/id/$username'
   id:
     | '__root__'
     | '/'
     | '/admin'
+    | '/analytics'
     | '/garage'
+    | '/leaderboard'
     | '/login'
     | '/messages'
     | '/news'
     | '/privacy'
     | '/register'
     | '/rides'
+    | '/trip-records'
     | '/id/$username'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  AnalyticsRoute: typeof AnalyticsRoute
   GarageRoute: typeof GarageRoute
+  LeaderboardRoute: typeof LeaderboardRoute
   LoginRoute: typeof LoginRoute
   MessagesRoute: typeof MessagesRoute
   NewsRoute: typeof NewsRoute
   PrivacyRoute: typeof PrivacyRoute
   RegisterRoute: typeof RegisterRoute
   RidesRoute: typeof RidesRoute
+  TripRecordsRoute: typeof TripRecordsRoute
   IdUsernameRoute: typeof IdUsernameRoute
 }
 
@@ -176,11 +215,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/analytics': {
+      id: '/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/garage': {
       id: '/garage'
       path: '/garage'
       fullPath: '/garage'
       preLoaderRoute: typeof GarageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leaderboard': {
+      id: '/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/leaderboard'
+      preLoaderRoute: typeof LeaderboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -225,6 +278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RidesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/trip-records': {
+      id: '/trip-records'
+      path: '/trip-records'
+      fullPath: '/trip-records'
+      preLoaderRoute: typeof TripRecordsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/id/$username': {
       id: '/id/$username'
       path: '/id/$username'
@@ -238,13 +298,16 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  AnalyticsRoute: AnalyticsRoute,
   GarageRoute: GarageRoute,
+  LeaderboardRoute: LeaderboardRoute,
   LoginRoute: LoginRoute,
   MessagesRoute: MessagesRoute,
   NewsRoute: NewsRoute,
   PrivacyRoute: PrivacyRoute,
   RegisterRoute: RegisterRoute,
   RidesRoute: RidesRoute,
+  TripRecordsRoute: TripRecordsRoute,
   IdUsernameRoute: IdUsernameRoute,
 }
 export const routeTree = rootRouteImport
