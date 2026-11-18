@@ -117,10 +117,51 @@ export interface MasterComponentItem {
   id: number;
   code: string;
   name: string;
+  name_id?: string | null;
+  name_en?: string | null;
   default_interval_km?: number | null;
   default_interval_months?: number | null;
   applicable_transmission: string[];
   is_active: boolean;
+}
+
+export interface PublicMasterBrandItem {
+  id: number;
+  name: string;
+  motorcycle_count: number;
+}
+
+export interface MasterNotificationTemplateItem {
+  id: number;
+  code: string;
+  category: string;
+  name: string;
+  title_template: string;
+  body_template: string;
+  language: string;
+  variables_hint?: string | null;
+  updated_at: string;
+}
+
+export interface MasterEmailTemplateItem {
+  id: number;
+  code: string;
+  name: string;
+  subject_template: string;
+  html_body: string;
+  variables_hint: string;
+  updated_at: string;
+}
+
+export interface MasterGeneralSettingItem {
+  id: number;
+  category: string;
+  setting_key: string;
+  setting_value: string;
+  value_type: string;
+  label: string;
+  description?: string | null;
+  updated_at: string;
 }
 
 export interface FeedPostItem {
@@ -144,57 +185,27 @@ export interface FeedPostItem {
   comment_count: number;
 }
 
-export interface BetaRegistrationPayload {
-  full_name: string;
-  email: string;
-  phone?: string;
-  city?: string;
-  motorcycle_brand?: string;
-  motorcycle_series?: string;
-  playstore_email?: string;
-  riding_style?: string;
-  referral_source?: string;
-  notes?: string;
-  website?: string;
-}
-
-export interface BetaRegistrationRow {
-  id: string;
-  full_name: string;
-  email: string;
-  phone?: string | null;
-  city?: string | null;
-  motorcycle_brand?: string | null;
-  motorcycle_series?: string | null;
-  playstore_email?: string | null;
-  riding_style?: string | null;
-  referral_source?: string | null;
-  notes?: string | null;
-  status: string;
-  admin_notes?: string | null;
-  reviewed_by?: string | null;
-  reviewed_at?: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface AdminDashboardStats {
   total_users: number;
   active_users: number;
   suspended_users: number;
   deleted_users: number;
-  pending_registrations: number;
-  approved_registrations: number;
   total_garages: number;
   total_feed_posts: number;
   total_communities: number;
+  total_trips?: number;
+  total_news_articles?: number;
   total_master_brands: number;
   total_master_motorcycles: number;
   total_master_components: number;
+  master_brands_count?: number;
+  master_motorcycles_count?: number;
+  master_components_count?: number;
 }
 
 export interface AdminUserItem {
   id: string;
+  name?: string | null;
   phone?: string | null;
   email?: string | null;
   username?: string | null;
@@ -202,11 +213,13 @@ export interface AdminUserItem {
   first_name?: string | null;
   middle_name?: string | null;
   last_name?: string | null;
+  city?: string | null;
+  country?: string | null;
   avatar_url?: string | null;
   date_of_birth?: string | null;
   bio?: string | null;
-  is_phone_verified: boolean;
-  is_email_verified: boolean;
+  is_phone_verified?: boolean;
+  is_email_verified?: boolean;
   status: string;
   role: string;
   created_at: string;
@@ -297,7 +310,8 @@ export function resolveMediaUrl(path?: string | null): string | null {
     return trimmed;
   }
   const origin = getApiBaseUrl().replace(/\/api\/v1\/?$/, "");
-  const normalized = trimmed.startsWith("/") ? trimmed : `/uploads/${trimmed}`;
+  const clean = trimmed.replace(/^\/+/, "");
+  const normalized = clean.startsWith("uploads/") ? `/${clean}` : `/uploads/${clean}`;
   return `${origin}${normalized}`;
 }
 
@@ -808,39 +822,48 @@ export async function authRequest<T>(path: string, options: RequestInit = {}): P
 }
 
 /**
- * Submit Closed Beta Pre-Registration (`POST /api/v1/registrations`)
+ * Public master motorcycle brands catalog (`GET /api/v1/master/brands`)
  */
-export async function submitBetaRegistration(
-  payload: BetaRegistrationPayload,
-): Promise<{ id: string; status: string; created_at: string }> {
-  const baseUrl = getApiBaseUrl();
-  const res = await fetch(`${baseUrl}/registrations`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  const body = await res.json().catch(() => null);
-  if (!res.ok) {
-    const msg =
-      body?.meta?.message || body?.message || "Unable to submit beta registration right now.";
-    throw new AuthApiError(msg, res.status);
+export async function fetchPublicMasterBrands(): Promise<PublicMasterBrandItem[]> {
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/master/brands`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return [];
+    const body: ApiResponse<PublicMasterBrandItem[]> = await res.json();
+    return Array.isArray(body.data) ? body.data : [];
+  } catch {
+    return [];
   }
-  return body?.data;
 }
 
 /**
- * Public master motorcycle catalog (`GET /api/v1/master/motorcycles`)
+ * Public master motorcycle catalog (`GET /api/v1/master/motorcycles?brand_id=...`)
  */
-export async function fetchMasterMotorcycles(): Promise<MasterMotorcycleItem[]> {
+export async function fetchMasterMotorcycles(brandId?: number): Promise<MasterMotorcycleItem[]> {
   try {
-    const res = await fetch(`${getApiBaseUrl()}/master/motorcycles`, {
+    const qs = brandId ? `?brand_id=${brandId}` : "";
+    const res = await fetch(`${getApiBaseUrl()}/master/motorcycles${qs}`, {
       headers: { Accept: "application/json" },
     });
     if (!res.ok) return [];
     const body: ApiResponse<MasterMotorcycleItem[]> = await res.json();
+    return Array.isArray(body.data) ? body.data : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Public general settings (`GET /api/v1/master/general-settings`)
+ */
+export async function fetchPublicGeneralSettings(): Promise<MasterGeneralSettingItem[]> {
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/master/general-settings`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return [];
+    const body: ApiResponse<MasterGeneralSettingItem[]> = await res.json();
     return Array.isArray(body.data) ? body.data : [];
   } catch {
     return [];
@@ -1272,10 +1295,23 @@ export async function fetchAdminUsers(): Promise<AdminUserItem[]> {
 
 export async function updateAdminUser(
   userId: string,
-  payload: { role?: string; status?: string },
+  payload: {
+    username?: string;
+    first_name?: string;
+    middle_name?: string;
+    last_name?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    city?: string;
+    country?: string;
+    bio?: string;
+    role?: string;
+    status?: string;
+  },
 ): Promise<AdminUserItem> {
   return authRequest<AdminUserItem>(`/users/${encodeURIComponent(userId)}`, {
-    method: "PUT",
+    method: "PATCH",
     body: JSON.stringify(payload),
   });
 }
@@ -1292,27 +1328,6 @@ export async function updateAdminUserStatus(
 
 export async function deleteAdminUser(userId: string): Promise<void> {
   await authRequest<unknown>(`/users/${encodeURIComponent(userId)}`, {
-    method: "DELETE",
-  });
-}
-
-export async function fetchBetaRegistrations(status?: string): Promise<BetaRegistrationRow[]> {
-  const qs = status && status !== "ALL" ? `?status=${encodeURIComponent(status)}` : "";
-  return authRequest<BetaRegistrationRow[]>(`/admin/registrations${qs}`);
-}
-
-export async function updateBetaRegistration(
-  id: string,
-  payload: { status?: string; admin_notes?: string },
-): Promise<BetaRegistrationRow> {
-  return authRequest<BetaRegistrationRow>(`/admin/registrations/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function deleteBetaRegistration(id: string): Promise<void> {
-  await authRequest<unknown>(`/admin/registrations/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
 }
@@ -1365,6 +1380,23 @@ export async function createAdminMotorcycle(payload: {
   });
 }
 
+export async function updateAdminMotorcycle(
+  id: number,
+  payload: {
+    brand_id?: number;
+    series_name?: string;
+    transmission?: string;
+    category?: string;
+    engine_cc?: number | null;
+    is_active?: boolean;
+  },
+): Promise<MasterMotorcycleItem> {
+  return authRequest<MasterMotorcycleItem>(`/admin/master/motorcycles/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function deleteAdminMotorcycle(id: number): Promise<void> {
   await authRequest<unknown>(`/admin/master/motorcycles/${id}`, {
     method: "DELETE",
@@ -1378,6 +1410,8 @@ export async function fetchAdminComponents(): Promise<MasterComponentItem[]> {
 export async function createAdminComponent(payload: {
   code: string;
   name: string;
+  name_id?: string;
+  name_en?: string;
   default_interval_km?: number | null;
   default_interval_months?: number | null;
   applicable_transmission?: string[];
@@ -1389,9 +1423,128 @@ export async function createAdminComponent(payload: {
   });
 }
 
+export async function updateAdminComponent(
+  id: number,
+  payload: {
+    code?: string;
+    name?: string;
+    name_id?: string;
+    name_en?: string;
+    default_interval_km?: number | null;
+    default_interval_months?: number | null;
+    applicable_transmission?: string[];
+    is_active?: boolean;
+  },
+): Promise<MasterComponentItem> {
+  return authRequest<MasterComponentItem>(`/admin/master/components/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function deleteAdminComponent(id: number): Promise<void> {
   await authRequest<unknown>(`/admin/master/components/${id}`, {
     method: "DELETE",
+  });
+}
+
+export async function fetchAdminNotificationTemplates(): Promise<
+  MasterNotificationTemplateItem[]
+> {
+  return authRequest<MasterNotificationTemplateItem[]>(
+    "/admin/master/notification-templates",
+  );
+}
+
+export async function createAdminNotificationTemplate(payload: {
+  code: string;
+  category: string;
+  name: string;
+  title_template: string;
+  body_template: string;
+  language: string;
+  variables_hint?: string;
+}): Promise<MasterNotificationTemplateItem> {
+  return authRequest<MasterNotificationTemplateItem>(
+    "/admin/master/notification-templates",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function updateAdminNotificationTemplate(
+  id: number,
+  payload: Partial<{
+    code: string;
+    category: string;
+    name: string;
+    title_template: string;
+    body_template: string;
+    language: string;
+    variables_hint: string;
+  }>,
+): Promise<MasterNotificationTemplateItem> {
+  return authRequest<MasterNotificationTemplateItem>(
+    `/admin/master/notification-templates/${id}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function deleteAdminNotificationTemplate(id: number): Promise<void> {
+  await authRequest<unknown>(`/admin/master/notification-templates/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function fetchAdminEmailTemplates(): Promise<MasterEmailTemplateItem[]> {
+  return authRequest<MasterEmailTemplateItem[]>("/admin/master/email-templates");
+}
+
+export async function createAdminEmailTemplate(payload: {
+  code: string;
+  name: string;
+  subject_template: string;
+  html_body: string;
+  variables_hint?: string;
+}): Promise<MasterEmailTemplateItem> {
+  return authRequest<MasterEmailTemplateItem>("/admin/master/email-templates", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAdminEmailTemplate(
+  id: number,
+  payload: Partial<{
+    code: string;
+    name: string;
+    subject_template: string;
+    html_body: string;
+    variables_hint: string;
+  }>,
+): Promise<MasterEmailTemplateItem> {
+  return authRequest<MasterEmailTemplateItem>(`/admin/master/email-templates/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchAdminGeneralSettings(): Promise<MasterGeneralSettingItem[]> {
+  return authRequest<MasterGeneralSettingItem[]>("/admin/master/general-settings");
+}
+
+export async function updateAdminGeneralSetting(
+  id: number,
+  payload: { setting_value: string; label?: string; description?: string },
+): Promise<MasterGeneralSettingItem> {
+  return authRequest<MasterGeneralSettingItem>(`/admin/master/general-settings/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
   });
 }
 

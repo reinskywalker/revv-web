@@ -23,11 +23,14 @@ import {
   deleteGarageMotorcycle,
   fetchMasterMotorcycles,
   fetchMyGarage,
+  fetchPublicMasterBrands,
   resolveMediaUrl,
   type GarageMotorcycle,
   type MasterMotorcycleItem,
+  type PublicMasterBrandItem,
   updateGarageMotorcycle,
 } from "@/lib/api";
+import { formatThousandsDot, parseThousandsDot } from "@/lib/number-format";
 import {
   fetchMasterComponentsPublic,
   uploadGarageBikeImage,
@@ -52,7 +55,10 @@ export const Route = createFileRoute("/garage")({
 function GaragePage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [garage, setGarage] = useState<GarageMotorcycle[]>([]);
+  const [masterBrands, setMasterBrands] = useState<PublicMasterBrandItem[]>([]);
+  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
   const [masterCatalog, setMasterCatalog] = useState<MasterMotorcycleItem[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
   const [masterComponents, setMasterComponents] = useState<MasterComponentItemPublic[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -73,23 +79,27 @@ function GaragePage() {
   const [bikeBrandManual, setBikeBrandManual] = useState("");
   const [bikeSeriesManual, setBikeSeriesManual] = useState("");
   const [bikeNickname, setBikeNickname] = useState("");
+  const [bikeYear, setBikeYear] = useState("");
   const [bikeMileage, setBikeMileage] = useState("0");
   const [bikePlate, setBikePlate] = useState("");
   const [bikeTransmission, setBikeTransmission] = useState("matic");
   const [bikeCategory, setBikeCategory] = useState("scooter");
   const [bikePrimary, setBikePrimary] = useState(false);
 
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 101 }, (_, i) => currentYear - i);
+
   const loadGarageData = useCallback(async () => {
     try {
       setLoading(true);
       setLoadError(null);
-      const [gar, masters, comps] = await Promise.all([
+      const [gar, brands, comps] = await Promise.all([
         fetchMyGarage(),
-        fetchMasterMotorcycles().catch(() => []),
+        fetchPublicMasterBrands().catch(() => []),
         fetchMasterComponentsPublic().catch(() => []),
       ]);
       setGarage(gar);
-      setMasterCatalog(masters);
+      setMasterBrands(brands);
       setMasterComponents(comps);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to load Digital Garage.";
@@ -99,6 +109,22 @@ function GaragePage() {
       setLoading(false);
     }
   }, []);
+
+  const handleSelectCatalogBrand = async (brandIdStr: string) => {
+    setSelectedBrandId(brandIdStr);
+    setSelectedMasterBikeId("");
+    if (!brandIdStr || brandIdStr === "manual") {
+      setMasterCatalog([]);
+      return;
+    }
+    setLoadingModels(true);
+    try {
+      const models = await fetchMasterMotorcycles(Number(brandIdStr));
+      setMasterCatalog(models);
+    } finally {
+      setLoadingModels(false);
+    }
+  };
 
   useEffect(() => {
     if (!isAuthenticated && !authLoading) {
@@ -121,7 +147,8 @@ function GaragePage() {
         ...(!masterId && bikeBrandManual.trim() ? { brand_manual: bikeBrandManual.trim() } : {}),
         ...(!masterId && bikeSeriesManual.trim() ? { series_manual: bikeSeriesManual.trim() } : {}),
         ...(bikeNickname.trim() ? { nickname: bikeNickname.trim() } : {}),
-        current_mileage: Number(bikeMileage) || 0,
+        ...(bikeYear ? { manufacture_year: Number(bikeYear) } : {}),
+        current_mileage: parseThousandsDot(bikeMileage),
         ...(bikePlate.trim() ? { plate_number: bikePlate.trim() } : {}),
         transmission: bikeTransmission,
         category: bikeCategory,
@@ -129,10 +156,13 @@ function GaragePage() {
       });
 
       // Reset form
+      setSelectedBrandId("");
       setSelectedMasterBikeId("");
+      setMasterCatalog([]);
       setBikeBrandManual("");
       setBikeSeriesManual("");
       setBikeNickname("");
+      setBikeYear("");
       setBikePlate("");
       setBikeMileage("0");
       setBikePrimary(false);
@@ -315,27 +345,59 @@ function GaragePage() {
               </span>
             </div>
 
-            <div>
-              <label className="font-mono text-xs uppercase text-muted-foreground block mb-1">
-                Select From Master Catalog
-              </label>
-              <select
-                value={selectedMasterBikeId}
-                onChange={(e) => setSelectedMasterBikeId(e.target.value)}
-                className="w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none"
-              >
-                <option value="" className="bg-background">
-                  -- Custom / Manual Entry --
-                </option>
-                {masterCatalog.map((m) => (
-                  <option key={m.id} value={String(m.id)} className="bg-background">
-                    {m.brand_name} {m.series_name} ({m.transmission})
+            <div className="space-y-3">
+              <div>
+                <label className="font-mono text-xs uppercase text-muted-foreground block mb-1">
+                  1. Select Brand (Catalog or Custom)
+                </label>
+                <select
+                  value={selectedBrandId}
+                  onChange={(e) => void handleSelectCatalogBrand(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none"
+                >
+                  <option value="manual" className="bg-background">
+                    -- Custom / Manual Entry --
                   </option>
-                ))}
-              </select>
+                  {masterBrands.map((b) => (
+                    <option key={b.id} value={String(b.id)} className="bg-background">
+                      {b.name} ({b.motorcycle_count})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedBrandId && selectedBrandId !== "manual" && (
+                <div>
+                  <label className="font-mono text-xs uppercase text-muted-foreground block mb-1">
+                    2. Select Model {loadingModels ? "(Loading…)" : ""}
+                  </label>
+                  <select
+                    value={selectedMasterBikeId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedMasterBikeId(val);
+                      const chosen = masterCatalog.find((m) => String(m.id) === val);
+                      if (chosen) {
+                        setBikeTransmission(chosen.transmission);
+                        setBikeCategory(chosen.category);
+                      }
+                    }}
+                    className="w-full rounded-lg border border-input bg-secondary/40 px-3.5 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none"
+                  >
+                    <option value="" className="bg-background">
+                      -- Choose Motorcycle Model --
+                    </option>
+                    {masterCatalog.map((m) => (
+                      <option key={m.id} value={String(m.id)} className="bg-background">
+                        {m.series_name} ({m.engine_cc ?? "-"}cc · {m.transmission})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
-            {!selectedMasterBikeId && (
+            {(!selectedMasterBikeId || selectedBrandId === "manual") && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="font-mono text-xs uppercase text-muted-foreground block mb-1">
@@ -381,14 +443,34 @@ function GaragePage() {
               </div>
               <div>
                 <label className="font-mono text-xs uppercase text-muted-foreground block mb-1">
+                  Model Year
+                </label>
+                <select
+                  value={bikeYear}
+                  onChange={(e) => setBikeYear(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+                >
+                  <option value="" className="bg-background">
+                    Select Year
+                  </option>
+                  {yearOptions.map((y) => (
+                    <option key={y} value={String(y)} className="bg-background">
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="font-mono text-xs uppercase text-muted-foreground block mb-1">
                   Odometer (km)
                 </label>
                 <input
-                  type="number"
-                  min={0}
+                  type="text"
+                  inputMode="numeric"
                   value={bikeMileage}
-                  onChange={(e) => setBikeMileage(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+                  onChange={(e) => setBikeMileage(formatThousandsDot(e.target.value))}
+                  placeholder="3.000"
+                  className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm font-mono text-foreground focus:border-primary focus:outline-none"
                 />
               </div>
               <div>
@@ -406,9 +488,15 @@ function GaragePage() {
                   <option value="manual" className="bg-background">
                     Manual / Clutch
                   </option>
+                  <option value="semi_auto" className="bg-background">
+                    Semi-Auto
+                  </option>
+                  <option value="dct" className="bg-background">
+                    DCT
+                  </option>
                 </select>
               </div>
-              <div>
+              <div className="sm:col-span-2">
                 <label className="font-mono text-xs uppercase text-muted-foreground block mb-1">
                   Category
                 </label>
@@ -431,6 +519,9 @@ function GaragePage() {
                   </option>
                   <option value="cruiser" className="bg-background">
                     Cruiser
+                  </option>
+                  <option value="classic" className="bg-background">
+                    Classic
                   </option>
                 </select>
               </div>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
   AtSign,
@@ -26,53 +26,52 @@ import {
   ShieldCheck,
   Smartphone,
   Trash2,
-  UserCheck,
   Users,
   Wrench,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
 import { RichTextEditor } from "@/components/revv/RichTextEditor";
+import { AdminOverviewAnalyticsPanel } from "@/components/admin/AdminOverviewAnalyticsPanel";
+import { AdminUsersTablePanel } from "@/components/admin/AdminUsersTablePanel";
+import { AdminMasterDataPanel, type MasterSubTab } from "@/components/admin/AdminMasterDataPanel";
 import {
+  type AdminAnalyticsResponse,
   type AdminDashboardStats,
   type AdminSystemStatusRecord,
   type AdminUserItem,
-  type BetaRegistrationRow,
   type BroadcastNotificationItem,
-  createAdminBrand,
-  createAdminComponent,
-  createAdminMotorcycle,
   createAdminNewsArticle,
-  deleteAdminBrand,
-  deleteAdminComponent,
-  deleteAdminMotorcycle,
   deleteAdminNewsArticle,
   deleteAdminUser,
-  deleteBetaRegistration,
+  fetchAdminAnalytics,
   fetchAdminBrands,
   fetchAdminBroadcasts,
   fetchAdminComponents,
   fetchAdminDashboard,
+  fetchAdminEmailTemplates,
+  fetchAdminGeneralSettings,
   fetchAdminLegalDocuments,
   fetchAdminMotorcycles,
   fetchAdminNewsArticles,
+  fetchAdminNotificationTemplates,
   fetchAdminSupportTickets,
   fetchAdminSystemStatus,
   fetchAdminUsers,
-  fetchBetaRegistrations,
   type LegalDocumentItem,
   type MasterBrandItem,
   type MasterComponentItem,
+  type MasterEmailTemplateItem,
+  type MasterGeneralSettingItem,
   type MasterMotorcycleItem,
+  type MasterNotificationTemplateItem,
   type NewsArticle,
   replyAdminSupportTicket,
   resolveMediaUrl,
   sendAdminBroadcast,
   type SupportTicketItem,
-  updateAdminBrand,
   updateAdminNewsArticle,
   updateAdminSystemStatus,
   updateAdminUser,
-  updateBetaRegistration,
   uploadCompressedMedia,
   upsertAdminLegalDocument,
 } from "@/lib/api";
@@ -86,7 +85,7 @@ export const Route = createFileRoute("/admin")({
       {
         name: "description",
         content:
-          "REVV Superuser Command Center for user management, master catalog, beta tester roster, and push broadcast CMS.",
+          "REVV Superuser Command Center for overview analytics, users & RBAC, master data, news CMS, and push broadcast.",
       },
     ],
   }),
@@ -95,7 +94,6 @@ export const Route = createFileRoute("/admin")({
 
 type AdminSubTab =
   | "overview"
-  | "registrations"
   | "users"
   | "master"
   | "news"
@@ -105,7 +103,6 @@ type AdminSubTab =
   | "maintenance";
 
 type AdminConfirmAction =
-  | { kind: "delete_beta"; reg: BetaRegistrationRow }
   | { kind: "change_role"; user: AdminUserItem; nextRole: string }
   | { kind: "change_status"; user: AdminUserItem; nextStatus: string }
   | { kind: "soft_delete_user"; user: AdminUserItem };
@@ -114,7 +111,16 @@ const NEWS_CATEGORIES = ["EDITORIAL", "UPDATE", "SAFETY", "COMMUNITY", "TELEMETR
 
 function AdminPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const searchObj = (location.search ?? {}) as Record<string, string | undefined>;
+  const roleLower = user?.role?.toLowerCase() ?? "";
+  const isSuperuser = roleLower === "administrator";
+  const isModerator = roleLower === "moderator";
+  const canEnterConsole = isSuperuser || isModerator;
+
   const [activeSubTab, setActiveSubTab] = useState<AdminSubTab>("overview");
+  const [activeMasterSub, setActiveMasterSub] = useState<MasterSubTab>("brands");
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [pendingConfirm, setPendingConfirm] = useState<AdminConfirmAction | null>(null);
@@ -122,11 +128,14 @@ function AdminPage() {
 
   // Data states
   const [adminStats, setAdminStats] = useState<AdminDashboardStats | null>(null);
-  const [betaRegistrations, setBetaRegistrations] = useState<BetaRegistrationRow[]>([]);
+  const [analyticsData, setAnalyticsData] = useState<AdminAnalyticsResponse | null>(null);
   const [adminUsers, setAdminUsers] = useState<AdminUserItem[]>([]);
   const [adminBrands, setAdminBrands] = useState<MasterBrandItem[]>([]);
   const [adminMotorcycles, setAdminMotorcycles] = useState<MasterMotorcycleItem[]>([]);
   const [adminComponents, setAdminComponents] = useState<MasterComponentItem[]>([]);
+  const [notifTemplates, setNotifTemplates] = useState<MasterNotificationTemplateItem[]>([]);
+  const [emailTemplates, setEmailTemplates] = useState<MasterEmailTemplateItem[]>([]);
+  const [generalSettings, setGeneralSettings] = useState<MasterGeneralSettingItem[]>([]);
   const [adminNews, setAdminNews] = useState<NewsArticle[]>([]);
   const [adminBroadcasts, setAdminBroadcasts] = useState<BroadcastNotificationItem[]>([]);
 
@@ -140,18 +149,6 @@ function AdminPage() {
   const [statusIcon, setStatusIcon] = useState("wrench");
   const [isSavingStatus, setIsSavingStatus] = useState(false);
 
-  // Master creation form inputs
-  const [newBrandName, setNewBrandName] = useState("");
-  const [newMotoBrandId, setNewMotoBrandId] = useState("");
-  const [newMotoSeries, setNewMotoSeries] = useState("");
-  const [newMotoTransmission, setNewMotoTransmission] = useState("matic");
-  const [newMotoCategory, setNewMotoCategory] = useState("scooter");
-  const [newMotoCc, setNewMotoCc] = useState("150");
-  const [newCompCode, setNewCompCode] = useState("");
-  const [newCompName, setNewCompName] = useState("");
-  const [newCompKm, setNewCompKm] = useState("4000");
-  const [newCompMonths, setNewCompMonths] = useState("6");
-
   // Broadcast push form inputs
   const [broadcastTitle, setBroadcastTitle] = useState("");
   const [broadcastBody, setBroadcastBody] = useState("");
@@ -160,17 +157,61 @@ function AdminPage() {
   const [broadcastDeepLink, setBroadcastDeepLink] = useState("notifications");
   const [broadcastIsSending, setBroadcastIsSending] = useState(false);
 
-  const isSuperuser = user?.role?.toLowerCase() === "administrator";
+  // Sync tab with URL search params (?tab=...&sub=...)
+  useEffect(() => {
+    if (isModerator && !isSuperuser) {
+      setActiveSubTab("news");
+      return;
+    }
+    const t = searchObj["tab"];
+    if (
+      t === "overview" ||
+      t === "users" ||
+      t === "master" ||
+      t === "news" ||
+      t === "broadcast" ||
+      t === "support" ||
+      t === "legal" ||
+      t === "maintenance"
+    ) {
+      setActiveSubTab(t);
+    }
+    const s = searchObj["sub"];
+    if (
+      s === "brands" ||
+      s === "components" ||
+      s === "notifications" ||
+      s === "emails" ||
+      s === "settings"
+    ) {
+      setActiveMasterSub(s);
+    }
+  }, [searchObj["tab"], searchObj["sub"], isModerator, isSuperuser]);
+
+  const selectSubTab = (tab: AdminSubTab) => {
+    setActiveSubTab(tab);
+    void navigate({
+      to: "/admin",
+      search: (tab === "master" ? { tab, sub: activeMasterSub } : { tab }) as never,
+      replace: true,
+    });
+  };
+
+  const selectMasterSub = (sub: MasterSubTab) => {
+    setActiveMasterSub(sub);
+    setActiveSubTab("master");
+    void navigate({
+      to: "/admin",
+      search: { tab: "master", sub } as never,
+      replace: true,
+    });
+  };
 
   const handleConfirmAction = async () => {
     if (!pendingConfirm) return;
     setConfirmBusy(true);
     try {
-      if (pendingConfirm.kind === "delete_beta") {
-        await deleteBetaRegistration(pendingConfirm.reg.id);
-        setBetaRegistrations(await fetchBetaRegistrations());
-        setNotice("Registration deleted.");
-      } else if (pendingConfirm.kind === "change_role") {
+      if (pendingConfirm.kind === "change_role") {
         await updateAdminUser(pendingConfirm.user.id, { role: pendingConfirm.nextRole });
         setAdminUsers(await fetchAdminUsers());
         setNotice(
@@ -198,24 +239,48 @@ function AdminPage() {
   const refreshAllAdminData = async () => {
     try {
       setLoading(true);
-      const [stats, users, betas, brands, motos, comps, newsRes, broadcasts, sysStatus] =
-        await Promise.all([
-          fetchAdminDashboard().catch(() => null),
-          fetchAdminUsers().catch(() => []),
-          fetchBetaRegistrations().catch(() => []),
-          fetchAdminBrands().catch(() => []),
-          fetchAdminMotorcycles().catch(() => []),
-          fetchAdminComponents().catch(() => []),
-          fetchAdminNewsArticles().catch(() => []),
-          fetchAdminBroadcasts().catch(() => []),
-          fetchAdminSystemStatus().catch(() => null),
-        ]);
+      if (isModerator && !isSuperuser) {
+        const newsRes = await fetchAdminNewsArticles().catch(() => []);
+        setAdminNews(newsRes);
+        return;
+      }
+
+      const [
+        stats,
+        analyticsRes,
+        users,
+        brands,
+        motos,
+        comps,
+        notifs,
+        emails,
+        settings,
+        newsRes,
+        broadcasts,
+        sysStatus,
+      ] = await Promise.all([
+        fetchAdminDashboard().catch(() => null),
+        fetchAdminAnalytics().catch(() => null),
+        fetchAdminUsers().catch(() => []),
+        fetchAdminBrands().catch(() => []),
+        fetchAdminMotorcycles().catch(() => []),
+        fetchAdminComponents().catch(() => []),
+        fetchAdminNotificationTemplates().catch(() => []),
+        fetchAdminEmailTemplates().catch(() => []),
+        fetchAdminGeneralSettings().catch(() => []),
+        fetchAdminNewsArticles().catch(() => []),
+        fetchAdminBroadcasts().catch(() => []),
+        fetchAdminSystemStatus().catch(() => null),
+      ]);
       setAdminStats(stats);
+      setAnalyticsData(analyticsRes);
       setAdminUsers(users);
-      setBetaRegistrations(betas);
       setAdminBrands(brands);
       setAdminMotorcycles(motos);
       setAdminComponents(comps);
+      setNotifTemplates(notifs);
+      setEmailTemplates(emails);
+      setGeneralSettings(settings);
       setAdminNews(newsRes);
       setAdminBroadcasts(broadcasts);
       if (sysStatus) {
@@ -224,9 +289,6 @@ function AdminPage() {
         setStatusTitle(sysStatus.title);
         setStatusMessage(sysStatus.message);
         setStatusIcon(sysStatus.icon);
-      }
-      if (brands.length > 0 && brands[0] && !newMotoBrandId) {
-        setNewMotoBrandId(String(brands[0].id));
       }
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Failed to load administrator data.");
@@ -264,12 +326,12 @@ function AdminPage() {
   };
 
   useEffect(() => {
-    if (isAuthenticated && isSuperuser) {
+    if (isAuthenticated && canEnterConsole) {
       refreshAllAdminData();
     } else {
       setLoading(false);
     }
-  }, [isAuthenticated, isSuperuser]);
+  }, [isAuthenticated, canEnterConsole]);
 
   if (authLoading) {
     return (
@@ -289,7 +351,7 @@ function AdminPage() {
           Restricted Command Deck
         </h1>
         <p className="text-sm text-muted-foreground">
-          You must authenticate with superuser credentials to enter the REVV Administrator Console.
+          You must authenticate with administrator or moderator credentials to enter this console.
         </p>
         <div className="pt-2">
           <Link to="/login" className="btn-primary inline-flex items-center gap-2">
@@ -301,7 +363,7 @@ function AdminPage() {
     );
   }
 
-  if (!isSuperuser) {
+  if (!canEnterConsole) {
     return (
       <div className="animate-fade-in mx-auto max-w-xl space-y-6 text-center py-16">
         <div className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-destructive/30 bg-destructive/10 text-destructive">
@@ -380,40 +442,45 @@ function AdminPage() {
       )}
 
       {/* Navigation Subtabs */}
-      <div className="flex flex-wrap gap-2 border-b border-border/40 pb-4">
-        {(
-          [
-            ["overview", "Overview", LayoutDashboard],
-            ["registrations", `Beta Roster (${betaRegistrations.length})`, UserCheck],
-            ["users", `Users & RBAC (${adminUsers.length})`, Users],
-            ["master", "Master Data CRUD", Database],
-            ["news", `News CMS (${adminNews.length})`, FileText],
-            ["broadcast", `Push Broadcast (${adminBroadcasts.length})`, Bell],
-            ["support", "Support Inbox", MessageSquare],
-            ["legal", "Privacy & Legal", Scale],
+      {isSuperuser ? (
+        <div className="flex flex-wrap gap-2 border-b border-border/40 pb-4">
+          {(
             [
-              "maintenance",
-              isMaintenance ? "Maintenance (ACTIVE)" : "System Health",
-              isMaintenance ? AlertTriangle : Wrench,
-            ],
-          ] as const
-        ).map(([key, label, Icon]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setActiveSubTab(key)}
-            className={cn(
-              "inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 font-mono text-xs font-semibold uppercase tracking-wider transition-colors",
-              activeSubTab === key
-                ? "border-primary bg-primary/20 text-primary shadow-sm"
-                : "border-border/60 bg-secondary/30 text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
-            )}
-          >
-            <Icon className="size-3.5" />
-            {label}
-          </button>
-        ))}
-      </div>
+              ["overview", "Overview & Analytics", LayoutDashboard],
+              ["users", `Users & RBAC (${adminUsers.length})`, Users],
+              ["master", "Master Data", Database],
+              ["news", `News CMS (${adminNews.length})`, FileText],
+              ["broadcast", `Push Broadcast (${adminBroadcasts.length})`, Bell],
+              ["support", "Support Inbox", MessageSquare],
+              ["legal", "Privacy & Legal", Scale],
+              [
+                "maintenance",
+                isMaintenance ? "Maintenance (ACTIVE)" : "System Health",
+                isMaintenance ? AlertTriangle : Wrench,
+              ],
+            ] as const
+          ).map(([key, label, Icon]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => selectSubTab(key)}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 font-mono text-xs font-semibold uppercase tracking-wider transition-colors",
+                activeSubTab === key
+                  ? "border-primary bg-primary/20 text-primary shadow-sm"
+                  : "border-border/60 bg-secondary/30 text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
+              )}
+            >
+              <Icon className="size-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 font-mono text-xs text-primary">
+          Moderator Access — Editorial News Management Only
+        </div>
+      )}
 
       {loading ? (
         <div className="hud-card flex items-center justify-center py-20">
@@ -421,508 +488,57 @@ function AdminPage() {
         </div>
       ) : (
         <>
-          {/* TAB 1: OVERVIEW */}
-          {activeSubTab === "overview" && (
-            <div className="space-y-6">
-              {adminStats ? (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  {[
-                    ["Active Users", adminStats.active_users],
-                    [
-                      "Suspended / Deleted",
-                      `${adminStats.suspended_users} / ${adminStats.deleted_users}`,
-                    ],
-                    ["Pending Beta Roster", adminStats.pending_registrations],
-                    ["Approved Beta Roster", adminStats.approved_registrations],
-                    ["Digital Garages", adminStats.total_garages],
-                    ["Feed Posts", adminStats.total_feed_posts],
-                    ["Master Motorcycles", adminStats.total_master_motorcycles],
-                    ["Master Components", adminStats.total_master_components],
-                  ].map(([title, value]) => (
-                    <div key={String(title)} className="hud-card p-5">
-                      <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-                        {title}
-                      </p>
-                      <p className="font-display mt-2 text-3xl font-black text-primary">{value}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="hud-card p-8 text-center text-muted-foreground">
-                  No dashboard statistics returned from backend.
-                </div>
-              )}
-            </div>
+          {/* TAB 1: OVERVIEW & ANALYTICS */}
+          {isSuperuser && activeSubTab === "overview" && (
+            <AdminOverviewAnalyticsPanel adminStats={adminStats} analytics={analyticsData} />
           )}
 
-          {/* TAB 2: BETA REGISTRATIONS */}
-          {activeSubTab === "registrations" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-display text-lg font-black uppercase tracking-tight">
-                  Pre-Launch Beta Registrations Roster
-                </h3>
-                <span className="font-mono text-xs text-muted-foreground">
-                  Total: {betaRegistrations.length}
-                </span>
-              </div>
-
-              {betaRegistrations.length === 0 ? (
-                <div className="hud-card p-12 text-center text-muted-foreground">
-                  No beta pre-registrations submitted yet.
-                </div>
-              ) : (
-                betaRegistrations.map((reg) => (
-                  <div
-                    key={reg.id}
-                    className="hud-card flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-bold text-foreground text-sm">{reg.full_name}</span>
-                        <span className="font-mono text-xs text-primary">{reg.email}</span>
-                        <span className="rounded border border-primary/40 bg-primary/10 px-2 py-0.5 font-mono text-[10px] uppercase font-bold text-primary">
-                          {reg.status}
-                        </span>
-                      </div>
-                      <p className="font-mono text-xs text-muted-foreground">
-                        Play Store: {reg.playstore_email || reg.email} · Phone: {reg.phone || "-"} ·
-                        City: {reg.city || "-"} · Bike: {reg.motorcycle_brand || "-"}{" "}
-                        {reg.motorcycle_series || ""}
-                      </p>
-                      {reg.notes && (
-                        <p className="text-xs text-muted-foreground/90 italic">"{reg.notes}"</p>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      {(["approved", "invited", "rejected"] as const).map((st) => (
-                        <button
-                          key={st}
-                          type="button"
-                          onClick={async () => {
-                            await updateBetaRegistration(reg.id, { status: st });
-                            setBetaRegistrations(await fetchBetaRegistrations());
-                            setNotice(`Beta registration marked as ${st}.`);
-                          }}
-                          className={cn(
-                            "rounded border px-2.5 py-1.5 font-mono text-[11px] uppercase transition-colors",
-                            reg.status === st
-                              ? "border-primary bg-primary/20 text-primary font-bold"
-                              : "border-border bg-secondary/50 text-muted-foreground hover:border-primary/50 hover:text-foreground",
-                          )}
-                        >
-                          {st}
-                        </button>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() => setPendingConfirm({ kind: "delete_beta", reg })}
-                        className="rounded border border-destructive/40 bg-destructive/10 p-2 text-destructive hover:bg-destructive/20"
-                        title="Delete registration"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+          {/* TAB 2: USERS & RBAC TABLE + DETAIL MODAL */}
+          {isSuperuser && activeSubTab === "users" && (
+            <AdminUsersTablePanel
+              users={adminUsers}
+              currentUserId={user?.id}
+              currentUserEmail={user?.email}
+              onReload={async () => {
+                setAdminUsers(await fetchAdminUsers());
+              }}
+              onNotice={setNotice}
+              onRequestSoftDelete={(u) => setPendingConfirm({ kind: "soft_delete_user", user: u })}
+            />
           )}
 
-          {/* TAB 3: USERS & RBAC */}
-          {activeSubTab === "users" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-display text-lg font-black uppercase tracking-tight">
-                  User Management & Role-Based Access Control
-                </h3>
-                <span className="font-mono text-xs text-muted-foreground">
-                  Total: {adminUsers.length} Riders
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                {adminUsers.map((u) => {
-                  const isSelf =
-                    u.id === user?.id ||
-                    (user?.email && u.email?.toLowerCase() === user.email.toLowerCase());
-
-                  return (
-                    <div
-                      key={u.id}
-                      className="hud-card flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center"
-                    >
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold text-foreground">
-                            {u.username ? `@${u.username}` : u.email || u.phone || u.id}
-                          </span>
-                          {u.noreg && (
-                            <span className="font-mono text-xs text-primary font-bold">
-                              {u.noreg}
-                            </span>
-                          )}
-                          <span className="rounded border border-border bg-secondary/60 px-2 py-0.5 font-mono text-[10px] uppercase font-bold">
-                            Role: {u.role}
-                          </span>
-                          <span
-                            className={cn(
-                              "rounded px-2 py-0.5 font-mono text-[10px] uppercase font-bold",
-                              u.status === "Active"
-                                ? "bg-emerald-500/20 text-emerald-400"
-                                : "bg-destructive/20 text-destructive",
-                            )}
-                          >
-                            {u.status}
-                          </span>
-                        </div>
-                        <p className="mt-1 font-mono text-xs text-muted-foreground">
-                          Email: {u.email || "-"} · Phone: {u.phone || "-"} · ID: {u.id}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        {isSelf ? (
-                          <span className="rounded border border-primary/50 bg-primary/20 px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider text-primary">
-                            You (Superuser)
-                          </span>
-                        ) : (
-                          <>
-                            <select
-                              value={u.role.toLowerCase()}
-                              onChange={(e) => {
-                                const nextRole = e.target.value;
-                                if (nextRole === u.role.toLowerCase()) return;
-                                e.target.value = u.role.toLowerCase();
-                                setPendingConfirm({ kind: "change_role", user: u, nextRole });
-                              }}
-                              className="rounded border border-input bg-secondary/60 px-2.5 py-1.5 font-mono text-xs uppercase text-foreground"
-                            >
-                              <option value="user" className="bg-background">
-                                user
-                              </option>
-                              <option value="moderator" className="bg-background">
-                                moderator
-                              </option>
-                              <option value="administrator" className="bg-background">
-                                administrator
-                              </option>
-                            </select>
-
-                            <select
-                              value={u.status}
-                              onChange={(e) => {
-                                const nextStatus = e.target.value;
-                                if (nextStatus === u.status) return;
-                                e.target.value = u.status;
-                                setPendingConfirm({ kind: "change_status", user: u, nextStatus });
-                              }}
-                              className="rounded border border-input bg-secondary/60 px-2.5 py-1.5 font-mono text-xs uppercase text-foreground"
-                            >
-                              <option value="Active" className="bg-background">
-                                Active
-                              </option>
-                              <option value="Suspended" className="bg-background">
-                                Suspended
-                              </option>
-                              <option value="Banned" className="bg-background">
-                                Banned
-                              </option>
-                              <option value="Deleted" className="bg-background">
-                                Deleted
-                              </option>
-                            </select>
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setPendingConfirm({ kind: "soft_delete_user", user: u })
-                              }
-                              className="inline-flex items-center gap-1 rounded border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 font-mono text-xs uppercase text-destructive hover:bg-destructive/20"
-                            >
-                              <Trash2 className="size-3.5" />
-                              Soft Delete
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+          {/* TAB 3: MASTER DATA SUB-SUBMENUS */}
+          {isSuperuser && activeSubTab === "master" && (
+            <AdminMasterDataPanel
+              activeMasterSub={activeMasterSub}
+              onSelectMasterSub={selectMasterSub}
+              brands={adminBrands}
+              motorcycles={adminMotorcycles}
+              components={adminComponents}
+              notifTemplates={notifTemplates}
+              emailTemplates={emailTemplates}
+              generalSettings={generalSettings}
+              onReload={async () => {
+                const [brands, motos, comps, notifs, emails, settings] = await Promise.all([
+                  fetchAdminBrands().catch(() => []),
+                  fetchAdminMotorcycles().catch(() => []),
+                  fetchAdminComponents().catch(() => []),
+                  fetchAdminNotificationTemplates().catch(() => []),
+                  fetchAdminEmailTemplates().catch(() => []),
+                  fetchAdminGeneralSettings().catch(() => []),
+                ]);
+                setAdminBrands(brands);
+                setAdminMotorcycles(motos);
+                setAdminComponents(comps);
+                setNotifTemplates(notifs);
+                setEmailTemplates(emails);
+                setGeneralSettings(settings);
+              }}
+              onNotice={setNotice}
+            />
           )}
 
-          {/* TAB 4: MASTER DATA CRUD */}
-          {activeSubTab === "master" && (
-            <div className="grid gap-6 lg:grid-cols-3">
-              {/* Brands */}
-              <div className="hud-card space-y-4 p-5">
-                <h3 className="font-display text-lg font-bold uppercase">
-                  Master Brands ({adminBrands.length})
-                </h3>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!newBrandName.trim()) return;
-                    await createAdminBrand({ name: newBrandName.trim(), is_active: true });
-                    setNewBrandName("");
-                    setAdminBrands(await fetchAdminBrands());
-                    setNotice("Brand added to catalog.");
-                  }}
-                  className="flex gap-2"
-                >
-                  <input
-                    type="text"
-                    value={newBrandName}
-                    onChange={(e) => setNewBrandName(e.target.value)}
-                    placeholder="New brand name..."
-                    className="flex-1 rounded border border-input bg-secondary/40 px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="rounded bg-primary px-3 py-2 font-mono text-xs font-bold uppercase text-primary-foreground"
-                  >
-                    Add
-                  </button>
-                </form>
-                <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
-                  {adminBrands.map((b) => (
-                    <div
-                      key={b.id}
-                      className="flex items-center justify-between rounded border border-border bg-secondary/30 px-3 py-2 text-xs"
-                    >
-                      <span>
-                        {b.name}{" "}
-                        {!b.is_active && <span className="text-muted-foreground">(Archived)</span>}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await updateAdminBrand(b.id, { is_active: !b.is_active });
-                            setAdminBrands(await fetchAdminBrands());
-                          }}
-                          className="font-mono text-[10px] uppercase text-primary underline"
-                        >
-                          {b.is_active ? "Archive" : "Activate"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await deleteAdminBrand(b.id);
-                            setAdminBrands(await fetchAdminBrands());
-                          }}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Motorcycles */}
-              <div className="hud-card space-y-4 p-5">
-                <h3 className="font-display text-lg font-bold uppercase">
-                  Master Motorcycles ({adminMotorcycles.length})
-                </h3>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!newMotoBrandId || !newMotoSeries.trim()) return;
-                    await createAdminMotorcycle({
-                      brand_id: Number(newMotoBrandId),
-                      series_name: newMotoSeries.trim(),
-                      transmission: newMotoTransmission,
-                      category: newMotoCategory,
-                      engine_cc: Number(newMotoCc) || 150,
-                      is_active: true,
-                    });
-                    setNewMotoSeries("");
-                    setAdminMotorcycles(await fetchAdminMotorcycles());
-                    setNotice("Motorcycle added to master catalog.");
-                  }}
-                  className="space-y-2"
-                >
-                  <select
-                    value={newMotoBrandId}
-                    onChange={(e) => setNewMotoBrandId(e.target.value)}
-                    className="w-full rounded border border-input bg-secondary/40 px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
-                  >
-                    {adminBrands.map((b) => (
-                      <option key={b.id} value={String(b.id)} className="bg-background">
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="text"
-                    value={newMotoSeries}
-                    onChange={(e) => setNewMotoSeries(e.target.value)}
-                    placeholder="Series name (e.g. XMAX 250)"
-                    className="w-full rounded border border-input bg-secondary/40 px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
-                  />
-                  <div className="grid grid-cols-3 gap-2">
-                    <select
-                      value={newMotoTransmission}
-                      onChange={(e) => setNewMotoTransmission(e.target.value)}
-                      className="rounded border border-input bg-secondary/40 px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
-                    >
-                      <option value="matic" className="bg-background">
-                        matic
-                      </option>
-                      <option value="manual" className="bg-background">
-                        manual
-                      </option>
-                    </select>
-                    <select
-                      value={newMotoCategory}
-                      onChange={(e) => setNewMotoCategory(e.target.value)}
-                      className="rounded border border-input bg-secondary/40 px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
-                    >
-                      <option value="scooter" className="bg-background">
-                        scooter
-                      </option>
-                      <option value="sport" className="bg-background">
-                        sport
-                      </option>
-                      <option value="naked" className="bg-background">
-                        naked
-                      </option>
-                      <option value="touring" className="bg-background">
-                        touring
-                      </option>
-                    </select>
-                    <input
-                      type="number"
-                      value={newMotoCc}
-                      onChange={(e) => setNewMotoCc(e.target.value)}
-                      placeholder="CC"
-                      className="rounded border border-input bg-secondary/40 px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="w-full rounded bg-primary py-2 font-mono text-xs font-bold uppercase text-primary-foreground"
-                  >
-                    Add Motorcycle
-                  </button>
-                </form>
-                <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-                  {adminMotorcycles.map((m) => (
-                    <div
-                      key={m.id}
-                      className="flex items-center justify-between rounded border border-border bg-secondary/30 px-3 py-2 text-xs"
-                    >
-                      <span>
-                        {m.brand_name} {m.series_name} ({m.engine_cc || "-"}cc)
-                      </span>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await deleteAdminMotorcycle(m.id);
-                          setAdminMotorcycles(await fetchAdminMotorcycles());
-                        }}
-                        className="text-destructive"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Components */}
-              <div className="hud-card space-y-4 p-5">
-                <h3 className="font-display text-lg font-bold uppercase">
-                  Master Components ({adminComponents.length})
-                </h3>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!newCompCode.trim() || !newCompName.trim()) return;
-                    await createAdminComponent({
-                      code: newCompCode.trim(),
-                      name: newCompName.trim(),
-                      default_interval_km: Number(newCompKm) || 4000,
-                      default_interval_months: Number(newCompMonths) || 6,
-                      applicable_transmission: ["matic", "manual"],
-                      is_active: true,
-                    });
-                    setNewCompCode("");
-                    setNewCompName("");
-                    setAdminComponents(await fetchAdminComponents());
-                    setNotice("Component added to catalog.");
-                  }}
-                  className="space-y-2"
-                >
-                  <input
-                    type="text"
-                    value={newCompCode}
-                    onChange={(e) => setNewCompCode(e.target.value)}
-                    placeholder="Code (e.g. ENGINE_OIL)"
-                    className="w-full rounded border border-input bg-secondary/40 px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
-                  />
-                  <input
-                    type="text"
-                    value={newCompName}
-                    onChange={(e) => setNewCompName(e.target.value)}
-                    placeholder="Component Name"
-                    className="w-full rounded border border-input bg-secondary/40 px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="number"
-                      value={newCompKm}
-                      onChange={(e) => setNewCompKm(e.target.value)}
-                      placeholder="Interval KM"
-                      className="rounded border border-input bg-secondary/40 px-3 py-1.5 text-xs text-foreground"
-                    />
-                    <input
-                      type="number"
-                      value={newCompMonths}
-                      onChange={(e) => setNewCompMonths(e.target.value)}
-                      placeholder="Interval Months"
-                      className="rounded border border-input bg-secondary/40 px-3 py-1.5 text-xs text-foreground"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="w-full rounded bg-primary py-2 font-mono text-xs font-bold uppercase text-primary-foreground"
-                  >
-                    Add Component
-                  </button>
-                </form>
-                <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-                  {adminComponents.map((c) => (
-                    <div
-                      key={c.id}
-                      className="flex items-center justify-between rounded border border-border bg-secondary/30 px-3 py-2 text-xs"
-                    >
-                      <span>
-                        {c.name} ({c.default_interval_km || "-"} km)
-                      </span>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await deleteAdminComponent(c.id);
-                          setAdminComponents(await fetchAdminComponents());
-                        }}
-                        className="text-destructive"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 5: NEWS CMS (WYSIWYG + COMPRESSED MEDIA + PUSH) */}
+          {/* TAB 4: NEWS CMS (ADMIN & MODERATOR) */}
           {activeSubTab === "news" && (
             <NewsCmsTab
               articles={adminNews}
@@ -1488,35 +1104,23 @@ function AdminPage() {
       <ConfirmDialog
         open={Boolean(pendingConfirm)}
         title={
-          pendingConfirm?.kind === "delete_beta"
-            ? "Delete Beta Registration"
-            : pendingConfirm?.kind === "change_role"
-              ? "Change User Role"
-              : pendingConfirm?.kind === "change_status"
-                ? "Change Account Status"
-                : "Soft-Delete User"
+          pendingConfirm?.kind === "change_role"
+            ? "Change User Role"
+            : pendingConfirm?.kind === "change_status"
+              ? "Change Account Status"
+              : "Soft-Delete User"
         }
         message={
-          pendingConfirm?.kind === "delete_beta"
-            ? `Delete registration for ${pendingConfirm.reg.full_name}?`
-            : pendingConfirm?.kind === "change_role"
-              ? `Change role of ${pendingConfirm.user.email || pendingConfirm.user.username} to ${pendingConfirm.nextRole.toUpperCase()}?`
-              : pendingConfirm?.kind === "change_status"
-                ? `Change status of ${pendingConfirm.user.email || pendingConfirm.user.username} to ${pendingConfirm.nextStatus.toUpperCase()}?`
-                : pendingConfirm?.kind === "soft_delete_user"
-                  ? `Soft-delete ${pendingConfirm.user.email || pendingConfirm.user.username}? All active bearer sessions will be immediately invalidated.`
-                  : ""
+          pendingConfirm?.kind === "change_role"
+            ? `Change role of ${pendingConfirm.user.email || pendingConfirm.user.username} to ${pendingConfirm.nextRole.toUpperCase()}?`
+            : pendingConfirm?.kind === "change_status"
+              ? `Change status of ${pendingConfirm.user.email || pendingConfirm.user.username} to ${pendingConfirm.nextStatus.toUpperCase()}?`
+              : pendingConfirm?.kind === "soft_delete_user"
+                ? `Soft-delete ${pendingConfirm.user.email || pendingConfirm.user.username}? All active bearer sessions will be immediately invalidated.`
+                : ""
         }
-        confirmLabel={
-          pendingConfirm?.kind === "delete_beta"
-            ? "Delete"
-            : pendingConfirm?.kind === "soft_delete_user"
-              ? "Soft Delete"
-              : "Confirm"
-        }
-        destructive={
-          pendingConfirm?.kind === "delete_beta" || pendingConfirm?.kind === "soft_delete_user"
-        }
+        confirmLabel={pendingConfirm?.kind === "soft_delete_user" ? "Soft Delete" : "Confirm"}
+        destructive={pendingConfirm?.kind === "soft_delete_user"}
         busy={confirmBusy}
         onCancel={() => setPendingConfirm(null)}
         onConfirm={() => void handleConfirmAction()}

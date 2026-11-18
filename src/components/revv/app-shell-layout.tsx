@@ -1,26 +1,37 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
+  Activity,
   BarChart3,
   Bell,
   Check,
   CheckCheck,
+  ChevronDown,
+  ChevronRight,
   Compass,
+  Database,
   FileText,
   Home,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
+  Mail,
   MapPin,
+  Megaphone,
   Menu,
   MessageSquare,
+  Newspaper,
+  Settings,
   ShieldCheck,
+  Sliders,
   Trash2,
   Trophy,
   User,
+  Users,
   Wrench,
   X,
   LogIn,
-  UserPlus,
+  type LucideIcon,
 } from "lucide-react";
 import { Wordmark } from "./wordmark";
 import { useAuth } from "@/lib/auth-context";
@@ -30,6 +41,7 @@ import {
   fetchMyNotifications,
   markAllNotificationsAsRead,
   markNotificationAsRead,
+  resolveMediaUrl,
   type WebNotificationItem,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -42,6 +54,12 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<WebNotificationItem[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    riding: true,
+    garage: true,
+    admin: true,
+    "admin-master": false,
+  });
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuth();
@@ -144,69 +162,306 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     return <div className="min-h-screen bg-background text-foreground antialiased">{children}</div>;
   }
 
-  const isAdministrator = user?.role?.toLowerCase() === "administrator";
+  const roleLower = user?.role?.toLowerCase() ?? "user";
+  const isAdministrator = roleLower === "administrator";
+  const isModerator = roleLower === "moderator";
+  const canAccessAdminSection = isAdministrator || isModerator;
 
   const myProfilePath = user?.username ? `/id/${encodeURIComponent(user.username)}` : "/id/me";
+  const userAvatarSrc = resolveMediaUrl(user?.avatar_url);
 
-  const navItems = [
-    {
-      label: "Home",
-      to: "/",
-      icon: Home,
-      exact: true,
-    },
-    {
-      label: "Rides & Clubs",
-      to: "/rides",
-      icon: Compass,
-    },
-    {
-      label: "Crew & Chat",
-      to: "/messages",
-      icon: MessageSquare,
-    },
-    {
-      label: "Leaderboard",
-      to: "/leaderboard",
-      icon: Trophy,
-    },
-    {
-      label: "News",
-      to: "/news",
-      icon: FileText,
-    },
-    {
-      label: "Digital Garage",
-      to: "/garage",
-      icon: Wrench,
-    },
-    {
-      label: "My Profile",
-      to: myProfilePath,
-      icon: User,
-    },
-    ...(isAdministrator
+  interface NavLeafItem {
+    id: string;
+    label: string;
+    to?: string;
+    search?: Record<string, string>;
+    icon: LucideIcon;
+    exact?: boolean;
+    children?: NavLeafItem[];
+  }
+
+  interface NavGroupItem {
+    id: string;
+    label: string;
+    icon: LucideIcon;
+    items: NavLeafItem[];
+  }
+
+  const adminMenuItems: NavLeafItem[] = isAdministrator
+    ? [
+        {
+          id: "admin-overview",
+          label: "Overview & Analytics",
+          to: "/admin",
+          search: { tab: "overview" },
+          icon: BarChart3,
+        },
+        {
+          id: "admin-users",
+          label: "Users & RBAC",
+          to: "/admin",
+          search: { tab: "users" },
+          icon: Users,
+        },
+        {
+          id: "admin-trips",
+          label: "Trip Records",
+          to: "/trip-records",
+          icon: MapPin,
+        },
+        {
+          id: "admin-master",
+          label: "Master Data",
+          icon: Database,
+          children: [
+            {
+              id: "master-brands",
+              label: "Brand & Motorcycle",
+              to: "/admin",
+              search: { tab: "master", sub: "brands" },
+              icon: Wrench,
+            },
+            {
+              id: "master-components",
+              label: "Components",
+              to: "/admin",
+              search: { tab: "master", sub: "components" },
+              icon: Sliders,
+            },
+            {
+              id: "master-notifications",
+              label: "Notification Templates",
+              to: "/admin",
+              search: { tab: "master", sub: "notifications" },
+              icon: Bell,
+            },
+            {
+              id: "master-emails",
+              label: "Email Templates",
+              to: "/admin",
+              search: { tab: "master", sub: "emails" },
+              icon: Mail,
+            },
+            {
+              id: "master-settings",
+              label: "General Settings",
+              to: "/admin",
+              search: { tab: "master", sub: "settings" },
+              icon: Settings,
+            },
+          ],
+        },
+        {
+          id: "admin-news",
+          label: "News Management",
+          to: "/admin",
+          search: { tab: "news" },
+          icon: Newspaper,
+        },
+        {
+          id: "admin-broadcast",
+          label: "Push Broadcast",
+          to: "/admin",
+          search: { tab: "broadcast" },
+          icon: Megaphone,
+        },
+        {
+          id: "admin-support",
+          label: "Support & Legal",
+          to: "/admin",
+          search: { tab: "support" },
+          icon: LifeBuoy,
+        },
+        {
+          id: "admin-health",
+          label: "System Health",
+          to: "/admin",
+          search: { tab: "maintenance" },
+          icon: Activity,
+        },
+      ]
+    : isModerator
       ? [
           {
-            label: "Analytics",
-            to: "/analytics",
-            icon: BarChart3,
-          },
-          {
-            label: "Trip Records",
-            to: "/trip-records",
-            icon: MapPin,
-          },
-          {
-            label: "Admin Console",
+            id: "admin-news",
+            label: "News Management",
             to: "/admin",
+            search: { tab: "news" },
+            icon: Newspaper,
+          },
+        ]
+      : [];
+
+  const navGroups: NavGroupItem[] = [
+    {
+      id: "riding",
+      label: "Riding & Social",
+      icon: Compass,
+      items: [
+        { id: "home", label: "Home Feed", to: "/", icon: Home, exact: true },
+        { id: "rides", label: "Rides & Clubs", to: "/rides", icon: Compass },
+        { id: "messages", label: "Crew & Chat", to: "/messages", icon: MessageSquare },
+      ],
+    },
+    {
+      id: "garage",
+      label: "Garage & Community",
+      icon: Wrench,
+      items: [
+        { id: "garage", label: "Digital Garage", to: "/garage", icon: Wrench },
+        { id: "leaderboard", label: "Leaderboard", to: "/leaderboard", icon: Trophy },
+        { id: "news", label: "News", to: "/news", icon: FileText },
+        { id: "profile", label: "My Profile", to: myProfilePath, icon: User },
+      ],
+    },
+    ...(canAccessAdminSection
+      ? [
+          {
+            id: "admin",
+            label: "Admin Console",
             icon: LayoutDashboard,
+            items: adminMenuItems,
           },
         ]
       : []),
   ];
 
   const currentPath = location.pathname;
+  const currentSearchObj = (location.search ?? {}) as Record<string, string | undefined>;
+  const currentTab = currentSearchObj["tab"];
+  const currentSub = currentSearchObj["sub"];
+
+  const isLeafActive = (item: NavLeafItem): boolean => {
+    if (!item.to) return false;
+    if (item.to === "/admin") {
+      if (currentPath !== "/admin") return false;
+      const targetTab = item.search?.["tab"] ?? "overview";
+      if (targetTab === "support" && currentTab === "legal") return true;
+      if ((currentTab ?? "overview") !== targetTab) return false;
+      if (item.search?.["sub"]) {
+        return (currentSub ?? "brands") === item.search["sub"];
+      }
+      return true;
+    }
+    return item.exact ? currentPath === item.to : currentPath.startsWith(item.to);
+  };
+
+  const toggleGroup = (id: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const renderNavTree = (onNavigate?: () => void) => (
+    <div className="space-y-3">
+      {navGroups.map((group) => {
+        const GroupIcon = group.icon;
+        const isGroupOpen = expandedGroups[group.id] ?? true;
+        return (
+          <div key={group.id} className="space-y-1">
+            <button
+              type="button"
+              onClick={() => toggleGroup(group.id)}
+              className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-[11px] font-mono font-bold uppercase tracking-wider text-muted-foreground hover:bg-secondary/30 hover:text-foreground transition"
+            >
+              <span className="flex items-center gap-2">
+                <GroupIcon className="size-3.5 text-primary/80" />
+                <span>{group.label}</span>
+              </span>
+              {isGroupOpen ? (
+                <ChevronDown className="size-3.5" />
+              ) : (
+                <ChevronRight className="size-3.5" />
+              )}
+            </button>
+
+            {isGroupOpen && (
+              <div className="space-y-1 pl-1.5 border-l border-border/50 ml-3">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  if (item.children && item.children.length > 0) {
+                    const isSubOpen = expandedGroups[item.id] ?? currentTab === "master";
+                    return (
+                      <div key={item.id} className="space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => toggleGroup(item.id)}
+                          className={cn(
+                            "flex w-full items-center justify-between rounded-lg px-3 py-2 font-display text-xs font-bold uppercase tracking-wider transition-all",
+                            currentPath === "/admin" && currentTab === "master"
+                              ? "bg-primary/15 text-primary border border-primary/30"
+                              : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground",
+                          )}
+                        >
+                          <span className="flex items-center gap-2.5">
+                            <Icon className="size-3.5 shrink-0" />
+                            <span>{item.label}</span>
+                          </span>
+                          {isSubOpen ? (
+                            <ChevronDown className="size-3.5" />
+                          ) : (
+                            <ChevronRight className="size-3.5" />
+                          )}
+                        </button>
+                        {isSubOpen && (
+                          <div className="space-y-0.5 pl-2.5 ml-3 border-l border-border/50">
+                            {item.children.map((sub) => {
+                              const SubIcon = sub.icon;
+                              const subActive = isLeafActive(sub);
+                              return (
+                                <Link
+                                  key={sub.id}
+                                  to={sub.to ?? "/admin"}
+                                  search={sub.search as never}
+                                  onClick={onNavigate}
+                                  className={cn(
+                                    "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-mono text-[11px] font-semibold transition-all",
+                                    subActive
+                                      ? "bg-primary/20 text-primary border border-primary/40"
+                                      : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground",
+                                  )}
+                                >
+                                  <SubIcon className="size-3 shrink-0" />
+                                  <span className="truncate">{sub.label}</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  const active = isLeafActive(item);
+                  return (
+                    <Link
+                      key={item.id}
+                      to={item.to ?? "/"}
+                      search={item.search as never}
+                      onClick={onNavigate}
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-lg px-3 py-2 font-display text-xs font-bold uppercase tracking-wider transition-all",
+                        active
+                          ? "bg-primary/20 text-primary border border-primary/40 shadow-sm"
+                          : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground",
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          "size-3.5 shrink-0",
+                          active ? "text-primary" : "text-muted-foreground",
+                        )}
+                      />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+
   const isDashboardPage =
     currentPath.startsWith("/id") ||
     currentPath === "/garage" ||
@@ -256,8 +511,19 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
               to={myProfilePath}
               className="flex items-center gap-2 rounded-full border border-border/80 bg-secondary/40 px-2.5 py-1 text-xs font-mono"
             >
-              <div className="flex size-6 items-center justify-center rounded-full bg-primary/20 text-primary font-bold text-[10px]">
-                {user.username?.charAt(0).toUpperCase() || "R"}
+              <div className="flex size-6 items-center justify-center rounded-full bg-primary/20 text-primary font-bold text-[10px] overflow-hidden">
+                {userAvatarSrc ? (
+                  <img
+                    src={userAvatarSrc}
+                    alt={user.username ?? "Rider"}
+                    className="size-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                ) : (
+                  user.username?.charAt(0).toUpperCase() || "R"
+                )}
               </div>
               <span className="max-w-[90px] truncate font-medium">@{user.username}</span>
             </Link>
@@ -293,29 +559,8 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
               </button>
             </div>
 
-            <nav className="mt-5 flex-1 space-y-1.5">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const active = item.exact
-                  ? currentPath === item.to
-                  : currentPath.startsWith(item.to);
-                return (
-                  <Link
-                    key={item.label}
-                    to={item.to}
-                    onClick={() => setMobileOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3.5 py-2.5 font-display text-sm font-bold uppercase tracking-wider transition-colors",
-                      active
-                        ? "bg-primary/20 text-primary border border-primary/30"
-                        : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground",
-                    )}
-                  >
-                    <Icon className="size-4 shrink-0" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
+            <nav className="mt-4 flex-1 overflow-y-auto pr-1">
+              {renderNavTree(() => setMobileOpen(false))}
             </nav>
 
             {/* Mobile Footer Session Status */}
@@ -323,8 +568,19 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
               {isAuthenticated && user ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex size-9 items-center justify-center rounded-lg bg-primary/20 font-bold text-primary font-display text-sm">
-                      {user.username?.charAt(0).toUpperCase() || "R"}
+                    <div className="flex size-9 items-center justify-center rounded-lg bg-primary/20 font-bold text-primary font-display text-sm overflow-hidden">
+                      {userAvatarSrc ? (
+                        <img
+                          src={userAvatarSrc}
+                          alt={user.username ?? "Rider"}
+                          className="size-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        user.username?.charAt(0).toUpperCase() || "R"
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-display text-sm font-bold">
@@ -357,14 +613,6 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
                     <LogIn className="size-3.5" />
                     Sign In
                   </Link>
-                  <Link
-                    to="/register"
-                    onClick={() => setMobileOpen(false)}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary/40 py-2 font-mono text-xs font-semibold uppercase text-muted-foreground"
-                  >
-                    <UserPlus className="size-3.5" />
-                    Join Beta
-                  </Link>
                 </div>
               )}
             </div>
@@ -380,40 +628,17 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
             <Wordmark className="text-2xl" />
           </Link>
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-primary">
-              <span className="size-1.5 rounded-full bg-primary animate-pulse" />
-              Closed Beta
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
+              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Rider Cockpit
             </span>
-            <span className="font-mono text-[10px] text-muted-foreground">v0.1</span>
+            <span className="font-mono text-[10px] text-muted-foreground">v1.0.1</span>
           </div>
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex-1 space-y-1.5 px-3 py-6 overflow-y-auto">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = item.exact ? currentPath === item.to : currentPath.startsWith(item.to);
-            return (
-              <Link
-                key={item.label}
-                to={item.to}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3.5 py-2.5 font-display text-xs font-bold uppercase tracking-wider transition-all",
-                  active
-                    ? "bg-primary/20 text-primary border border-primary/40 shadow-sm"
-                    : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground",
-                )}
-              >
-                <Icon
-                  className={cn(
-                    "size-4 shrink-0",
-                    active ? "text-primary" : "text-muted-foreground",
-                  )}
-                />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
+        <nav className="flex-1 space-y-2 px-3 py-5 overflow-y-auto">
+          {renderNavTree()}
           <button
             type="button"
             onClick={() => setNotifOpen(true)}
@@ -439,8 +664,19 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
                 to={myProfilePath}
                 className="group flex items-center gap-3 rounded-lg p-2 transition hover:bg-secondary/40"
               >
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/20 font-bold text-primary font-display text-sm">
-                  {user.username?.charAt(0).toUpperCase() || "R"}
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/20 font-bold text-primary font-display text-sm overflow-hidden">
+                  {userAvatarSrc ? (
+                    <img
+                      src={userAvatarSrc}
+                      alt={user.username ?? "Rider"}
+                      className="size-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    user.username?.charAt(0).toUpperCase() || "R"
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-display text-xs font-bold group-hover:text-primary transition-colors">
@@ -476,13 +712,6 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
               >
                 <LogIn className="size-3.5" />
                 Sign In
-              </Link>
-              <Link
-                to="/register"
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary/30 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground transition hover:text-foreground"
-              >
-                <UserPlus className="size-3.5" />
-                Join Beta
               </Link>
             </div>
           )}

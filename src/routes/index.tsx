@@ -815,11 +815,14 @@ function AuthenticatedHome({ user }: { user: RiderProfile | null }) {
                           className="flex items-center gap-2.5 overflow-hidden group"
                         >
                           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary font-display text-xs font-bold text-primary overflow-hidden border border-border">
-                            {r.avatar_url ? (
+                            {resolveMediaUrl(r.avatar_url) ? (
                               <img
-                                src={r.avatar_url}
+                                src={resolveMediaUrl(r.avatar_url) ?? ""}
                                 alt={r.display_name}
                                 className="size-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                }}
                               />
                             ) : (
                               r.username.charAt(0).toUpperCase()
@@ -888,11 +891,14 @@ function AuthenticatedHome({ user }: { user: RiderProfile | null }) {
                       className="flex items-center gap-2.5 overflow-hidden group"
                     >
                       <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary font-display text-xs font-bold text-primary overflow-hidden border border-border">
-                        {req.avatar_url ? (
+                        {resolveMediaUrl(req.avatar_url) ? (
                           <img
-                            src={req.avatar_url}
+                            src={resolveMediaUrl(req.avatar_url) ?? ""}
                             alt={req.display_name}
                             className="size-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
                           />
                         ) : (
                           req.username.charAt(0).toUpperCase()
@@ -987,11 +993,14 @@ function AuthenticatedHome({ user }: { user: RiderProfile | null }) {
                   >
                     <div className="flex items-center gap-3 overflow-hidden">
                       <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary font-display text-xs font-bold text-primary overflow-hidden border border-border">
-                        {friend.avatar_url ? (
+                        {resolveMediaUrl(friend.avatar_url) ? (
                           <img
-                            src={friend.avatar_url}
+                            src={resolveMediaUrl(friend.avatar_url) ?? ""}
                             alt={friend.display_name}
                             className="size-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
                           />
                         ) : (
                           friend.username.charAt(0).toUpperCase()
@@ -1145,12 +1154,12 @@ function MarketingLandingPage() {
               the road takes you next.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
-              <Link to="/register" className="btn-primary">
-                Join Closed Beta
+              <Link to="/login" className="btn-primary">
+                Open Rider Cockpit
                 <ArrowRight className="size-5" />
               </Link>
-              <Link to="/login" className="btn-ghost">
-                Sign In
+              <Link to="/leaderboard" className="btn-ghost">
+                Leaderboard
               </Link>
             </div>
           </div>
@@ -1195,7 +1204,7 @@ function MarketingLandingPage() {
               before ride day.
             </p>
             <div className="mt-8">
-              <Link to="/register" className="btn-primary">
+              <Link to="/login" className="btn-primary">
                 Explore Garage
                 <ArrowRight className="size-5" />
               </Link>
@@ -1288,17 +1297,17 @@ function MarketingLandingPage() {
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link
-              to="/register"
+              to="/login"
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-foreground px-9 py-4 font-display text-base font-bold uppercase tracking-wide text-background transition-opacity hover:opacity-90"
             >
-              Join Closed Beta
+              Rider Sign In
               <ArrowRight className="size-5" />
             </Link>
             <Link
-              to="/login"
+              to="/leaderboard"
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-primary-foreground/50 px-8 py-4 font-display text-base font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary-foreground/10"
             >
-              Rider Sign In
+              View Leaderboard
             </Link>
           </div>
         </div>

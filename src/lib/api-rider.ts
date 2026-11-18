@@ -41,6 +41,8 @@ export interface MasterComponentItemPublic {
   id: number;
   code: string;
   name: string;
+  name_id?: string | null;
+  name_en?: string | null;
   default_interval_km?: number | null;
   default_interval_months?: number | null;
   applicable_transmission: string[];
@@ -51,7 +53,10 @@ export interface GarageComponentItem {
   component_id: number;
   code: string;
   name: string;
+  name_id?: string | null;
+  name_en?: string | null;
   brand_or_spec?: string | null;
+  notes?: string | null;
   last_replaced_date: string;
   last_replaced_mileage: number;
   interval_km?: number | null;
@@ -71,9 +76,24 @@ export interface MaintenanceLogItem {
   part_name_or_brand?: string | null;
   service_date: string;
   mileage_at_service: number;
+  custom_interval_km?: number | null;
+  custom_interval_months?: number | null;
   cost: string;
   workshop_name?: string | null;
   notes?: string | null;
+}
+
+export interface GarageItemCommentItem {
+  id: string;
+  garage_id: string;
+  user_id: string;
+  item_type: "component" | "service_log";
+  item_id: string;
+  comment: string;
+  author_name: string;
+  author_username?: string | null;
+  author_avatar_url?: string | null;
+  created_at: string;
 }
 
 export interface CommunitySummary {
@@ -235,6 +255,7 @@ export async function upsertGarageComponent(
   payload: {
     component_id: number;
     brand_or_spec?: string;
+    notes?: string;
     last_replaced_date?: string;
     last_replaced_mileage?: number;
     custom_interval_km?: number;
@@ -246,6 +267,28 @@ export async function upsertGarageComponent(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function updateGarageComponent(
+  garageId: string,
+  entryId: string,
+  payload: {
+    brand_or_spec?: string;
+    notes?: string;
+    last_replaced_date?: string;
+    last_replaced_mileage?: number;
+    custom_interval_km?: number;
+    custom_interval_months?: number;
+    is_reminder_enabled?: boolean;
+  },
+): Promise<GarageComponentItem> {
+  return authRequest<GarageComponentItem>(
+    `/me/garage/${encodeURIComponent(garageId)}/components/${encodeURIComponent(entryId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+  );
 }
 
 export async function deleteGarageComponent(garageId: string, entryId: string): Promise<void> {
@@ -269,6 +312,8 @@ export async function createMaintenanceLog(
     part_name_or_brand?: string;
     service_date?: string;
     mileage_at_service?: number;
+    custom_interval_km?: number | null;
+    custom_interval_months?: number | null;
     cost?: string | number;
     workshop_name?: string;
     notes?: string;
@@ -280,9 +325,69 @@ export async function createMaintenanceLog(
   });
 }
 
+export async function updateMaintenanceLog(
+  garageId: string,
+  logId: string,
+  payload: {
+    component_id?: number | null;
+    service_type?: string;
+    part_name_or_brand?: string;
+    service_date?: string;
+    mileage_at_service?: number;
+    custom_interval_km?: number | null;
+    custom_interval_months?: number | null;
+    cost?: string | number;
+    workshop_name?: string;
+    notes?: string;
+  },
+): Promise<MaintenanceLogItem> {
+  return authRequest<MaintenanceLogItem>(
+    `/me/garage/${encodeURIComponent(garageId)}/maintenance/${encodeURIComponent(logId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
 export async function deleteMaintenanceLog(garageId: string, logId: string): Promise<void> {
   await authRequest(
     `/me/garage/${encodeURIComponent(garageId)}/maintenance/${encodeURIComponent(logId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function fetchGarageItemComments(
+  garageId: string,
+  itemType: "component" | "service_log",
+  itemId: string,
+): Promise<GarageItemCommentItem[]> {
+  return authRequest<GarageItemCommentItem[]>(
+    `/me/garage/${encodeURIComponent(garageId)}/items/${itemType}/${encodeURIComponent(itemId)}/comments`,
+  );
+}
+
+export async function createGarageItemComment(
+  garageId: string,
+  itemType: "component" | "service_log",
+  itemId: string,
+  comment: string,
+): Promise<GarageItemCommentItem> {
+  return authRequest<GarageItemCommentItem>(
+    `/me/garage/${encodeURIComponent(garageId)}/items/${itemType}/${encodeURIComponent(itemId)}/comments`,
+    {
+      method: "POST",
+      body: JSON.stringify({ comment }),
+    },
+  );
+}
+
+export async function deleteGarageItemComment(
+  garageId: string,
+  commentId: string,
+): Promise<void> {
+  await authRequest(
+    `/me/garage/${encodeURIComponent(garageId)}/items/comments/${encodeURIComponent(commentId)}`,
     { method: "DELETE" },
   );
 }
