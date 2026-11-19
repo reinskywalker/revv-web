@@ -1,4 +1,12 @@
-import { authRequest, authRequestRaw, compressImageFile, getApiBaseUrl } from "./api";
+import {
+  AuthApiError,
+  type FeedPostItem,
+  authRequest,
+  authRequestRaw,
+  compressImageFile,
+  getApiBaseUrl,
+  optionalAuthRequest,
+} from "./api";
 
 export interface SavedRouteItem {
   id: string;
@@ -406,15 +414,200 @@ export async function uploadGarageBikeImage(
 }
 
 // Communities & Events
+export interface CommunityMemberItem {
+  user_id: string;
+  username: string;
+  display_name: string;
+  avatar_url?: string | null;
+  role: string;
+  status: string;
+  joined_at: string;
+}
+
+export interface CommunityThreadItem {
+  id: string;
+  community_id: string;
+  author_id: string;
+  author_username: string;
+  author_display_name: string;
+  author_avatar_url?: string | null;
+  title: string;
+  body: string;
+  is_pinned: boolean;
+  reply_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CommunityChatChannelItem {
+  id: string;
+  community_id: string;
+  name: string;
+  description?: string | null;
+  visibility?: string;
+  is_locked: boolean;
+  last_message_preview?: string | null;
+  last_message_sender?: string | null;
+  last_message_at?: string | null;
+  created_at: string;
+  is_muted?: boolean;
+  has_unread_mention?: boolean;
+}
+
+export interface CommunityChannelMessageItem {
+  id: string;
+  channel_id: string;
+  community_id: string;
+  sender_id: string;
+  sender_username: string;
+  sender_display_name: string;
+  sender_avatar_url?: string | null;
+  sender_role?: string | null;
+  content: string;
+  created_at: string;
+}
+
+export interface CommunityEventFullItem {
+  id: string;
+  community_id: string;
+  community_name: string;
+  created_by: string;
+  creator_name: string;
+  title: string;
+  description?: string | null;
+  start_time: string;
+  end_time?: string | null;
+  duration_minutes: number;
+  cover_image_url?: string | null;
+  location_name?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  route_id?: string | null;
+  is_riding_event: boolean;
+  status: string;
+  lifecycle_state: string;
+  cancelled_at?: string | null;
+  stops?: PublicSharedEventStop[] | unknown;
+  going_count: number;
+  interested_count: number;
+  tentative_count: number;
+  not_going_count: number;
+  my_rsvp?: string | null;
+  active_share_token?: string | null;
+  share_expires_at?: string | null;
+  created_at: string;
+}
+
+export interface CommunityDetailResponse {
+  community: CommunitySummary;
+  members: CommunityMemberItem[];
+  events: CommunityEventFullItem[];
+  threads: CommunityThreadItem[];
+  channels: CommunityChatChannelItem[];
+}
+
 export async function fetchCommunities(params?: {
-  search?: string;
-  joined_only?: boolean;
+  search?: string | undefined;
+  visibility?: "public" | "private" | undefined;
+  joined_only?: boolean | undefined;
 }): Promise<CommunitySummary[]> {
   const qs = new URLSearchParams();
   if (params?.search?.trim()) qs.set("search", params.search.trim());
+  if (params?.visibility) qs.set("visibility", params.visibility);
   if (params?.joined_only) qs.set("joined_only", "true");
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
-  return authRequest<CommunitySummary[]>(`/communities${suffix}`);
+  const data = await optionalAuthRequest<CommunitySummary[]>(`/communities${suffix}`);
+  return Array.isArray(data) ? data : [];
+}
+
+export async function fetchCommunityDetail(communityId: string): Promise<CommunityDetailResponse> {
+  return optionalAuthRequest<CommunityDetailResponse>(
+    `/communities/${encodeURIComponent(communityId)}`,
+  );
+}
+
+export async function fetchCommunityPosts(
+  communityId: string,
+  page = 1,
+  limit = 20,
+): Promise<FeedPostItem[]> {
+  const data = await optionalAuthRequest<FeedPostItem[]>(
+    `/communities/${encodeURIComponent(communityId)}/posts?page=${page}&limit=${limit}`,
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+export async function createCommunityStatusPost(
+  communityId: string,
+  caption: string,
+): Promise<FeedPostItem> {
+  return authRequest<FeedPostItem>(`/communities/${encodeURIComponent(communityId)}/posts`, {
+    method: "POST",
+    body: JSON.stringify({ caption, post_type: "status" }),
+  });
+}
+
+export async function fetchCommunityChannels(
+  communityId: string,
+): Promise<CommunityChatChannelItem[]> {
+  const data = await authRequest<CommunityChatChannelItem[]>(
+    `/communities/${encodeURIComponent(communityId)}/channels`,
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+export async function createCommunityChannel(
+  communityId: string,
+  payload: {
+    name: string;
+    description?: string | undefined;
+    visibility?: "member" | "administrator" | undefined;
+  },
+): Promise<CommunityChatChannelItem> {
+  return authRequest<CommunityChatChannelItem>(
+    `/communities/${encodeURIComponent(communityId)}/channels`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function fetchChannelMessages(
+  communityId: string,
+  channelId: string,
+): Promise<CommunityChannelMessageItem[]> {
+  const data = await authRequest<CommunityChannelMessageItem[]>(
+    `/communities/${encodeURIComponent(communityId)}/channels/${encodeURIComponent(channelId)}/messages`,
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+export async function sendChannelMessage(
+  communityId: string,
+  channelId: string,
+  content: string,
+): Promise<CommunityChannelMessageItem> {
+  return authRequest<CommunityChannelMessageItem>(
+    `/communities/${encodeURIComponent(communityId)}/channels/${encodeURIComponent(channelId)}/messages`,
+    {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    },
+  );
+}
+
+export async function createCommunityThread(
+  communityId: string,
+  payload: { title: string; body: string },
+): Promise<CommunityThreadItem> {
+  return authRequest<CommunityThreadItem>(
+    `/communities/${encodeURIComponent(communityId)}/threads`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
 }
 
 export async function joinCommunity(communityId: string): Promise<void> {
@@ -431,13 +624,22 @@ export async function fetchCommunityEvents(): Promise<CommunityEventItem[]> {
 
 export async function rsvpCommunityEvent(
   eventId: string,
-  status: "going" | "interested" | "not_going",
+  status: "going" | "tentative" | "interested" | "not_going",
 ): Promise<void> {
   await authRequest(`/events/${encodeURIComponent(eventId)}/rsvp`, {
     method: "POST",
     body: JSON.stringify({ status }),
   });
 }
+
+export async function createEventShareLink(eventId: string): Promise<{ token: string; expires_at?: string }> {
+  return authRequest<{ token: string; expires_at?: string }>(
+    `/events/${encodeURIComponent(eventId)}/share-link`,
+    { method: "POST" },
+  );
+}
+
+export { AuthApiError };
 
 // Direct Messages
 export async function fetchDirectConversations(): Promise<DirectConversationItem[]> {
@@ -553,17 +755,32 @@ export interface PublicSharedEventResponse {
   expires_at: string;
 }
 
+export class SharedEventError extends Error {
+  constructor(
+    message: string,
+    public readonly isNotFound: boolean,
+    public readonly status: number = 0,
+  ) {
+    super(message);
+    this.name = "SharedEventError";
+  }
+}
+
 export async function fetchPublicSharedEvent(
   token: string,
   params?: { status?: "going" | "tentative" | "not_going"; page?: number; limit?: number },
 ): Promise<PublicSharedEventResponse> {
+  const cleanToken = token.trim().replace(/[^a-zA-Z0-9_-]/g, "");
+  if (!cleanToken) {
+    throw new SharedEventError("This event share link is invalid.", true, 404);
+  }
   const qs = new URLSearchParams();
   if (params?.status) qs.set("status", params.status);
   if (params?.page) qs.set("page", String(params.page));
   if (params?.limit) qs.set("limit", String(params.limit));
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   const res = await fetch(
-    `${getApiBaseUrl()}/public/events/shared/${encodeURIComponent(token)}${suffix}`,
+    `${getApiBaseUrl()}/public/events/shared/${encodeURIComponent(cleanToken)}${suffix}`,
     {
       headers: { Accept: "application/json" },
     },
@@ -573,7 +790,13 @@ export async function fetchPublicSharedEvent(
     meta?: { message?: string };
   } | null;
   if (!res.ok || !body?.data) {
-    throw new Error(body?.meta?.message || "Event view link is invalid or has expired.");
+    const isNotFound = res.status === 404 || res.status === 410;
+    const msg =
+      body?.meta?.message ||
+      (isNotFound
+        ? "This event share link has expired or could not be found."
+        : "Unable to load event details right now. Please try again.");
+    throw new SharedEventError(msg, isNotFound, res.status);
   }
   return body.data;
 }

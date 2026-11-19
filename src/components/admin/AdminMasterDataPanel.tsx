@@ -137,34 +137,38 @@ export function AdminMasterDataPanel({
     [currentHtml],
   );
 
+  const masterSubLabel: Record<MasterSubTab, { title: string; subtitle: string }> = {
+    brands: {
+      title: `Brands & Motorcycles (${brands.length} brands · ${motorcycles.length} models)`,
+      subtitle: "Manage motorcycle manufacturers and catalog series definitions.",
+    },
+    components: {
+      title: `Maintenance Components (${components.length})`,
+      subtitle: "Configure component catalog items and bilingual EN / ID labels.",
+    },
+    notifications: {
+      title: `Notification Templates (${notifTemplates.length})`,
+      subtitle: "Manage push notification and alert templates across the platform.",
+    },
+    emails: {
+      title: `Email Templates (${emailTemplates.length})`,
+      subtitle: "Manage transactional HTML email templates.",
+    },
+    settings: {
+      title: `General Settings (${generalSettings.length})`,
+      subtitle: "Configure global system keys and defaults.",
+    },
+  };
+
   return (
     <div className="space-y-6">
-      {/* Sub-submenu tabs */}
-      <div className="flex flex-wrap gap-2">
-        {(
-          [
-            ["brands", `Brand & Motorcycle (${brands.length} / ${motorcycles.length})`, Wrench],
-            ["components", `Components (${components.length})`, Sliders],
-            ["notifications", `Notification Templates (${notifTemplates.length})`, Bell],
-            ["emails", `Email Templates (${emailTemplates.length})`, Mail],
-            ["settings", `General Settings (${generalSettings.length})`, Settings],
-          ] as const
-        ).map(([key, label, Icon]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onSelectMasterSub(key)}
-            className={cn(
-              "inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 font-mono text-xs font-semibold uppercase tracking-wider transition",
-              activeMasterSub === key
-                ? "border-primary bg-primary/15 text-primary"
-                : "border-border/70 bg-card text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Icon className="size-3.5" />
-            <span>{label}</span>
-          </button>
-        ))}
+      <div className="flex flex-col gap-1 border-b border-border/60 pb-3">
+        <h3 className="text-lg font-bold text-foreground">
+          {masterSubLabel[activeMasterSub].title}
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          {masterSubLabel[activeMasterSub].subtitle}
+        </p>
       </div>
 
       {/* 1. BRAND & MOTORCYCLE COMBINED */}
@@ -346,7 +350,7 @@ export function AdminMasterDataPanel({
 
             <div className="overflow-x-auto max-h-[430px] overflow-y-auto">
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-border/60 font-mono text-[10px] uppercase text-muted-foreground sticky top-0 bg-card">
+                <thead className="border-b border-border/60 text-xs font-semibold uppercase tracking-wide text-foreground/80 sticky top-0 bg-card">
                   <tr>
                     <th className="py-2 pr-3">Brand</th>
                     <th className="py-2 px-3">Series Name</th>
@@ -478,7 +482,7 @@ export function AdminMasterDataPanel({
             <button type="submit" className="btn-primary text-xs">
               + Add Component
             </button>
-            <div className="sm:col-span-6 flex flex-wrap gap-3 items-center font-mono text-[11px]">
+            <div className="sm:col-span-6 flex flex-wrap gap-3 items-center text-sm">
               <span className="text-muted-foreground">Applicable Transmission:</span>
               {TRANSMISSIONS.map((tr) => (
                 <label key={tr} className="inline-flex items-center gap-1.5 cursor-pointer">
@@ -499,7 +503,7 @@ export function AdminMasterDataPanel({
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-border/60 font-mono text-[10px] uppercase text-muted-foreground">
+              <thead className="border-b border-border/60 text-xs font-semibold uppercase tracking-wide text-foreground/80">
                 <tr>
                   <th className="py-2.5 pr-3">Code</th>
                   <th className="py-2.5 px-3">Name (EN)</th>
@@ -522,7 +526,7 @@ export function AdminMasterDataPanel({
                     <td className="py-2.5 px-3 font-mono text-right">
                       {c.default_interval_months ? `${c.default_interval_months} mo` : "—"}
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-[10px] uppercase">
+                    <td className="py-2.5 px-3 text-xs uppercase">
                       {c.applicable_transmission.join(", ")}
                     </td>
                     <td className="py-2.5 pl-3 text-right">
@@ -540,7 +544,7 @@ export function AdminMasterDataPanel({
                             );
                             setEditCompTrans(c.applicable_transmission);
                           }}
-                          className="rounded border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[11px] text-primary hover:bg-primary/20"
+                          className="rounded border border-primary/40 bg-primary/10 px-2.5 py-1 text-sm text-primary hover:bg-primary/20"
                         >
                           Edit
                         </button>
@@ -610,7 +614,7 @@ export function AdminMasterDataPanel({
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-border/60 font-mono text-[10px] uppercase text-muted-foreground">
+              <thead className="border-b border-border/60 text-xs font-semibold uppercase tracking-wide text-foreground/80">
                 <tr>
                   <th className="py-2.5 pr-3">Code</th>
                   <th className="py-2.5 px-3">Category</th>
@@ -627,7 +631,7 @@ export function AdminMasterDataPanel({
                     <td className="py-3 px-3 font-mono uppercase">{t.category}</td>
                     <td className="py-3 px-3 font-semibold">{t.title_template}</td>
                     <td className="py-3 px-3 text-muted-foreground max-w-md">{t.body_template}</td>
-                    <td className="py-3 px-3 font-mono text-[10px] text-muted-foreground">
+                    <td className="py-3 px-3 text-xs text-foreground/75">
                       {t.variables_hint || "—"}
                     </td>
                     <td className="py-3 pl-3 text-right">
@@ -646,7 +650,7 @@ export function AdminMasterDataPanel({
                               variables_hint: t.variables_hint || "",
                             });
                           }}
-                          className="rounded border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[11px] text-primary"
+                          className="rounded border border-primary/40 bg-primary/10 px-2.5 py-1 text-sm text-primary"
                         >
                           Edit
                         </button>
@@ -787,7 +791,7 @@ export function AdminMasterDataPanel({
                 >
                   <div className="space-y-1 max-w-xl">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] uppercase rounded bg-primary/15 px-2 py-0.5 text-primary font-bold">
+                      <span className="text-xs uppercase rounded bg-primary/15 px-2 py-0.5 text-primary font-bold">
                         {gs.category}
                       </span>
                       <span className="font-mono text-xs font-bold text-foreground">
@@ -1158,7 +1162,7 @@ export function AdminMasterDataPanel({
             <div className="flex items-center justify-between border-b border-border/70 px-5 py-3.5">
               <div>
                 <h5 className="font-display text-sm font-black uppercase">Email HTML Preview</h5>
-                <p className="font-mono text-[11px] text-muted-foreground">
+                <p className="text-sm text-foreground/75">
                   Subject:{" "}
                   <strong className="text-foreground">
                     {currentSubject.replaceAll("{{otp}}", "482910")}

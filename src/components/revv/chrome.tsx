@@ -32,6 +32,9 @@ export function SiteHeader() {
           <Link to="/leaderboard" className={navLinkClass} activeProps={{ className: "text-foreground" }}>
             Leaderboard
           </Link>
+          <Link to="/clubs" className={navLinkClass} activeProps={{ className: "text-foreground" }}>
+            Clubs
+          </Link>
           <Link to="/news" className={navLinkClass} activeProps={{ className: "text-foreground" }}>
             News
           </Link>
@@ -69,6 +72,9 @@ export function SiteFooter() {
             </Link>
             <Link to="/leaderboard" className={navLinkClass}>
               Leaderboard
+            </Link>
+            <Link to="/clubs" className={navLinkClass}>
+              Clubs
             </Link>
             <Link to="/news" className={navLinkClass}>
               News

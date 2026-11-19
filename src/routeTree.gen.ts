@@ -21,8 +21,11 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as RidesRouteImport } from './routes/rides'
 import { Route as TripRecordsRouteImport } from './routes/trip-records'
-import { Route as IdUsernameRouteImport } from './routes/id/$username'
+import { Route as ClubsIndexRouteImport } from './routes/clubs/index'
+import { Route as ClubsIdRouteImport } from './routes/clubs/$id'
+import { Route as CommunityIdRouteImport } from './routes/community/$id'
 import { Route as ETokenRouteImport } from './routes/e/$token'
+import { Route as IdUsernameRouteImport } from './routes/id/$username'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -84,14 +87,29 @@ const TripRecordsRoute = TripRecordsRouteImport.update({
   path: '/trip-records',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IdUsernameRoute = IdUsernameRouteImport.update({
-  id: '/id/$username',
-  path: '/id/$username',
+const ClubsIndexRoute = ClubsIndexRouteImport.update({
+  id: '/clubs/',
+  path: '/clubs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClubsIdRoute = ClubsIdRouteImport.update({
+  id: '/clubs/$id',
+  path: '/clubs/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommunityIdRoute = CommunityIdRouteImport.update({
+  id: '/community/$id',
+  path: '/community/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ETokenRoute = ETokenRouteImport.update({
   id: '/e/$token',
   path: '/e/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IdUsernameRoute = IdUsernameRouteImport.update({
+  id: '/id/$username',
+  path: '/id/$username',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -108,8 +126,11 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/rides': typeof RidesRoute
   '/trip-records': typeof TripRecordsRoute
-  '/id/$username': typeof IdUsernameRoute
+  '/clubs/$id': typeof ClubsIdRoute
+  '/community/$id': typeof CommunityIdRoute
   '/e/$token': typeof ETokenRoute
+  '/id/$username': typeof IdUsernameRoute
+  '/clubs/': typeof ClubsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -124,8 +145,11 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/rides': typeof RidesRoute
   '/trip-records': typeof TripRecordsRoute
-  '/id/$username': typeof IdUsernameRoute
+  '/clubs/$id': typeof ClubsIdRoute
+  '/community/$id': typeof CommunityIdRoute
   '/e/$token': typeof ETokenRoute
+  '/id/$username': typeof IdUsernameRoute
+  '/clubs': typeof ClubsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -141,8 +165,11 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/rides': typeof RidesRoute
   '/trip-records': typeof TripRecordsRoute
-  '/id/$username': typeof IdUsernameRoute
+  '/clubs/$id': typeof ClubsIdRoute
+  '/community/$id': typeof CommunityIdRoute
   '/e/$token': typeof ETokenRoute
+  '/id/$username': typeof IdUsernameRoute
+  '/clubs/': typeof ClubsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -159,8 +186,11 @@ export interface FileRouteTypes {
     | '/register'
     | '/rides'
     | '/trip-records'
-    | '/id/$username'
+    | '/clubs/$id'
+    | '/community/$id'
     | '/e/$token'
+    | '/id/$username'
+    | '/clubs/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -175,8 +205,11 @@ export interface FileRouteTypes {
     | '/register'
     | '/rides'
     | '/trip-records'
-    | '/id/$username'
+    | '/clubs/$id'
+    | '/community/$id'
     | '/e/$token'
+    | '/id/$username'
+    | '/clubs'
   id:
     | '__root__'
     | '/'
@@ -191,8 +224,11 @@ export interface FileRouteTypes {
     | '/register'
     | '/rides'
     | '/trip-records'
-    | '/id/$username'
+    | '/clubs/$id'
+    | '/community/$id'
     | '/e/$token'
+    | '/id/$username'
+    | '/clubs/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -208,8 +244,11 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   RidesRoute: typeof RidesRoute
   TripRecordsRoute: typeof TripRecordsRoute
-  IdUsernameRoute: typeof IdUsernameRoute
+  ClubsIdRoute: typeof ClubsIdRoute
+  CommunityIdRoute: typeof CommunityIdRoute
   ETokenRoute: typeof ETokenRoute
+  IdUsernameRoute: typeof IdUsernameRoute
+  ClubsIndexRoute: typeof ClubsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -298,11 +337,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TripRecordsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/id/$username': {
-      id: '/id/$username'
-      path: '/id/$username'
-      fullPath: '/id/$username'
-      preLoaderRoute: typeof IdUsernameRouteImport
+    '/clubs/': {
+      id: '/clubs/'
+      path: '/clubs'
+      fullPath: '/clubs/'
+      preLoaderRoute: typeof ClubsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clubs/$id': {
+      id: '/clubs/$id'
+      path: '/clubs/$id'
+      fullPath: '/clubs/$id'
+      preLoaderRoute: typeof ClubsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/community/$id': {
+      id: '/community/$id'
+      path: '/community/$id'
+      fullPath: '/community/$id'
+      preLoaderRoute: typeof CommunityIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/e/$token': {
@@ -310,6 +363,13 @@ declare module '@tanstack/react-router' {
       path: '/e/$token'
       fullPath: '/e/$token'
       preLoaderRoute: typeof ETokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/id/$username': {
+      id: '/id/$username'
+      path: '/id/$username'
+      fullPath: '/id/$username'
+      preLoaderRoute: typeof IdUsernameRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -328,8 +388,11 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   RidesRoute: RidesRoute,
   TripRecordsRoute: TripRecordsRoute,
-  IdUsernameRoute: IdUsernameRoute,
+  ClubsIdRoute: ClubsIdRoute,
+  CommunityIdRoute: CommunityIdRoute,
   ETokenRoute: ETokenRoute,
+  IdUsernameRoute: IdUsernameRoute,
+  ClubsIndexRoute: ClubsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

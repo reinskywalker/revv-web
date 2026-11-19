@@ -434,51 +434,17 @@ function AdminPage() {
           <button
             type="button"
             onClick={() => setNotice(null)}
-            className="hover:underline uppercase text-[10px]"
+            className="hover:underline uppercase text-xs font-semibold"
           >
             Dismiss
           </button>
         </div>
       )}
 
-      {/* Navigation Subtabs */}
-      {isSuperuser ? (
-        <div className="flex flex-wrap gap-2 border-b border-border/40 pb-4">
-          {(
-            [
-              ["overview", "Overview & Analytics", LayoutDashboard],
-              ["users", `Users & RBAC (${adminUsers.length})`, Users],
-              ["master", "Master Data", Database],
-              ["news", `News CMS (${adminNews.length})`, FileText],
-              ["broadcast", `Push Broadcast (${adminBroadcasts.length})`, Bell],
-              ["support", "Support Inbox", MessageSquare],
-              ["legal", "Privacy & Legal", Scale],
-              [
-                "maintenance",
-                isMaintenance ? "Maintenance (ACTIVE)" : "System Health",
-                isMaintenance ? AlertTriangle : Wrench,
-              ],
-            ] as const
-          ).map(([key, label, Icon]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => selectSubTab(key)}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 font-mono text-xs font-semibold uppercase tracking-wider transition-colors",
-                activeSubTab === key
-                  ? "border-primary bg-primary/20 text-primary shadow-sm"
-                  : "border-border/60 bg-secondary/30 text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
-              )}
-            >
-              <Icon className="size-3.5" />
-              {label}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 font-mono text-xs text-primary">
-          Moderator Access — Editorial News Management Only
+      {/* Active Section Banner (Sidebar-driven navigation) */}
+      {!isSuperuser && (
+        <div className="rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-medium text-primary">
+          Moderator Access — Editorial News Management
         </div>
       )}
 
@@ -670,7 +636,7 @@ function AdminPage() {
                       maxLength={500}
                       className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
                     />
-                    <p className="text-right font-mono text-[10px] text-muted-foreground">
+                    <p className="text-right text-xs text-foreground/75">
                       {broadcastBody.length} / 500
                     </p>
                   </div>
@@ -678,7 +644,7 @@ function AdminPage() {
                   <div className="space-y-2">
                     <label className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
                       <span>In-App Deep Link / Target Route</span>
-                      <span className="text-[10px] text-primary font-bold uppercase tracking-wider">
+                      <span className="text-xs text-primary font-bold uppercase tracking-wider">
                         Predefined Only
                       </span>
                     </label>
@@ -723,7 +689,7 @@ function AdminPage() {
                         </optgroup>
                       )}
                     </select>
-                    <p className="font-mono text-[11px] text-muted-foreground flex items-center justify-between pt-0.5">
+                    <p className="text-sm text-foreground/75 flex items-center justify-between pt-0.5">
                       <span>Selected Route Target:</span>
                       <code className="text-primary font-bold">
                         {broadcastDeepLink || "notifications"}
@@ -802,11 +768,11 @@ function AdminPage() {
                     <div className="flex items-center justify-between border-b border-white/5 pb-2">
                       <div className="flex items-center gap-1.5">
                         <Smartphone className="size-3 text-muted-foreground" />
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-foreground/80">
                           REVV Mobile Push · now
                         </span>
                       </div>
-                      <span className="font-mono text-[10px] text-muted-foreground">12:30</span>
+                      <span className="text-xs text-foreground/75">12:30</span>
                     </div>
 
                     <div className="mt-3 flex items-start gap-3">
@@ -816,14 +782,14 @@ function AdminPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-xs text-white">REVV Motorsport</span>
-                          <span className="font-mono text-[9px] text-primary uppercase">
+                          <span className="text-xs font-semibold text-primary uppercase">
                             {broadcastTargetType === "all" ? "BROADCAST" : "TARGETED"}
                           </span>
                         </div>
                         <h5 className="mt-0.5 font-bold text-xs text-white line-clamp-1">
                           {broadcastTitle.trim() || "Notification Title Here"}
                         </h5>
-                        <p className="mt-0.5 text-[11px] leading-tight text-white/70 line-clamp-2">
+                        <p className="mt-0.5 text-xs leading-snug text-foreground/90 line-clamp-2">
                           {broadcastBody.trim() ||
                             "Message content will appear here as received on Android or iOS push notification tray."}
                         </p>
@@ -852,14 +818,14 @@ function AdminPage() {
                       >
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <span className="rounded bg-primary/20 px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-primary">
+                            <span className="rounded bg-primary/20 px-2 py-0.5 text-xs font-bold uppercase text-primary">
                               {b.target_type}
                             </span>
                             <h5 className="font-bold text-sm text-foreground">{b.title}</h5>
                           </div>
                           <p className="text-xs text-muted-foreground line-clamp-1">{b.body}</p>
                         </div>
-                        <div className="font-mono text-[11px] text-muted-foreground text-right">
+                        <div className="text-sm text-foreground/75 text-right">
                           <span>Targets: {b.sent_count} devices</span>
                           <br />
                           <span>{new Date(b.created_at).toLocaleString()}</span>
@@ -900,7 +866,7 @@ function AdminPage() {
                       <span className="font-mono text-xs font-bold uppercase tracking-wider text-foreground block">
                         Enable Maintenance Mode
                       </span>
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-sm text-foreground/75">
                         Toggle to immediately gate user access across Android, iOS, and Web.
                       </span>
                     </div>
@@ -1013,7 +979,7 @@ function AdminPage() {
 
                   {/* Metadata info */}
                   {systemStatus?.updated_at && (
-                    <p className="font-mono text-[10px] text-muted-foreground text-center">
+                    <p className="text-xs text-foreground/75 text-center">
                       Last updated: {new Date(systemStatus.updated_at).toLocaleString()}
                     </p>
                   )}
@@ -1035,7 +1001,7 @@ function AdminPage() {
                   {/* Simulated Mobile Screen */}
                   <div className="mx-auto w-full max-w-xs rounded-[28px] border-2 border-border/80 bg-[#0B0F14] p-5 shadow-2xl space-y-6 text-center my-auto">
                     {/* Status Bar */}
-                    <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground px-1">
+                    <div className="flex items-center justify-between text-xs text-foreground/75 px-1">
                       <span>09:41</span>
                       <div className="flex items-center gap-1">
                         <span>5G</span>
@@ -1048,7 +1014,7 @@ function AdminPage() {
                       <span className="font-display font-black tracking-widest text-lg text-primary">
                         REVV
                       </span>
-                      <p className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-foreground/80">
                         Digital Cockpit
                       </p>
                     </div>
@@ -1073,7 +1039,7 @@ function AdminPage() {
                       <h5 className="font-display text-sm font-black uppercase tracking-tight text-white">
                         {statusTitle.trim() || "Under Scheduled Maintenance"}
                       </h5>
-                      <p className="text-[11px] leading-relaxed text-white/70 line-clamp-4">
+                      <p className="text-sm leading-relaxed text-foreground/90 line-clamp-4">
                         {statusMessage.trim() ||
                           "We are performing scheduled maintenance and performance upgrades on REVV servers."}
                       </p>
@@ -1084,13 +1050,13 @@ function AdminPage() {
                       <div className="rounded-xl bg-primary/20 border border-primary/50 py-2.5 text-center text-xs font-bold text-primary font-mono uppercase">
                         Refresh Status
                       </div>
-                      <div className="rounded-xl border border-border/40 py-2 text-center text-[10px] text-muted-foreground font-mono">
+                      <div className="rounded-xl border border-border/40 py-2 text-center text-xs text-foreground/75">
                         Administrator Access
                       </div>
                     </div>
                   </div>
 
-                  <p className="text-center font-mono text-[10px] text-muted-foreground">
+                  <p className="text-center text-xs text-foreground/75">
                     Status endpoint: <code className="text-primary font-bold">GET /health</code> &{" "}
                     <code className="text-primary font-bold">GET /api/v1/health</code>
                   </p>
@@ -1264,7 +1230,7 @@ function NewsCmsTab({
           <button
             type="button"
             onClick={resetForm}
-            className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 font-mono text-[11px] font-bold uppercase text-primary-foreground"
+            className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-bold uppercase text-primary-foreground"
           >
             <FilePlus2 className="size-3.5" />
             New
@@ -1288,14 +1254,14 @@ function NewsCmsTab({
                 )}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <span className="rounded bg-secondary px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-primary">
+                  <span className="rounded bg-secondary px-2 py-0.5 text-xs font-bold uppercase text-primary">
                     {item.category}
                   </span>
                   <div className="flex items-center gap-1">
                     {item.high_importance && (
                       <span
                         title="High Importance Push Sent"
-                        className="rounded bg-primary/20 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary"
+                        className="rounded bg-primary/20 px-1.5 py-0.5 text-xs font-bold text-primary"
                       >
                         PUSH
                       </span>
@@ -1672,7 +1638,7 @@ function SupportInboxTab({ onNotice }: { onNotice: (msg: string | null) => void 
 
               {t.device_info && Object.keys(t.device_info).length > 0 && (
                 <div className="rounded-lg border border-border/60 bg-secondary/20 px-3.5 py-2.5 text-xs">
-                  <span className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-wider text-primary">
+                  <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-primary">
                     Device Diagnostics
                   </span>
                   <div className="grid gap-1.5 text-muted-foreground sm:grid-cols-4">
@@ -1722,7 +1688,7 @@ function SupportInboxTab({ onNotice }: { onNotice: (msg: string | null) => void 
                         <div className="mb-1 flex items-center justify-between gap-2">
                           <span
                             className={cn(
-                              "font-mono text-[11px] font-bold uppercase",
+                              "text-xs font-bold uppercase",
                               isAdmin ? "text-emerald-400" : "text-primary",
                             )}
                           >
@@ -1730,7 +1696,7 @@ function SupportInboxTab({ onNotice }: { onNotice: (msg: string | null) => void 
                               ? m.sender_name || "Support Team (Admin)"
                               : m.sender_name || t.reporter_name}
                           </span>
-                          <span className="font-mono text-[11px] text-muted-foreground">
+                          <span className="text-sm text-foreground/75">
                             {new Date(m.created_at).toLocaleString()}
                           </span>
                         </div>
@@ -1747,7 +1713,7 @@ function SupportInboxTab({ onNotice }: { onNotice: (msg: string | null) => void 
 
                   {t.admin_reply && (
                     <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-sm text-foreground">
-                      <span className="block font-mono text-[11px] font-bold uppercase text-emerald-400">
+                      <span className="block text-xs font-bold uppercase text-emerald-400">
                         Admin Reply Sent
                       </span>
                       <p className="mt-1">{t.admin_reply}</p>

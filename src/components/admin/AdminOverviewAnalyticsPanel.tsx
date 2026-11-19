@@ -45,13 +45,13 @@ function KpiCard({
   return (
     <div className="hud-card p-5 space-y-2">
       <div className="flex items-center justify-between text-muted-foreground">
-        <span className="font-mono text-[11px] uppercase tracking-wider">{label}</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-foreground/80">{label}</span>
         {icon}
       </div>
       <div className={`font-display text-2xl sm:text-3xl font-black ${accent || "text-foreground"}`}>
         {value}
       </div>
-      <div className="font-mono text-[11px] text-muted-foreground truncate">{sub}</div>
+      <div className="text-sm text-foreground/75 truncate">{sub}</div>
     </div>
   );
 }
@@ -120,7 +120,7 @@ export function AdminOverviewAnalyticsPanel({
             ["Components", adminStats.total_master_components ?? adminStats.master_components_count ?? 0],
           ].map(([title, value]) => (
             <div key={String(title)} className="hud-card p-4">
-              <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <p className="text-xs font-semibold uppercase tracking-wider text-foreground/80">
                 {title}
               </p>
               <p className="font-display mt-1.5 text-2xl font-black text-primary">{value}</p>
@@ -183,7 +183,7 @@ export function AdminOverviewAnalyticsPanel({
                     <BarChart3 className="size-4 text-primary" />
                     14-Day Distance &amp; Active Riders
                   </h3>
-                  <p className="font-mono text-[11px] text-muted-foreground">
+                  <p className="text-sm text-foreground/75">
                     Daily ride kilometers aggregated from telemetry
                   </p>
                 </div>
@@ -193,7 +193,7 @@ export function AdminOverviewAnalyticsPanel({
                   const pct = Math.max(4, Math.round((d.distance_km / maxDailyKm) * 100));
                   return (
                     <div key={d.day} className="flex-1 flex flex-col items-center gap-1 group">
-                      <span className="font-mono text-[9px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-xs text-foreground/75 opacity-0 group-hover:opacity-100 transition-opacity">
                         {d.distance_km.toFixed(0)}
                       </span>
                       <div className="w-full bg-secondary/40 rounded-t-md h-32 flex items-end overflow-hidden">
@@ -203,7 +203,7 @@ export function AdminOverviewAnalyticsPanel({
                           title={`${d.day}: ${d.distance_km} km · ${d.trips_count} trips`}
                         />
                       </div>
-                      <span className="font-mono text-[9px] text-muted-foreground">
+                      <span className="text-xs text-foreground/75">
                         {d.day.slice(8)}
                       </span>
                     </div>
@@ -219,7 +219,7 @@ export function AdminOverviewAnalyticsPanel({
                   <Compass className="size-4 text-sky-400" />
                   Trip Distance Distribution
                 </h3>
-                <p className="font-mono text-[11px] text-muted-foreground">
+                <p className="text-sm text-foreground/75">
                   Segmentation of completed trips across distance brackets
                 </p>
               </div>
@@ -253,7 +253,7 @@ export function AdminOverviewAnalyticsPanel({
                   <Clock className="size-4 text-amber-400" />
                   24-Hour Riding Activity (WIB / GMT+7)
                 </h3>
-                <p className="font-mono text-[11px] text-muted-foreground">
+                <p className="text-sm text-foreground/75">
                   Peak sunmori &amp; commuting departure hours
                 </p>
               </div>
@@ -270,11 +270,11 @@ export function AdminOverviewAnalyticsPanel({
                         />
                       </div>
                       {h.hour_wib % 4 === 0 ? (
-                        <span className="font-mono text-[9px] text-muted-foreground">
+                        <span className="text-xs text-foreground/75">
                           {String(h.hour_wib).padStart(2, "0")}
                         </span>
                       ) : (
-                        <span className="font-mono text-[9px] text-transparent">·</span>
+                        <span className="text-xs text-transparent">·</span>
                       )}
                     </div>
                   );
@@ -288,7 +288,7 @@ export function AdminOverviewAnalyticsPanel({
                 <h3 className="font-display text-sm font-black uppercase tracking-wider">
                   Top Motorcycle Brands in Garage
                 </h3>
-                <p className="font-mono text-[11px] text-muted-foreground">
+                <p className="text-sm text-foreground/75">
                   Distribution across registered rider garages
                 </p>
               </div>
@@ -320,7 +320,7 @@ export function AdminOverviewAnalyticsPanel({
                 <h3 className="font-display text-base font-black uppercase tracking-wider">
                   User Login &amp; Activity Telemetry
                 </h3>
-                <p className="font-mono text-[11px] text-muted-foreground">
+                <p className="text-sm text-foreground/75">
                   15-min throttled backend activity &amp; 6-hour mobile telemetry ping
                 </p>
               </div>
@@ -351,7 +351,7 @@ export function AdminOverviewAnalyticsPanel({
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-border/70 font-mono text-[10px] uppercase text-muted-foreground">
+                <thead className="border-b border-border/70 text-xs font-semibold uppercase tracking-wide text-foreground/80">
                   <tr>
                     <th className="py-2.5 pr-3">Rider</th>
                     <th className="py-2.5 px-3">Last Active</th>
@@ -367,23 +367,23 @@ export function AdminOverviewAnalyticsPanel({
                     <tr key={u.id} className="hover:bg-secondary/20">
                       <td className="py-2.5 pr-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="size-7 rounded-full bg-primary/15 text-primary font-mono text-[10px] font-bold flex items-center justify-center shrink-0">
+                          <div className="size-7 rounded-full bg-primary/15 text-primary text-xs font-bold flex items-center justify-center shrink-0">
                             {u.username.charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0">
                             <div className="font-bold text-foreground truncate max-w-[160px]">
                               {u.display_name}
                             </div>
-                            <div className="font-mono text-[10px] text-muted-foreground">
+                            <div className="text-xs text-foreground/75">
                               @{u.username}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="py-2.5 px-3 font-mono text-[11px]">
+                      <td className="py-2.5 px-3 text-sm">
                         {formatShortDate(u.last_active_at)}
                       </td>
-                      <td className="py-2.5 px-3 font-mono text-[11px] text-muted-foreground">
+                      <td className="py-2.5 px-3 text-sm text-foreground/75">
                         {formatShortDate(u.last_login_at)}
                       </td>
                       <td className="py-2.5 px-3 font-mono text-right font-semibold">
@@ -392,7 +392,7 @@ export function AdminOverviewAnalyticsPanel({
                       <td className="py-2.5 px-3 font-mono text-right text-muted-foreground">
                         {u.session_count}
                       </td>
-                      <td className="py-2.5 px-3 font-mono text-[11px]">
+                      <td className="py-2.5 px-3 text-sm">
                         <span className="uppercase">{u.last_platform || "—"}</span>
                         {u.last_app_version ? ` v${u.last_app_version}` : ""}
                         {u.last_device_model ? ` · ${u.last_device_model}` : ""}

@@ -21,6 +21,9 @@ import {
   Menu,
   MessageSquare,
   Newspaper,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Scale,
   Settings,
   ShieldCheck,
   Sliders,
@@ -60,9 +63,27 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     admin: true,
     "admin-master": false,
   });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuth();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (localStorage.getItem("revv_sidebar_collapsed") === "true") {
+      setSidebarCollapsed(true);
+    }
+  }, []);
+
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("revv_sidebar_collapsed", next ? "true" : "false");
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -267,10 +288,17 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
         },
         {
           id: "admin-support",
-          label: "Support & Legal",
+          label: "Support Inbox",
           to: "/admin",
           search: { tab: "support" },
           icon: LifeBuoy,
+        },
+        {
+          id: "admin-legal",
+          label: "Privacy & Legal",
+          to: "/admin",
+          search: { tab: "legal" },
+          icon: Scale,
         },
         {
           id: "admin-health",
@@ -309,6 +337,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
       icon: Wrench,
       items: [
         { id: "garage", label: "Digital Garage", to: "/garage", icon: Wrench },
+        { id: "clubs", label: "Clubs", to: "/clubs", icon: Users },
         { id: "leaderboard", label: "Leaderboard", to: "/leaderboard", icon: Trophy },
         { id: "news", label: "News", to: "/news", icon: FileText },
         { id: "profile", label: "My Profile", to: myProfilePath, icon: User },
@@ -336,7 +365,6 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     if (item.to === "/admin") {
       if (currentPath !== "/admin") return false;
       const targetTab = item.search?.["tab"] ?? "overview";
-      if (targetTab === "support" && currentTab === "legal") return true;
       if ((currentTab ?? "overview") !== targetTab) return false;
       if (item.search?.["sub"]) {
         return (currentSub ?? "brands") === item.search["sub"];
@@ -350,117 +378,168 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     setExpandedGroups((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const renderNavTree = (onNavigate?: () => void) => (
-    <div className="space-y-3">
-      {navGroups.map((group) => {
-        const GroupIcon = group.icon;
-        const isGroupOpen = expandedGroups[group.id] ?? true;
-        return (
-          <div key={group.id} className="space-y-1">
-            <button
-              type="button"
-              onClick={() => toggleGroup(group.id)}
-              className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-[11px] font-mono font-bold uppercase tracking-wider text-muted-foreground hover:bg-secondary/30 hover:text-foreground transition"
-            >
-              <span className="flex items-center gap-2">
-                <GroupIcon className="size-3.5 text-primary/80" />
-                <span>{group.label}</span>
-              </span>
-              {isGroupOpen ? (
-                <ChevronDown className="size-3.5" />
-              ) : (
-                <ChevronRight className="size-3.5" />
-              )}
-            </button>
+  const renderNavTree = (onNavigate?: () => void, collapsed = false) => {
+    if (collapsed) {
+      const flatItems: NavLeafItem[] = navGroups.flatMap((group) =>
+        group.items.flatMap((item): NavLeafItem[] => {
+          const firstChild = item.children?.[0];
+          if (firstChild) {
+            return [
+              {
+                id: item.id,
+                label: item.label,
+                to: firstChild.to ?? "/admin",
+                ...(firstChild.search ? { search: firstChild.search } : {}),
+                icon: item.icon,
+              },
+            ];
+          }
+          return [item];
+        }),
+      );
+      return (
+        <div className="space-y-1.5">
+          {flatItems.map((item) => {
+            const Icon = item.icon;
+            const active =
+              item.id === "admin-master"
+                ? currentPath === "/admin" && currentTab === "master"
+                : isLeafActive(item);
+            return (
+              <Link
+                key={item.id}
+                to={item.to ?? "/"}
+                search={item.search as never}
+                onClick={onNavigate}
+                title={item.label}
+                aria-label={item.label}
+                className={cn(
+                  "mx-auto flex h-11 w-11 items-center justify-center rounded-xl transition-all",
+                  active
+                    ? "bg-primary/20 text-primary border border-primary/40 shadow-sm"
+                    : "text-foreground/75 hover:bg-secondary/50 hover:text-foreground",
+                )}
+              >
+                <Icon className="size-5 shrink-0" />
+              </Link>
+            );
+          })}
+        </div>
+      );
+    }
 
-            {isGroupOpen && (
-              <div className="space-y-1 pl-1.5 border-l border-border/50 ml-3">
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  if (item.children && item.children.length > 0) {
-                    const isSubOpen = expandedGroups[item.id] ?? currentTab === "master";
+    return (
+      <div className="space-y-4">
+        {navGroups.map((group) => {
+          const GroupIcon = group.icon;
+          const isGroupOpen = expandedGroups[group.id] ?? true;
+          return (
+            <div key={group.id} className="space-y-1">
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.id)}
+                className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-xs font-semibold uppercase tracking-wider text-foreground/75 hover:bg-secondary/40 hover:text-foreground transition"
+              >
+                <span className="flex items-center gap-2">
+                  <GroupIcon className="size-4 text-primary" />
+                  <span>{group.label}</span>
+                </span>
+                {isGroupOpen ? (
+                  <ChevronDown className="size-4" />
+                ) : (
+                  <ChevronRight className="size-4" />
+                )}
+              </button>
+
+              {isGroupOpen && (
+                <div className="space-y-1 pl-2 border-l border-border/60 ml-3">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    if (item.children && item.children.length > 0) {
+                      const isSubOpen = expandedGroups[item.id] ?? currentTab === "master";
+                      return (
+                        <div key={item.id} className="space-y-1">
+                          <button
+                            type="button"
+                            onClick={() => toggleGroup(item.id)}
+                            className={cn(
+                              "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-all",
+                              currentPath === "/admin" && currentTab === "master"
+                                ? "bg-primary/15 text-primary border border-primary/30"
+                                : "text-foreground/85 hover:bg-secondary/40 hover:text-foreground",
+                            )}
+                          >
+                            <span className="flex items-center gap-2.5">
+                              <Icon className="size-4 shrink-0" />
+                              <span>{item.label}</span>
+                            </span>
+                            {isSubOpen ? (
+                              <ChevronDown className="size-4" />
+                            ) : (
+                              <ChevronRight className="size-4" />
+                            )}
+                          </button>
+                          {isSubOpen && (
+                            <div className="space-y-1 pl-2.5 ml-3 border-l border-border/60">
+                              {item.children.map((sub) => {
+                                const SubIcon = sub.icon;
+                                const subActive = isLeafActive(sub);
+                                return (
+                                  <Link
+                                    key={sub.id}
+                                    to={sub.to ?? "/admin"}
+                                    search={sub.search as never}
+                                    onClick={onNavigate}
+                                    className={cn(
+                                      "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                                      subActive
+                                        ? "bg-primary/20 text-primary border border-primary/40 font-semibold"
+                                        : "text-foreground/80 hover:bg-secondary/40 hover:text-foreground",
+                                    )}
+                                  >
+                                    <SubIcon className="size-3.5 shrink-0" />
+                                    <span className="truncate">{sub.label}</span>
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    const active = isLeafActive(item);
                     return (
-                      <div key={item.id} className="space-y-1">
-                        <button
-                          type="button"
-                          onClick={() => toggleGroup(item.id)}
-                          className={cn(
-                            "flex w-full items-center justify-between rounded-lg px-3 py-2 font-display text-xs font-bold uppercase tracking-wider transition-all",
-                            currentPath === "/admin" && currentTab === "master"
-                              ? "bg-primary/15 text-primary border border-primary/30"
-                              : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground",
-                          )}
-                        >
-                          <span className="flex items-center gap-2.5">
-                            <Icon className="size-3.5 shrink-0" />
-                            <span>{item.label}</span>
-                          </span>
-                          {isSubOpen ? (
-                            <ChevronDown className="size-3.5" />
-                          ) : (
-                            <ChevronRight className="size-3.5" />
-                          )}
-                        </button>
-                        {isSubOpen && (
-                          <div className="space-y-0.5 pl-2.5 ml-3 border-l border-border/50">
-                            {item.children.map((sub) => {
-                              const SubIcon = sub.icon;
-                              const subActive = isLeafActive(sub);
-                              return (
-                                <Link
-                                  key={sub.id}
-                                  to={sub.to ?? "/admin"}
-                                  search={sub.search as never}
-                                  onClick={onNavigate}
-                                  className={cn(
-                                    "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-mono text-[11px] font-semibold transition-all",
-                                    subActive
-                                      ? "bg-primary/20 text-primary border border-primary/40"
-                                      : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground",
-                                  )}
-                                >
-                                  <SubIcon className="size-3 shrink-0" />
-                                  <span className="truncate">{sub.label}</span>
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  const active = isLeafActive(item);
-                  return (
-                    <Link
-                      key={item.id}
-                      to={item.to ?? "/"}
-                      search={item.search as never}
-                      onClick={onNavigate}
-                      className={cn(
-                        "flex items-center gap-2.5 rounded-lg px-3 py-2 font-display text-xs font-bold uppercase tracking-wider transition-all",
-                        active
-                          ? "bg-primary/20 text-primary border border-primary/40 shadow-sm"
-                          : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground",
-                      )}
-                    >
-                      <Icon
+                      <Link
+                        key={item.id}
+                        to={item.to ?? "/"}
+                        search={item.search as never}
+                        onClick={onNavigate}
                         className={cn(
-                          "size-3.5 shrink-0",
-                          active ? "text-primary" : "text-muted-foreground",
+                          "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                          active
+                            ? "bg-primary/20 text-primary border border-primary/40 font-semibold shadow-sm"
+                            : "text-foreground/85 hover:bg-secondary/40 hover:text-foreground",
                         )}
-                      />
-                      <span className="truncate">{item.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
+                      >
+                        <Icon
+                          className={cn(
+                            "size-4 shrink-0",
+                            active ? "text-primary" : "text-muted-foreground",
+                          )}
+                        />
+                        <span className="truncate">{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   const isDashboardPage =
     currentPath.startsWith("/id") ||
@@ -621,50 +700,105 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
       )}
 
       {/* Desktop Persistent Left Navigation Sidebar */}
-      <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-border/80 bg-card/60 backdrop-blur-xl h-screen sticky top-0 z-30">
-        {/* Brand Header */}
-        <div className="flex flex-col gap-1.5 p-6 border-b border-border/60">
-          <Link to="/" className="inline-block transition-opacity hover:opacity-85">
-            <Wordmark className="text-2xl" />
-          </Link>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
-              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Rider Cockpit
-            </span>
-            <span className="font-mono text-[10px] text-muted-foreground">v1.0.1</span>
+      <aside
+        className={cn(
+          "hidden md:flex shrink-0 flex-col border-r border-border/80 bg-card/60 backdrop-blur-xl h-screen sticky top-0 z-30 transition-[width] duration-200",
+          sidebarCollapsed ? "w-[72px]" : "w-64",
+        )}
+      >
+        {/* Brand Header & Collapse Toggle */}
+        <div
+          className={cn(
+            "flex border-b border-border/60",
+            sidebarCollapsed ? "flex-col items-center gap-3 p-3" : "flex-col gap-2 p-5",
+          )}
+        >
+          <div className="flex w-full items-center justify-between gap-2">
+            {!sidebarCollapsed ? (
+              <Link to="/" className="inline-block transition-opacity hover:opacity-85">
+                <Wordmark className="text-2xl" />
+              </Link>
+            ) : (
+              <Link
+                to="/"
+                title="REVV Home"
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 font-display text-sm font-black text-primary"
+              >
+                R
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={toggleSidebarCollapsed}
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-background/60 text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen className="size-4" />
+              ) : (
+                <PanelLeftClose className="size-4" />
+              )}
+            </button>
           </div>
+          {!sidebarCollapsed && (
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-400">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Rider Cockpit
+              </span>
+              <span className="text-xs text-muted-foreground">v1.0.1</span>
+            </div>
+          )}
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex-1 space-y-2 px-3 py-5 overflow-y-auto">
-          {renderNavTree()}
-          <button
-            type="button"
-            onClick={() => setNotifOpen(true)}
-            className="flex w-full items-center justify-between rounded-lg px-3.5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-muted-foreground transition-all hover:bg-secondary/40 hover:text-foreground"
-          >
-            <span className="flex items-center gap-3">
-              <Bell className="size-4 shrink-0 text-muted-foreground" />
-              <span>Notifications</span>
-            </span>
-            {unreadCount > 0 && (
-              <span className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-primary px-1.5 py-0.5 font-mono text-[10px] font-black text-primary-foreground">
-                {unreadCount}
+        <nav className="flex-1 space-y-2 px-2.5 py-4 overflow-y-auto">
+          {renderNavTree(undefined, sidebarCollapsed)}
+          {sidebarCollapsed ? (
+            <button
+              type="button"
+              onClick={() => setNotifOpen(true)}
+              title="Notifications"
+              aria-label="Notifications"
+              className="relative mx-auto flex h-11 w-11 items-center justify-center rounded-xl text-foreground/75 transition-all hover:bg-secondary/50 hover:text-foreground"
+            >
+              <Bell className="size-5 shrink-0" />
+              {unreadCount > 0 && (
+                <span className="absolute right-1.5 top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setNotifOpen(true)}
+              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-foreground/85 transition-all hover:bg-secondary/40 hover:text-foreground"
+            >
+              <span className="flex items-center gap-2.5">
+                <Bell className="size-4 shrink-0 text-muted-foreground" />
+                <span>Notifications</span>
               </span>
-            )}
-          </button>
+              {unreadCount > 0 && (
+                <span className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs font-bold text-primary-foreground">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          )}
         </nav>
 
         {/* Bottom Profile / Session Card */}
-        <div className="border-t border-border/60 p-4 bg-secondary/10">
+        <div className="border-t border-border/60 p-3 bg-secondary/10">
           {isAuthenticated && user ? (
-            <div className="space-y-3">
-              <Link
-                to={myProfilePath}
-                className="group flex items-center gap-3 rounded-lg p-2 transition hover:bg-secondary/40"
-              >
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/20 font-bold text-primary font-display text-sm overflow-hidden">
+            sidebarCollapsed ? (
+              <div className="flex flex-col items-center gap-2">
+                <Link
+                  to={myProfilePath}
+                  title={`@${user.username}`}
+                  className="flex size-10 items-center justify-center rounded-lg bg-primary/20 font-bold text-primary font-display text-sm overflow-hidden hover:ring-2 hover:ring-primary/50"
+                >
                   {userAvatarSrc ? (
                     <img
                       src={userAvatarSrc}
@@ -677,41 +811,72 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
                   ) : (
                     user.username?.charAt(0).toUpperCase() || "R"
                   )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-display text-xs font-bold group-hover:text-primary transition-colors">
-                    {user.first_name || user.username}
+                </Link>
+                <button
+                  type="button"
+                  onClick={logout}
+                  title="Sign Out"
+                  aria-label="Sign Out"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-secondary/30 text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <LogOut className="size-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <Link
+                  to={myProfilePath}
+                  className="group flex items-center gap-3 rounded-lg p-2 transition hover:bg-secondary/40"
+                >
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/20 font-bold text-primary font-display text-sm overflow-hidden">
+                    {userAvatarSrc ? (
+                      <img
+                        src={userAvatarSrc}
+                        alt={user.username ?? "Rider"}
+                        className="size-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      user.username?.charAt(0).toUpperCase() || "R"
+                    )}
                   </div>
-                  <div className="flex items-center gap-1 truncate font-mono text-[11px] text-muted-foreground">
-                    <span>@{user.username}</span>
-                    {isAdministrator && <ShieldCheck className="size-3 text-primary inline" />}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-bold group-hover:text-primary transition-colors">
+                      {user.first_name || user.username}
+                    </div>
+                    <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                      <span>@{user.username}</span>
+                      {isAdministrator && <ShieldCheck className="size-3.5 text-primary inline" />}
+                    </div>
                   </div>
-                </div>
-              </Link>
+                </Link>
 
-              <button
-                type="button"
-                onClick={logout}
-                className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-lg border border-border bg-secondary/30 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-              >
-                <LogOut className="size-3.5" />
-                Sign Out
-              </button>
-              <Link
-                to="/privacy"
-                className="block text-center font-mono text-[11px] uppercase tracking-wider text-muted-foreground/80 hover:text-primary"
-              >
-                Privacy &amp; Legal
-              </Link>
-            </div>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="flex w-full min-h-[42px] items-center justify-center gap-2 rounded-lg border border-border bg-secondary/30 py-2 text-sm font-medium text-foreground/85 transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <LogOut className="size-4" />
+                  Sign Out
+                </button>
+                <Link
+                  to="/privacy"
+                  className="block text-center text-xs font-medium text-muted-foreground hover:text-primary"
+                >
+                  Privacy &amp; Legal
+                </Link>
+              </div>
+            )
           ) : (
             <div className="space-y-2">
               <Link
                 to="/login"
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 font-display text-xs font-bold uppercase tracking-wide text-primary-foreground shadow transition hover:bg-primary/90"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow transition hover:bg-primary/90"
               >
-                <LogIn className="size-3.5" />
-                Sign In
+                <LogIn className="size-4" />
+                {!sidebarCollapsed && <span>Sign In</span>}
               </Link>
             </div>
           )}

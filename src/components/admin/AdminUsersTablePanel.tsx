@@ -119,7 +119,7 @@ export function AdminUsersTablePanel({
           <h3 className="font-display text-lg font-black uppercase tracking-tight">
             Users &amp; RBAC Directory ({filteredUsers.length} / {users.length})
           </h3>
-          <p className="font-mono text-[11px] text-muted-foreground">
+          <p className="text-sm text-foreground/75">
             Click any rider row to view full details, edit profile, check username uniqueness, or
             update RBAC role.
           </p>
@@ -151,7 +151,7 @@ export function AdminUsersTablePanel({
 
       <div className="hud-card overflow-x-auto">
         <table className="w-full text-left text-xs">
-          <thead className="border-b border-border/70 bg-secondary/20 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <thead className="border-b border-border/70 bg-secondary/20 text-xs font-semibold uppercase tracking-wider text-foreground/80">
             <tr>
               <th className="py-3 px-4">Rider</th>
               <th className="py-3 px-3">Username / NoReg</th>
@@ -203,7 +203,7 @@ export function AdminUsersTablePanel({
                           <span>{fullName}</span>
                           {isSelf && <ShieldCheck className="size-3.5 text-primary shrink-0" />}
                         </div>
-                        <div className="font-mono text-[10px] text-muted-foreground truncate max-w-[160px]">
+                        <div className="text-xs text-foreground/75 truncate max-w-[160px]">
                           {u.id.slice(0, 8)}…
                         </div>
                       </div>
@@ -214,25 +214,25 @@ export function AdminUsersTablePanel({
                       @{u.username || "—"}
                     </div>
                     {u.noreg && (
-                      <div className="text-[10px] text-primary">{u.noreg}</div>
+                      <div className="text-xs font-medium text-primary">{u.noreg}</div>
                     )}
                   </td>
-                  <td className="py-3 px-3 font-mono text-[11px]">
+                  <td className="py-3 px-3 text-sm">
                     <div className="truncate max-w-[180px]">{u.email || "—"}</div>
                     <div className="text-muted-foreground">{u.phone || "—"}</div>
                   </td>
-                  <td className="py-3 px-3 font-mono text-[11px] text-muted-foreground">
+                  <td className="py-3 px-3 text-sm text-foreground/75">
                     {[u.city, u.country].filter(Boolean).join(", ") || "—"}
                   </td>
                   <td className="py-3 px-3">
-                    <span className="rounded border border-border bg-secondary/60 px-2 py-0.5 font-mono text-[10px] font-bold uppercase">
+                    <span className="rounded border border-border bg-secondary/60 px-2 py-0.5 text-xs font-bold uppercase">
                       {u.role}
                     </span>
                   </td>
                   <td className="py-3 px-3">
                     <span
                       className={cn(
-                        "rounded px-2 py-0.5 font-mono text-[10px] font-bold uppercase",
+                        "rounded px-2 py-0.5 text-xs font-bold uppercase",
                         u.status === "Active"
                           ? "bg-emerald-500/20 text-emerald-400"
                           : "bg-destructive/20 text-destructive",
@@ -241,7 +241,7 @@ export function AdminUsersTablePanel({
                       {u.status}
                     </span>
                   </td>
-                  <td className="py-3 px-3 font-mono text-[11px] text-muted-foreground">
+                  <td className="py-3 px-3 text-sm text-foreground/75">
                     {new Date(u.created_at).toLocaleDateString()}
                   </td>
                   <td
@@ -252,7 +252,7 @@ export function AdminUsersTablePanel({
                       <button
                         type="button"
                         onClick={() => openEditModal(u)}
-                        className="inline-flex items-center gap-1 rounded border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-[11px] font-semibold text-primary hover:bg-primary/20"
+                        className="inline-flex items-center gap-1 rounded border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20"
                       >
                         <Pencil className="size-3" />
                         Edit
@@ -291,7 +291,7 @@ export function AdminUsersTablePanel({
                 <h4 className="font-display text-lg font-black uppercase">
                   Edit Rider Profile &amp; RBAC
                 </h4>
-                <p className="font-mono text-[11px] text-muted-foreground">
+                <p className="text-sm text-foreground/75">
                   ID: {editingUser.id}
                 </p>
               </div>
@@ -313,7 +313,7 @@ export function AdminUsersTablePanel({
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <label className="font-mono text-[11px] uppercase text-muted-foreground">
+                  <label className="text-sm font-medium text-foreground/85">
                     Username (Unique)
                   </label>
                   <input
@@ -325,7 +325,7 @@ export function AdminUsersTablePanel({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-mono text-[11px] uppercase text-muted-foreground">
+                  <label className="text-sm font-medium text-foreground/85">
                     Email
                   </label>
                   <input
@@ -336,7 +336,7 @@ export function AdminUsersTablePanel({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-mono text-[11px] uppercase text-muted-foreground">
+                  <label className="text-sm font-medium text-foreground/85">
                     First Name
                   </label>
                   <input
@@ -347,7 +347,7 @@ export function AdminUsersTablePanel({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-mono text-[11px] uppercase text-muted-foreground">
+                  <label className="text-sm font-medium text-foreground/85">
                     Middle Name
                   </label>
                   <input
@@ -358,7 +358,7 @@ export function AdminUsersTablePanel({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-mono text-[11px] uppercase text-muted-foreground">
+                  <label className="text-sm font-medium text-foreground/85">
                     Last Name
                   </label>
                   <input
@@ -369,7 +369,7 @@ export function AdminUsersTablePanel({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-mono text-[11px] uppercase text-muted-foreground">
+                  <label className="text-sm font-medium text-foreground/85">
                     Phone
                   </label>
                   <input
@@ -380,7 +380,7 @@ export function AdminUsersTablePanel({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-mono text-[11px] uppercase text-muted-foreground">
+                  <label className="text-sm font-medium text-foreground/85">
                     City
                   </label>
                   <input
@@ -391,7 +391,7 @@ export function AdminUsersTablePanel({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-mono text-[11px] uppercase text-muted-foreground">
+                  <label className="text-sm font-medium text-foreground/85">
                     Country
                   </label>
                   <input
@@ -402,7 +402,7 @@ export function AdminUsersTablePanel({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-mono text-[11px] uppercase text-muted-foreground">
+                  <label className="text-sm font-medium text-foreground/85">
                     Role
                   </label>
                   <select
@@ -417,7 +417,7 @@ export function AdminUsersTablePanel({
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="font-mono text-[11px] uppercase text-muted-foreground">
+                  <label className="text-sm font-medium text-foreground/85">
                     Status
                   </label>
                   <select
@@ -433,7 +433,7 @@ export function AdminUsersTablePanel({
               </div>
 
               <div className="space-y-1">
-                <label className="font-mono text-[11px] uppercase text-muted-foreground">
+                <label className="text-sm font-medium text-foreground/85">
                   Rider Bio
                 </label>
                 <textarea

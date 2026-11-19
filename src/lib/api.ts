@@ -281,20 +281,35 @@ export const SEED_NEWS_ARTICLES: NewsArticle[] = [
   },
 ];
 
+export const PLAY_STORE_URL =
+  "https://play.google.com/store/apps/details?id=com.revv.revv_frontend";
+export const APP_STORE_URL = "https://apps.apple.com/search?term=REVV";
+
+export function normalizeApiBaseUrl(url: string): string {
+  const trimmed = url.trim().replace(/\/+$/, "");
+  if (!trimmed) return "";
+  return trimmed.endsWith("/api/v1") ? trimmed : `${trimmed}/api/v1`;
+}
+
 export function getApiBaseUrl(): string {
   const envUrl = import.meta.env["VITE_API_BASE_URL"];
   if (envUrl && envUrl.trim().length > 0) {
-    return envUrl.trim().replace(/\/+$/, "");
+    return normalizeApiBaseUrl(envUrl);
   }
 
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
-    if (host.includes("asteralabs.digital") || host.includes("vercel.app")) {
-      return "https://revv.asteralabs.digital/api/v1";
+    if (host === "localhost" || host === "127.0.0.1") {
+      return "http://localhost:8000/api/v1";
     }
+    return "https://revv.asteralabs.digital/api/v1";
   }
 
-  return "http://localhost:8000/api/v1";
+  // On SSR in production/preview (Vercel / NODE_ENV=production), default to production API
+  const isProd =
+    import.meta.env.PROD ||
+    (typeof process !== "undefined" && process.env?.["NODE_ENV"] === "production");
+  return isProd ? "https://revv.asteralabs.digital/api/v1" : "http://localhost:8000/api/v1";
 }
 
 export function resolveMediaUrl(path?: string | null): string | null {
@@ -819,6 +834,42 @@ export async function authRequestRaw<T>(
 export async function authRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const body = await authRequestRaw<T>(path, options);
   return body.data as T;
+}
+
+/**
+ * Request helper that sends auth headers if a session exists, otherwise falls
+ * back cleanly to an unauthenticated request (including SSR).
+ */
+export async function optionalAuthRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (typeof window !== "undefined" && getSavedSession().token) {
+    try {
+      return await authRequest<T>(path, options);
+    } catch (err) {
+      // If refresh failed & session was cleared on a public GET, retry anonymously once
+      if (!getSavedSession().token && (!options.method || options.method.toUpperCase() === "GET")) {
+        // fall through to public fetch
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  const res = await fetch(`${getApiBaseUrl()}${path}`, {
+    ...options,
+    headers: {
+      Accept: "application/json",
+      ...(options.headers || {}),
+    },
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new AuthApiError(
+      body?.meta?.message || body?.message || `HTTP ${res.status}`,
+      res.status,
+      res.status === 404,
+    );
+  }
+  return (body?.data ?? body) as T;
 }
 
 /**

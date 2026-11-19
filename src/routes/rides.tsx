@@ -146,8 +146,10 @@ function RidesHubPage() {
   async function toggleMembership(club: CommunitySummary) {
     setBusyClubId(club.id);
     setClubError(null);
+    const status = (club.my_status || "").trim().toLowerCase();
+    const isMember = status === "approved" || status === "active" || status === "joined";
     try {
-      if (club.my_status === "approved" || club.my_status === "joined") {
+      if (isMember) {
         await leaveCommunity(club.id);
       } else {
         await joinCommunity(club.id);
@@ -279,8 +281,10 @@ function RidesHubPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {communities.map((club) => {
-                const isMember = club.my_status === "approved" || club.my_status === "joined";
-                const isPending = club.my_status === "pending";
+                const st = (club.my_status || "").trim().toLowerCase();
+                const isMember = st === "approved" || st === "active" || st === "joined";
+                const isPending = st === "pending";
+                const isPrivate = (club.visibility || "public").toLowerCase() === "private";
                 return (
                   <article
                     key={club.id}
@@ -288,21 +292,25 @@ function RidesHubPage() {
                   >
                     <div className="space-y-1.5">
                       <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-display text-base font-bold text-foreground">
+                        <Link
+                          to="/clubs/$id"
+                          params={{ id: club.id }}
+                          className="font-display text-base font-bold text-foreground hover:text-primary transition-colors"
+                        >
                           {club.name}
-                        </h3>
-                        <span className="rounded-full border border-border px-2.5 py-0.5 text-[10px] font-mono uppercase text-muted-foreground">
+                        </Link>
+                        <span className="rounded-full border border-border px-2.5 py-0.5 text-xs font-medium capitalize text-muted-foreground">
                           {club.visibility}
                         </span>
                       </div>
                       {club.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2">
+                        <p className="text-sm text-muted-foreground line-clamp-2">
                           {club.description}
                         </p>
                       )}
                     </div>
                     <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
-                      <div className="flex items-center gap-3 text-[11px] font-mono text-muted-foreground">
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span>{club.member_count} riders</span>
                         {club.location_name && (
                           <span className="inline-flex items-center gap-1">
@@ -321,7 +329,13 @@ function RidesHubPage() {
                             : "bg-primary text-primary-foreground hover:bg-primary/90"
                         }`}
                       >
-                        {isPending ? "Pending" : isMember ? "Leave" : "Join"}
+                        {isPending
+                          ? "Pending"
+                          : isMember
+                            ? "Leave"
+                            : isPrivate
+                              ? "Request to Join"
+                              : "Join"}
                       </button>
                     </div>
                   </article>
