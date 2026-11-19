@@ -1,4 +1,4 @@
-import { authRequest, authRequestRaw, compressImageFile } from "./api";
+import { authRequest, authRequestRaw, compressImageFile, getApiBaseUrl } from "./api";
 
 export interface SavedRouteItem {
   id: string;
@@ -487,4 +487,93 @@ export async function replySupportTicket(ticketId: string, message: string): Pro
     method: "POST",
     body: JSON.stringify({ message }),
   });
+}
+
+export interface PublicSharedEventStop {
+  order?: number;
+  time?: string | null;
+  label?: string | null;
+  name: string;
+  address?: string | null;
+  notes?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export interface PublicSharedEventParticipant {
+  user_id?: string | null;
+  username: string;
+  display_name: string;
+  avatar_url?: string | null;
+  motorcycle_name?: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PublicSharedEventInfo {
+  id: string;
+  community_id: string;
+  community_name: string;
+  community_avatar_url?: string | null;
+  community_banner_url?: string | null;
+  creator_name: string;
+  title: string;
+  description?: string | null;
+  start_time: string;
+  end_time?: string | null;
+  duration_minutes: number;
+  cover_image_url?: string | null;
+  location_name?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  status: string;
+  lifecycle_state: string;
+  cancelled_at?: string | null;
+  stops: PublicSharedEventStop[];
+  going_count: number;
+  tentative_count: number;
+  not_going_count: number;
+  created_at: string;
+}
+
+export interface PublicSharedEventParticipantsPage {
+  items: PublicSharedEventParticipant[];
+  total: number;
+  page: number;
+  limit: number;
+  going_count: number;
+  tentative_count: number;
+  not_going_count: number;
+}
+
+export interface PublicSharedEventResponse {
+  event: PublicSharedEventInfo;
+  participants: PublicSharedEventParticipantsPage;
+  expires_at: string;
+}
+
+export async function fetchPublicSharedEvent(
+  token: string,
+  params?: { status?: "going" | "tentative" | "not_going"; page?: number; limit?: number },
+): Promise<PublicSharedEventResponse> {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set("status", params.status);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.limit) qs.set("limit", String(params.limit));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  const res = await fetch(
+    `${getApiBaseUrl()}/public/events/shared/${encodeURIComponent(token)}${suffix}`,
+    {
+      headers: { Accept: "application/json" },
+    },
+  );
+  const body = (await res.json().catch(() => null)) as {
+    data?: PublicSharedEventResponse;
+    meta?: { message?: string };
+  } | null;
+  if (!res.ok || !body?.data) {
+    throw new Error(body?.meta?.message || "Event view link is invalid or has expired.");
+  }
+  return body.data;
 }

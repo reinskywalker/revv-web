@@ -22,6 +22,7 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as RidesRouteImport } from './routes/rides'
 import { Route as TripRecordsRouteImport } from './routes/trip-records'
 import { Route as IdUsernameRouteImport } from './routes/id/$username'
+import { Route as ETokenRouteImport } from './routes/e/$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -88,6 +89,11 @@ const IdUsernameRoute = IdUsernameRouteImport.update({
   path: '/id/$username',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ETokenRoute = ETokenRouteImport.update({
+  id: '/e/$token',
+  path: '/e/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/rides': typeof RidesRoute
   '/trip-records': typeof TripRecordsRoute
   '/id/$username': typeof IdUsernameRoute
+  '/e/$token': typeof ETokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -118,6 +125,7 @@ export interface FileRoutesByTo {
   '/rides': typeof RidesRoute
   '/trip-records': typeof TripRecordsRoute
   '/id/$username': typeof IdUsernameRoute
+  '/e/$token': typeof ETokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -134,6 +142,7 @@ export interface FileRoutesById {
   '/rides': typeof RidesRoute
   '/trip-records': typeof TripRecordsRoute
   '/id/$username': typeof IdUsernameRoute
+  '/e/$token': typeof ETokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -151,6 +160,7 @@ export interface FileRouteTypes {
     | '/rides'
     | '/trip-records'
     | '/id/$username'
+    | '/e/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/rides'
     | '/trip-records'
     | '/id/$username'
+    | '/e/$token'
   id:
     | '__root__'
     | '/'
@@ -181,6 +192,7 @@ export interface FileRouteTypes {
     | '/rides'
     | '/trip-records'
     | '/id/$username'
+    | '/e/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -197,6 +209,7 @@ export interface RootRouteChildren {
   RidesRoute: typeof RidesRoute
   TripRecordsRoute: typeof TripRecordsRoute
   IdUsernameRoute: typeof IdUsernameRoute
+  ETokenRoute: typeof ETokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -292,6 +305,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IdUsernameRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/e/$token': {
+      id: '/e/$token'
+      path: '/e/$token'
+      fullPath: '/e/$token'
+      preLoaderRoute: typeof ETokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -309,6 +329,7 @@ const rootRouteChildren: RootRouteChildren = {
   RidesRoute: RidesRoute,
   TripRecordsRoute: TripRecordsRoute,
   IdUsernameRoute: IdUsernameRoute,
+  ETokenRoute: ETokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
