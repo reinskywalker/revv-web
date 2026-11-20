@@ -219,7 +219,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
         },
         {
           id: "admin-users",
-          label: "Users & RBAC",
+          label: "Users & Roles",
           to: "/admin",
           search: { tab: "users" },
           icon: Users,

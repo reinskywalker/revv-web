@@ -273,8 +273,8 @@ export const SEED_NEWS_ARTICLES: NewsArticle[] = [
     slug: "introducing-revv-photo-mode-route-story-overlays",
     title: "Introducing REVV Photo Mode & Route Story Overlays",
     summary:
-      "Turn post-ride snapshots into crisp telemetry cards with route polylines, average speed, ride duration, and your Digital Garage machine.",
-    content: `Every great ride deserves more than a raw camera roll frame.\n\nWith REVV Route Story, overlay your actual GPS polyline, total distance, ride duration, and average speed onto your favorite summit or rest-stop shot—ready to save to Gallery or share straight to Instagram Stories and TikTok.\n\nPrefer a minimal Strava-inspired aesthetic? Launch REVV Photo Mode to stamp the REVV mark, your @username, your motorcycle identity from Digital Garage, and custom telemetry badges.`,
+      "Turn post-ride photos into crisp route cards with polylines, average speed, ride time, and your Digital Garage bike.",
+    content: `Every great ride deserves more than a raw camera roll frame.\n\nWith REVV Route Story, overlay your actual GPS route, total distance, ride time, and average speed onto your favorite summit or rest-stop shot—ready to save to Gallery or share straight to Instagram Stories and TikTok.\n\nPrefer a minimal Strava-inspired look? Launch REVV Photo Mode to stamp the REVV mark, your @username, your bike from Digital Garage, and clean ride stats.`,
     category: "PRODUCT",
     author_name: "REVV Team",
     reading_time_minutes: 2,

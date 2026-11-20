@@ -118,11 +118,11 @@ export function AdminUsersTablePanel({
       <div className="hud-card p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="font-display text-lg font-black uppercase tracking-tight">
-            Users &amp; RBAC Directory ({filteredUsers.length} / {users.length})
+            Users &amp; Roles ({filteredUsers.length} / {users.length})
           </h3>
           <p className="text-sm text-foreground/75">
-            Click any rider row to view full details, edit profile, check username uniqueness, or
-            update RBAC role.
+            Click any rider row to view full details, edit profile, check username availability, or
+            update their role.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -287,7 +287,7 @@ export function AdminUsersTablePanel({
           closeOnBackdrop={!saving}
           title={
             <h4 className="font-display text-lg font-black uppercase">
-              Edit Rider Profile &amp; RBAC
+              Edit Rider Profile &amp; Role
             </h4>
           }
           subtitle={`ID: ${editingUser.id}`}
