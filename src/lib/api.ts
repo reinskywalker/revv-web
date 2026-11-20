@@ -76,6 +76,7 @@ export interface RiderProfile {
   privacy_country?: string | null;
   privacy_saved_routes?: string | null;
   leaderboard_opt_in?: boolean | null;
+  leaderboard_opt_changes_remaining?: number | null;
 }
 
 export interface GarageMotorcycle {

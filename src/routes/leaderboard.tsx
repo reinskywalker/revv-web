@@ -58,7 +58,9 @@ function LeaderboardPage() {
   const [metric, setMetric] = useState<SortMetric>("distance");
   const [search, setSearch] = useState("");
   const [optIn, setOptIn] = useState(true);
+  const [changesRemaining, setChangesRemaining] = useState(2);
   const [togglingOptIn, setTogglingOptIn] = useState(false);
+  const [optInCooldown, setOptInCooldown] = useState(false);
   const [optInMessage, setOptInMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,8 +68,14 @@ function LeaderboardPage() {
     let active = true;
     void fetchMyProfile()
       .then((profile) => {
-        if (active && typeof profile.leaderboard_opt_in === "boolean") {
+        if (!active) return;
+        if (typeof profile.leaderboard_opt_in === "boolean") {
           setOptIn(profile.leaderboard_opt_in);
+        }
+        if (typeof profile.leaderboard_opt_changes_remaining === "number") {
+          setChangesRemaining(profile.leaderboard_opt_changes_remaining);
+        } else {
+          setChangesRemaining(profile.leaderboard_opt_in === false ? 1 : 2);
         }
       })
       .catch(() => {});
@@ -77,14 +85,22 @@ function LeaderboardPage() {
   }, [isAuthenticated]);
 
   const handleToggleOptIn = async () => {
-    if (!isAuthenticated || togglingOptIn) return;
+    if (!isAuthenticated || togglingOptIn || optInCooldown || changesRemaining <= 0) return;
     const nextValue = !optIn;
     setTogglingOptIn(true);
     setOptInMessage(null);
     setError(null);
     try {
-      await updateMyPreferences({ leaderboard_opt_in: nextValue });
+      const res = await updateMyPreferences({ leaderboard_opt_in: nextValue });
       setOptIn(nextValue);
+      const rem = res["leaderboard_opt_changes_remaining"];
+      if (typeof rem === "number") {
+        setChangesRemaining(rem);
+      } else {
+        setChangesRemaining((prev) => Math.max(0, prev - 1));
+      }
+      setOptInCooldown(true);
+      setTimeout(() => setOptInCooldown(false), 5000);
       if (!nextValue) {
         if (user?.id) {
           setData((prev) =>
@@ -93,14 +109,14 @@ function LeaderboardPage() {
               : prev,
           );
         }
-        setOptInMessage("Opted out. Your rank has been hidden immediately.");
+        setOptInMessage("You are now hidden from the public rider rankings.");
       } else {
         setOptInMessage(
-          "Opted back in. Your rank will appear after the next 00:00 WIB daily refresh.",
+          "You're back on the leaderboard! Your rank will appear after the midnight WIB daily update.",
         );
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update leaderboard preference.");
+      setError(err instanceof Error ? err.message : "Could not update ranking visibility.");
     } finally {
       setTogglingOptIn(false);
     }
@@ -174,14 +190,14 @@ function LeaderboardPage() {
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-wider text-primary">
                 <Trophy className="size-3.5" />
-                <span>Daily Cached Snapshot • 00:00 WIB (GMT+7)</span>
+                <span>Updated Daily at Midnight WIB</span>
               </div>
               <h1 className="font-display text-2xl sm:text-4xl font-black uppercase tracking-tight">
                 REVV Rider Leaderboard
               </h1>
               <p className="text-sm text-muted-foreground max-w-2xl">
-                Ranked across verified GPS journeys (&ge; 0.3 km). Pre-computed daily at midnight
-                GMT+7 and served directly from memory cache for zero-latency access.
+                Ranked across verified rides (0.3 km or longer). Rankings update automatically every
+                night at midnight WIB.
               </p>
             </div>
 
@@ -189,18 +205,23 @@ function LeaderboardPage() {
               {data && (
                 <>
                   <span>
-                    SNAPSHOT DATE: <strong className="text-foreground">{data.snapshot_date}</strong>
+                    LAST UPDATED: <strong className="text-foreground">{data.snapshot_date}</strong>
                   </span>
                   <span>
-                    NEXT REFRESH: <strong className="text-primary">{data.next_refresh_wib}</strong>
+                    NEXT UPDATE: <strong className="text-primary">{data.next_refresh_wib}</strong>
                   </span>
                 </>
               )}
               {isAuthenticated && (
                 <button
                   type="button"
-                  disabled={togglingOptIn}
+                  disabled={togglingOptIn || optInCooldown || changesRemaining <= 0}
                   onClick={() => void handleToggleOptIn()}
+                  title={
+                    changesRemaining <= 0
+                      ? "Daily visibility change limit reached. Try again after midnight WIB."
+                      : undefined
+                  }
                   className={cn(
                     "mt-1 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 font-mono text-xs font-bold transition disabled:opacity-50",
                     optIn
@@ -208,7 +229,18 @@ function LeaderboardPage() {
                       : "border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25",
                   )}
                 >
-                  <span>{optIn ? "Ranked on Leaderboard: ON" : "Hidden from Leaderboard: OFF"}</span>
+                  {togglingOptIn && <RefreshCw className="size-3.5 animate-spin" />}
+                  <span>
+                    {togglingOptIn
+                      ? "Updating…"
+                      : changesRemaining <= 0
+                        ? optIn
+                          ? "Ranked (Locked until 00:00 WIB)"
+                          : "Hidden (Locked until 00:00 WIB)"
+                        : optIn
+                          ? "Show My Ranking: ON"
+                          : "Hidden from Rankings: OFF"}
+                  </span>
                 </button>
               )}
               {isAdmin && (
@@ -219,7 +251,7 @@ function LeaderboardPage() {
                   className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/15 px-3 py-1.5 font-mono text-xs font-bold text-primary hover:bg-primary/25 disabled:opacity-50"
                 >
                   <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
-                  <span>{refreshing ? "Refreshing SP & Cache…" : "Force Refresh Cache"}</span>
+                  <span>{refreshing ? "Updating Rankings…" : "Refresh Rankings"}</span>
                 </button>
               )}
             </div>
