@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { ModalShell } from "@/components/revv/ModalShell";
 import { updateGarageMotorcycle, type GarageMotorcycle } from "@/lib/api";
 import { formatThousandsDot, parseThousandsDot } from "@/lib/number-format";
 
@@ -17,15 +17,6 @@ export function UpdateOdometerModal({ bike, onClose, onUpdated, onError }: Odome
   useEffect(() => {
     if (bike) setMileage(String(bike.current_mileage));
   }, [bike]);
-
-  useEffect(() => {
-    if (!bike) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [bike, onClose]);
 
   if (!bike) return null;
 
@@ -50,29 +41,14 @@ export function UpdateOdometerModal({ bike, onClose, onUpdated, onError }: Odome
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
-      onClick={onClose}
+    <ModalShell
+      open
+      onClose={onClose}
+      title="Update Odometer"
+      subtitle={bike.nickname || bike.series_name || bike.name}
+      maxWidthClass="max-w-sm"
     >
-      <form
-        onSubmit={(e) => void handleSubmit(e)}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="font-display text-base font-bold text-foreground">Update Odometer</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close odometer dialog"
-            className="inline-flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary/50"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {bike.nickname || bike.series_name || bike.name}
-        </p>
+      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
         <div>
           <label
             htmlFor="odometer-km"
@@ -108,7 +84,7 @@ export function UpdateOdometerModal({ bike, onClose, onUpdated, onError }: Odome
           </button>
         </div>
       </form>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -143,15 +119,6 @@ export function EditBikeModal({ bike, onClose, onSaved, onError }: EditBikeModal
     setIsPrimary(Boolean(bike.is_primary));
   }, [bike]);
 
-  useEffect(() => {
-    if (!bike) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [bike, onClose]);
-
   if (!bike) return null;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -179,31 +146,14 @@ export function EditBikeModal({ bike, onClose, onSaved, onError }: EditBikeModal
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
-      onClick={onClose}
+    <ModalShell
+      open
+      onClose={onClose}
+      title="Edit Motorcycle"
+      subtitle={`${bike.brand_name ?? ""} ${bike.series_name || bike.name}`.trim()}
+      maxWidthClass="max-w-md"
     >
-      <form
-        onSubmit={(e) => void handleSubmit(e)}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-display text-base font-bold text-foreground">Edit Motorcycle</h3>
-            <p className="text-xs text-muted-foreground">
-              {bike.brand_name} {bike.series_name || bike.name}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close edit motorcycle modal"
-            className="inline-flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary/50"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
+      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -301,6 +251,6 @@ export function EditBikeModal({ bike, onClose, onSaved, onError }: EditBikeModal
           </button>
         </div>
       </form>
-    </div>
+    </ModalShell>
   );
 }

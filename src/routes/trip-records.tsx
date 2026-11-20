@@ -16,6 +16,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { ModalShell } from "@/components/revv/ModalShell";
 import {
   type AdminRiderTripGroup,
   type AdminTripDetailRecord,
@@ -739,15 +740,14 @@ function TripDetailModal({
   const maxLeanRight = Number(leanObj?.["max_lean_right_deg"] ?? 0);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
-      onClick={onClose}
+    <ModalShell
+      open
+      onClose={onClose}
+      maxWidthClass="max-w-4xl"
+      panelClassName="relative max-h-[90vh] overflow-y-auto p-0"
+      ariaLabel={detail?.title || "Trip telemetry inspector"}
     >
-      <div
-        className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Modal Header */}
+      {/* Modal Header */}
         <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-card/95 px-6 py-4 backdrop-blur-md">
           <div>
             <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-primary">
@@ -944,8 +944,7 @@ function TripDetailModal({
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </ModalShell>
   );
 }
 

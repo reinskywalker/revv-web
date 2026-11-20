@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/revv/chrome";
+import { ModalShell } from "@/components/revv/ModalShell";
 import { RichHtmlContent } from "@/components/revv/RichHtmlContent";
 import { fetchNewsArticles, resolveMediaUrl, type NewsArticle } from "@/lib/api";
 
@@ -381,17 +382,16 @@ export function NewsPage() {
       </main>
 
       {/* Article Modal */}
-      {activeArticle && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setActiveArticle(null)}
-        >
-          <div
-            className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-[#141A20] p-6 text-foreground shadow-2xl md:p-10"
-            onClick={(e) => e.stopPropagation()}
-          >
+      <ModalShell
+        open={Boolean(activeArticle)}
+        onClose={() => setActiveArticle(null)}
+        maxWidthClass="max-w-3xl"
+        backdropClassName="bg-black/85 backdrop-blur-md"
+        panelClassName="relative max-h-[90vh] overflow-y-auto bg-[#141A20] p-6 text-foreground md:p-10"
+        ariaLabel={activeArticle?.title ?? "Article dispatch"}
+      >
+        {activeArticle && (
+          <>
             <button
               onClick={() => setActiveArticle(null)}
               className="absolute right-5 top-5 rounded-lg border border-border/80 bg-secondary/50 p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
@@ -450,9 +450,9 @@ export function NewsPage() {
                 Close Dispatch
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </ModalShell>
 
       <SiteFooter />
     </div>

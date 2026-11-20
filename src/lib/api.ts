@@ -75,6 +75,7 @@ export interface RiderProfile {
   show_job?: boolean | null;
   privacy_country?: string | null;
   privacy_saved_routes?: string | null;
+  leaderboard_opt_in?: boolean | null;
 }
 
 export interface GarageMotorcycle {
@@ -1149,8 +1150,28 @@ export async function updateMyProfile(payload: {
   show_job?: boolean;
   privacy_country?: string;
   privacy_saved_routes?: string;
+  leaderboard_opt_in?: boolean;
 }): Promise<RiderProfile> {
   return authRequest<RiderProfile>("/me", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateMyPreferences(payload: {
+  theme?: string;
+  locale?: string;
+  account_visibility?: string;
+  privacy_country?: string;
+  privacy_saved_routes?: string;
+  show_country?: boolean;
+  show_motorcycle_count?: boolean;
+  show_garage_details?: boolean;
+  show_city?: boolean;
+  show_job?: boolean;
+  leaderboard_opt_in?: boolean;
+}): Promise<Record<string, unknown>> {
+  return authRequest<Record<string, unknown>>("/me/preferences", {
     method: "PATCH",
     body: JSON.stringify(payload),
   });

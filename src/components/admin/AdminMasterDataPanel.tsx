@@ -9,8 +9,8 @@ import {
   Sliders,
   Trash2,
   Wrench,
-  X,
 } from "lucide-react";
+import { ModalShell } from "@/components/revv/ModalShell";
 import {
   createAdminBrand,
   createAdminComponent,
@@ -833,15 +833,13 @@ export function AdminMasterDataPanel({
 
       {/* Brand Edit Modal */}
       {editingBrand && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setEditingBrand(null)}
+        <ModalShell
+          open
+          onClose={() => setEditingBrand(null)}
+          title={<h4 className="font-display text-base font-black uppercase">Edit Brand</h4>}
+          maxWidthClass="max-w-md"
+          panelClassName="p-6 space-y-4"
         >
-          <div
-            className="w-full max-w-md rounded-2xl border border-border bg-card p-6 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h4 className="font-display text-base font-black uppercase">Edit Brand</h4>
             <input
               type="text"
               value={editBrandName}
@@ -869,21 +867,18 @@ export function AdminMasterDataPanel({
                 Save
               </button>
             </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
 
       {/* Motorcycle Edit Modal */}
       {editingMoto && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setEditingMoto(null)}
+        <ModalShell
+          open
+          onClose={() => setEditingMoto(null)}
+          title={<h4 className="font-display text-base font-black uppercase">Edit Motorcycle</h4>}
+          maxWidthClass="max-w-lg"
+          panelClassName="p-6 space-y-4"
         >
-          <div
-            className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h4 className="font-display text-base font-black uppercase">Edit Motorcycle</h4>
             <div className="grid gap-3 sm:grid-cols-2">
               <select
                 value={editMotoBrandId}
@@ -960,21 +955,18 @@ export function AdminMasterDataPanel({
                 Save Changes
               </button>
             </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
 
       {/* Component Edit Modal */}
       {editingComp && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setEditingComp(null)}
+        <ModalShell
+          open
+          onClose={() => setEditingComp(null)}
+          title={<h4 className="font-display text-base font-black uppercase">Edit Component</h4>}
+          maxWidthClass="max-w-lg"
+          panelClassName="p-6 space-y-4"
         >
-          <div
-            className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h4 className="font-display text-base font-black uppercase">Edit Component</h4>
             <div className="grid gap-3 sm:grid-cols-2">
               <input
                 type="text"
@@ -1059,23 +1051,22 @@ export function AdminMasterDataPanel({
                 Save Changes
               </button>
             </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
 
       {/* Notification Template Edit/Create Modal */}
       {editingNotif && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setEditingNotif(null)}
-        >
-          <div
-            className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <ModalShell
+          open
+          onClose={() => setEditingNotif(null)}
+          title={
             <h4 className="font-display text-base font-black uppercase">
               {editingNotif.id ? `Edit ${editingNotif.code}` : "Create Notification Template"}
             </h4>
+          }
+          maxWidthClass="max-w-lg"
+          panelClassName="p-6 space-y-4"
+        >
             <div className="grid gap-3 sm:grid-cols-2">
               <input
                 type="text"
@@ -1145,38 +1136,26 @@ export function AdminMasterDataPanel({
                 Save Template
               </button>
             </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
 
       {/* Email HTML Preview Popup */}
-      {showEmailPreviewModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-          onClick={() => setShowEmailPreviewModal(false)}
-        >
-          <div
-            className="w-full max-w-xl rounded-2xl border border-border bg-card shadow-2xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-border/70 px-5 py-3.5">
-              <div>
-                <h5 className="font-display text-sm font-black uppercase">Email HTML Preview</h5>
-                <p className="text-sm text-foreground/75">
-                  Subject:{" "}
-                  <strong className="text-foreground">
-                    {currentSubject.replaceAll("{{otp}}", "482910")}
-                  </strong>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowEmailPreviewModal(false)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
+      <ModalShell
+        open={showEmailPreviewModal}
+        onClose={() => setShowEmailPreviewModal(false)}
+        title={<h5 className="font-display text-sm font-black uppercase">Email HTML Preview</h5>}
+        subtitle={
+          <>
+            Subject:{" "}
+            <strong className="text-foreground">
+              {currentSubject.replaceAll("{{otp}}", "482910")}
+            </strong>
+          </>
+        }
+        maxWidthClass="max-w-xl"
+        backdropClassName="bg-black/80"
+        panelClassName="p-0 overflow-hidden [&>div:first-child]:px-5 [&>div:first-child]:pt-3.5 [&>div:first-child]:mb-0 [&>div:first-child]:border-b [&>div:first-child]:border-border/70 [&>div:first-child]:pb-3.5"
+      >
             <div className="p-4 bg-[#07080a]">
               <iframe
                 title="REVV Email Preview"
@@ -1185,9 +1164,7 @@ export function AdminMasterDataPanel({
                 className="w-full h-[420px] rounded-xl border border-border/60 bg-[#0a0b0e]"
               />
             </div>
-          </div>
-        </div>
-      )}
+      </ModalShell>
     </div>
   );
 }

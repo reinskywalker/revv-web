@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, MessageSquare, Pencil, Plus, RefreshCw, Send, Trash2, Wrench, X } from "lucide-react";
+import { AlertTriangle, MessageSquare, Pencil, Plus, RefreshCw, Send, Trash2, Wrench } from "lucide-react";
 import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
+import { ModalShell } from "@/components/revv/ModalShell";
 import {
   createGarageItemComment,
   createMaintenanceLog,
@@ -585,12 +586,13 @@ export function GarageMaintenancePanel({
 
       {/* Edit Component Modal */}
       {editingComp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onClick={() => setEditingComp(null)}>
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h4 className="font-display text-sm font-bold uppercase">Edit {editingComp.name}</h4>
-              <button type="button" onClick={() => setEditingComp(null)}><X className="size-4" /></button>
-            </div>
+        <ModalShell
+          open
+          onClose={() => setEditingComp(null)}
+          title={<h4 className="font-display text-sm font-bold uppercase">Edit {editingComp.name}</h4>}
+          maxWidthClass="max-w-md"
+          panelClassName="p-5 space-y-3"
+        >
             <input value={editCompBrand} onChange={(e) => setEditCompBrand(e.target.value)} placeholder="Brand / spec" className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs" />
             <input value={editCompReplacedKm} onChange={(e) => setEditCompReplacedKm(formatThousandsDot(e.target.value))} placeholder="Last replaced mileage (km)" className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs" />
             <div className="grid grid-cols-2 gap-2">
@@ -622,18 +624,18 @@ export function GarageMaintenancePanel({
                 Save
               </button>
             </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
 
       {/* Edit Service Log Modal */}
       {editingLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onClick={() => setEditingLog(null)}>
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h4 className="font-display text-sm font-bold uppercase">Edit Service Log</h4>
-              <button type="button" onClick={() => setEditingLog(null)}><X className="size-4" /></button>
-            </div>
+        <ModalShell
+          open
+          onClose={() => setEditingLog(null)}
+          title={<h4 className="font-display text-sm font-bold uppercase">Edit Service Log</h4>}
+          maxWidthClass="max-w-md"
+          panelClassName="p-5 space-y-3"
+        >
             <input value={editLogType} onChange={(e) => setEditLogType(e.target.value)} placeholder="Service type" className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs" />
             <input value={editLogPart} onChange={(e) => setEditLogPart(e.target.value)} placeholder="Parts / oil brand" className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs" />
             <div className="grid grid-cols-3 gap-2">
@@ -670,20 +672,18 @@ export function GarageMaintenancePanel({
                 Save Log
               </button>
             </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
 
       {/* Per-Item Comments Modal */}
       {commentTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onClick={() => setCommentTarget(null)}>
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h4 className="font-display text-sm font-bold uppercase truncate">
-                Comments · {commentTarget.title}
-              </h4>
-              <button type="button" onClick={() => setCommentTarget(null)}><X className="size-4" /></button>
-            </div>
+        <ModalShell
+          open
+          onClose={() => setCommentTarget(null)}
+          title={<h4 className="font-display text-sm font-bold uppercase truncate">Comments · {commentTarget.title}</h4>}
+          maxWidthClass="max-w-md"
+          panelClassName="p-5 space-y-3"
+        >
             <div className="max-h-60 space-y-2 overflow-y-auto">
               {itemComments.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-4 text-center">No comments yet.</p>
@@ -733,8 +733,7 @@ export function GarageMaintenancePanel({
                 <Send className="size-3.5" />
               </button>
             </form>
-          </div>
-        </div>
+        </ModalShell>
       )}
 
       <ConfirmDialog

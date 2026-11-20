@@ -729,6 +729,9 @@ export interface PublicSharedEventInfo {
   location_name?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  route_polyline?: string | null;
+  route_distance_meters?: number | null;
+  route_duration_seconds?: number | null;
   status: string;
   lifecycle_state: string;
   cancelled_at?: string | null;

@@ -15,10 +15,12 @@ import {
 import { SiteFooter, SiteHeader } from "@/components/revv/chrome";
 import {
   adminRefreshLeaderboard,
+  fetchMyProfile,
   fetchPublicLeaderboard,
   type LeaderboardEntry,
   type LeaderboardResponse,
   resolveMediaUrl,
+  updateMyPreferences,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -55,6 +57,54 @@ function LeaderboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [metric, setMetric] = useState<SortMetric>("distance");
   const [search, setSearch] = useState("");
+  const [optIn, setOptIn] = useState(true);
+  const [togglingOptIn, setTogglingOptIn] = useState(false);
+  const [optInMessage, setOptInMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let active = true;
+    void fetchMyProfile()
+      .then((profile) => {
+        if (active && typeof profile.leaderboard_opt_in === "boolean") {
+          setOptIn(profile.leaderboard_opt_in);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated]);
+
+  const handleToggleOptIn = async () => {
+    if (!isAuthenticated || togglingOptIn) return;
+    const nextValue = !optIn;
+    setTogglingOptIn(true);
+    setOptInMessage(null);
+    setError(null);
+    try {
+      await updateMyPreferences({ leaderboard_opt_in: nextValue });
+      setOptIn(nextValue);
+      if (!nextValue) {
+        if (user?.id) {
+          setData((prev) =>
+            prev
+              ? { ...prev, entries: prev.entries.filter((e) => e.user_id !== user.id) }
+              : prev,
+          );
+        }
+        setOptInMessage("Opted out. Your rank has been hidden immediately.");
+      } else {
+        setOptInMessage(
+          "Opted back in. Your rank will appear after the next 00:00 WIB daily refresh.",
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update leaderboard preference.");
+    } finally {
+      setTogglingOptIn(false);
+    }
+  };
 
   const loadLeaderboard = useCallback(async () => {
     setLoading(true);
@@ -146,6 +196,21 @@ function LeaderboardPage() {
                   </span>
                 </>
               )}
+              {isAuthenticated && (
+                <button
+                  type="button"
+                  disabled={togglingOptIn}
+                  onClick={() => void handleToggleOptIn()}
+                  className={cn(
+                    "mt-1 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 font-mono text-xs font-bold transition disabled:opacity-50",
+                    optIn
+                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                      : "border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25",
+                  )}
+                >
+                  <span>{optIn ? "Ranked on Leaderboard: ON" : "Hidden from Leaderboard: OFF"}</span>
+                </button>
+              )}
               {isAdmin && (
                 <button
                   type="button"
@@ -203,6 +268,12 @@ function LeaderboardPage() {
             </div>
           </div>
         </div>
+
+        {optInMessage && (
+          <div className="mt-4 rounded-xl border border-primary/35 bg-primary/10 px-4 py-3 text-xs text-foreground">
+            {optInMessage}
+          </div>
+        )}
 
         {error && (
           <div className="mt-6 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-xs text-destructive">

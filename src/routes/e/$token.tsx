@@ -362,6 +362,14 @@ function PublicSharedEventPage() {
                     <p className="mt-1.5 text-sm font-semibold text-foreground">
                       {formatEventTime(ev.start_time)} · {formatDuration(ev.duration_minutes)}
                     </p>
+                    {ev.route_distance_meters != null && ev.route_distance_meters > 0 && (
+                      <p className="mt-1 text-xs font-mono text-primary">
+                        Route: {(ev.route_distance_meters / 1000).toFixed(1)} km
+                        {ev.route_duration_seconds != null && ev.route_duration_seconds > 0
+                          ? ` (~${Math.max(1, Math.round(ev.route_duration_seconds / 60))} min)`
+                          : ""}
+                      </p>
+                    )}
                   </div>
 
                   <div className="rounded-xl border border-border bg-background/60 p-3.5">

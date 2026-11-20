@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Loader2, Pencil, Search, ShieldCheck, Trash2, X } from "lucide-react";
+import { Loader2, Pencil, Search, ShieldCheck, Trash2 } from "lucide-react";
+import { ModalShell } from "@/components/revv/ModalShell";
 import { resolveMediaUrl, updateAdminUser, type AdminUserItem } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -278,32 +279,21 @@ export function AdminUsersTablePanel({
 
       {/* User Detail & Edit Modal */}
       {editingUser && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4"
-          onClick={() => !saving && setEditingUser(null)}
+        <ModalShell
+          open
+          onClose={() => {
+            if (!saving) setEditingUser(null);
+          }}
+          closeOnBackdrop={!saving}
+          title={
+            <h4 className="font-display text-lg font-black uppercase">
+              Edit Rider Profile &amp; RBAC
+            </h4>
+          }
+          subtitle={`ID: ${editingUser.id}`}
+          maxWidthClass="max-w-2xl"
+          panelClassName="p-0 overflow-hidden max-h-[92vh] flex flex-col [&>div:first-child]:px-6 [&>div:first-child]:pt-4 [&>div:first-child]:mb-0 [&>div:first-child]:border-b [&>div:first-child]:border-border/70 [&>div:first-child]:pb-4"
         >
-          <div
-            className="w-full max-w-2xl rounded-2xl border border-border bg-card shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-border/70 px-6 py-4">
-              <div>
-                <h4 className="font-display text-lg font-black uppercase">
-                  Edit Rider Profile &amp; RBAC
-                </h4>
-                <p className="text-sm text-foreground/75">
-                  ID: {editingUser.id}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditingUser(null)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
             <form onSubmit={handleSaveUser} className="p-6 space-y-4 overflow-y-auto">
               {modalError && (
                 <div className="rounded-lg border border-destructive/50 bg-destructive/15 px-3 py-2 font-mono text-xs text-destructive">
@@ -463,8 +453,7 @@ export function AdminUsersTablePanel({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   );
