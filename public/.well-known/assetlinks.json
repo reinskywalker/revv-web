@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.asteradigilabs.revv",
+      "sha256_cert_fingerprints": [
+        "BA:6E:CC:1A:B3:82:C4:34:9A:D2:80:7B:BC:BB:9F:8C:6B:A7:63:77:8A:5B:90:6C:03:20:A0:8A:93:CC:71:29"
+      ]
+    }
+  }
+]
