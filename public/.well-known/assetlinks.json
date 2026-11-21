@@ -8,7 +8,10 @@
       "namespace": "android_app",
       "package_name": "com.asteradigilabs.revv",
       "sha256_cert_fingerprints": [
-        "BA:6E:CC:1A:B3:82:C4:34:9A:D2:80:7B:BC:BB:9F:8C:6B:A7:63:77:8A:5B:90:6C:03:20:A0:8A:93:CC:71:29"
+        "BA:6E:CC:1A:B3:82:C4:34:9A:D2:80:7B:BC:BB:9F:8C:6B:A7:63:77:8A:5B:90:6C:03:20:A0:8A:93:CC:71:29",
+        "A4:39:E5:BE:E3:3C:10:C8:10:57:A2:55:A5:10:38:B1:4C:53:2B:5F:A8:F9:6D:40:D6:56:AC:58:51:A7:00:D5",
+        "E4:20:CF:D1:39:55:EE:56:C3:A4:EA:C4:A7:49:92:94:34:90:3D:4F:11:AB:B2:D6:E8:49:B4:9F:11:42:E5:DA",
+        "21:57:3E:0D:18:4A:0F:A5:AD:17:BA:12:AC:42:6B:2B:E3:8B:46:23:A5:A4:94:62:95:5C:97:9B:89:D1:D2:63"
       ]
     }
   }
