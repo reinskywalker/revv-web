@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronRight,
   Compass,
+  Crown,
   Database,
   FileText,
   Home,
@@ -223,6 +224,13 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
           to: "/admin",
           search: { tab: "users" },
           icon: Users,
+        },
+        {
+          id: "admin-subscriptions",
+          label: "Paid Users & Tiers",
+          to: "/admin",
+          search: { tab: "subscriptions" },
+          icon: Crown,
         },
         {
           id: "admin-trips",

@@ -1405,6 +1405,120 @@ export async function deleteAdminUser(userId: string): Promise<void> {
   });
 }
 
+export interface SubscriptionTierCatalogItem {
+  tier_code: "rookie" | "street" | "apex" | "grand_tourer";
+  name: string;
+  is_paid: boolean;
+  idr_weekly: number;
+  idr_monthly: number;
+  idr_yearly: number;
+  usd_weekly_cents: number;
+  usd_monthly_cents: number;
+  usd_yearly_cents: number;
+  includes_verified_frame: boolean;
+}
+
+export interface AdminSubscriptionItem {
+  id: string;
+  user_id: string;
+  username: string;
+  display_name: string;
+  email: string | null;
+  user_role: string;
+  plan_code: string;
+  tier_code: string;
+  billing_period: string;
+  status: string;
+  active_from: string | null;
+  active_until: string | null;
+  purchased_at: string;
+  duration_days: number | null;
+  amount: number | null;
+  currency: string | null;
+  payment_method: string | null;
+  payment_provider: string | null;
+  payment_channel: string | null;
+  paid_by_label: string | null;
+  account_scope: string;
+  is_consecutive: boolean;
+  consecutive_months: number;
+  consecutive_cycles: number;
+  total_paid_days: number;
+  auto_renew: boolean;
+  equipped_frame_code: string | null;
+  admin_notes: string | null;
+  updated_at: string;
+}
+
+export interface SubscriptionEventItem {
+  id: string;
+  subscription_id: string | null;
+  user_id: string;
+  username: string;
+  event_type: string;
+  actor_username: string | null;
+  previous_tier: string | null;
+  new_tier: string | null;
+  previous_status: string | null;
+  new_status: string | null;
+  delta_days: number | null;
+  amount: number | null;
+  currency: string | null;
+  created_at: string;
+}
+
+export interface AdminSubscriptionsPayload {
+  tiers: SubscriptionTierCatalogItem[];
+  active_count: number;
+  total_count: number;
+  subscriptions: AdminSubscriptionItem[];
+  events: SubscriptionEventItem[];
+}
+
+export interface AssignSubscriptionPayload {
+  user_id: string;
+  tier_code: string;
+  billing_period?: string;
+  duration_days?: number;
+  amount?: number;
+  currency?: string;
+  payment_method?: string;
+  payment_provider?: string;
+  payment_channel?: string;
+  paid_by_label?: string;
+  account_scope?: string;
+  is_consecutive?: boolean;
+  consecutive_months?: number;
+  auto_renew?: boolean;
+  admin_notes?: string;
+}
+
+export async function fetchAdminSubscriptions(): Promise<AdminSubscriptionsPayload> {
+  return authRequest<AdminSubscriptionsPayload>("/admin/subscriptions");
+}
+
+export async function assignAdminSubscription(
+  payload: AssignSubscriptionPayload,
+): Promise<Record<string, unknown>> {
+  return authRequest<Record<string, unknown>>("/admin/subscriptions/assign", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function revokeAdminSubscription(
+  subscriptionId: string,
+  reason?: string,
+): Promise<Record<string, unknown>> {
+  return authRequest<Record<string, unknown>>(
+    `/admin/subscriptions/${encodeURIComponent(subscriptionId)}/revoke`,
+    {
+      method: "POST",
+      body: JSON.stringify(reason ? { reason } : {}),
+    },
+  );
+}
+
 export async function fetchAdminBrands(): Promise<MasterBrandItem[]> {
   return authRequest<MasterBrandItem[]>("/admin/master/brands");
 }
@@ -1521,12 +1635,8 @@ export async function deleteAdminComponent(id: number): Promise<void> {
   });
 }
 
-export async function fetchAdminNotificationTemplates(): Promise<
-  MasterNotificationTemplateItem[]
-> {
-  return authRequest<MasterNotificationTemplateItem[]>(
-    "/admin/master/notification-templates",
-  );
+export async function fetchAdminNotificationTemplates(): Promise<MasterNotificationTemplateItem[]> {
+  return authRequest<MasterNotificationTemplateItem[]>("/admin/master/notification-templates");
 }
 
 export async function createAdminNotificationTemplate(payload: {
@@ -1538,13 +1648,10 @@ export async function createAdminNotificationTemplate(payload: {
   language: string;
   variables_hint?: string;
 }): Promise<MasterNotificationTemplateItem> {
-  return authRequest<MasterNotificationTemplateItem>(
-    "/admin/master/notification-templates",
-    {
-      method: "POST",
-      body: JSON.stringify(payload),
-    },
-  );
+  return authRequest<MasterNotificationTemplateItem>("/admin/master/notification-templates", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function updateAdminNotificationTemplate(
@@ -1559,13 +1666,10 @@ export async function updateAdminNotificationTemplate(
     variables_hint: string;
   }>,
 ): Promise<MasterNotificationTemplateItem> {
-  return authRequest<MasterNotificationTemplateItem>(
-    `/admin/master/notification-templates/${id}`,
-    {
-      method: "PATCH",
-      body: JSON.stringify(payload),
-    },
-  );
+  return authRequest<MasterNotificationTemplateItem>(`/admin/master/notification-templates/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function deleteAdminNotificationTemplate(id: number): Promise<void> {

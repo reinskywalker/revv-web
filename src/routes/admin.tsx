@@ -32,6 +32,7 @@ import {
 import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
 import { RichTextEditor } from "@/components/revv/RichTextEditor";
 import { AdminOverviewAnalyticsPanel } from "@/components/admin/AdminOverviewAnalyticsPanel";
+import { AdminSubscriptionsPanel } from "@/components/admin/AdminSubscriptionsPanel";
 import { AdminUsersTablePanel } from "@/components/admin/AdminUsersTablePanel";
 import { AdminMasterDataPanel, type MasterSubTab } from "@/components/admin/AdminMasterDataPanel";
 import {
@@ -95,6 +96,7 @@ export const Route = createFileRoute("/admin")({
 type AdminSubTab =
   | "overview"
   | "users"
+  | "subscriptions"
   | "master"
   | "news"
   | "broadcast"
@@ -167,6 +169,7 @@ function AdminPage() {
     if (
       t === "overview" ||
       t === "users" ||
+      t === "subscriptions" ||
       t === "master" ||
       t === "news" ||
       t === "broadcast" ||
@@ -470,6 +473,17 @@ function AdminPage() {
               }}
               onNotice={setNotice}
               onRequestSoftDelete={(u) => setPendingConfirm({ kind: "soft_delete_user", user: u })}
+            />
+          )}
+
+          {/* TAB 2B: PAID USERS & SUBSCRIPTION TIER MANAGEMENT */}
+          {isSuperuser && activeSubTab === "subscriptions" && (
+            <AdminSubscriptionsPanel
+              users={adminUsers}
+              onNotice={setNotice}
+              onReloadUsers={async () => {
+                setAdminUsers(await fetchAdminUsers());
+              }}
             />
           )}
 
