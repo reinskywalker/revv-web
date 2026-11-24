@@ -17,6 +17,7 @@ import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as NewsRouteImport } from './routes/news'
+import { Route as PlansRouteImport } from './routes/plans'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as RidesRouteImport } from './routes/rides'
@@ -65,6 +66,11 @@ const MessagesRoute = MessagesRouteImport.update({
 const NewsRoute = NewsRouteImport.update({
   id: '/news',
   path: '/news',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlansRoute = PlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/news': typeof NewsRoute
+  '/plans': typeof PlansRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/rides': typeof RidesRoute
@@ -141,6 +148,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/news': typeof NewsRoute
+  '/plans': typeof PlansRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/rides': typeof RidesRoute
@@ -161,6 +169,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/news': typeof NewsRoute
+  '/plans': typeof PlansRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/rides': typeof RidesRoute
@@ -182,6 +191,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/messages'
     | '/news'
+    | '/plans'
     | '/privacy'
     | '/register'
     | '/rides'
@@ -201,6 +211,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/messages'
     | '/news'
+    | '/plans'
     | '/privacy'
     | '/register'
     | '/rides'
@@ -220,6 +231,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/messages'
     | '/news'
+    | '/plans'
     | '/privacy'
     | '/register'
     | '/rides'
@@ -240,6 +252,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MessagesRoute: typeof MessagesRoute
   NewsRoute: typeof NewsRoute
+  PlansRoute: typeof PlansRoute
   PrivacyRoute: typeof PrivacyRoute
   RegisterRoute: typeof RegisterRoute
   RidesRoute: typeof RidesRoute
@@ -307,6 +320,13 @@ declare module '@tanstack/react-router' {
       path: '/news'
       fullPath: '/news'
       preLoaderRoute: typeof NewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plans': {
+      id: '/plans'
+      path: '/plans'
+      fullPath: '/plans'
+      preLoaderRoute: typeof PlansRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -384,6 +404,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MessagesRoute: MessagesRoute,
   NewsRoute: NewsRoute,
+  PlansRoute: PlansRoute,
   PrivacyRoute: PrivacyRoute,
   RegisterRoute: RegisterRoute,
   RidesRoute: RidesRoute,

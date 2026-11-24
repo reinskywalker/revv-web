@@ -1,14 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import { Wordmark } from "./wordmark";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useAuth } from "@/lib/auth-context";
+import { useI18n } from "@/lib/i18n";
 
 const navLinkClass =
   "font-mono text-sm uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:text-foreground";
 
 export function SiteHeader() {
   const { isAuthenticated } = useAuth();
+  const { t } = useI18n();
 
-  // If user is authenticated, the left cockpit sidebar handles navigation.
   if (isAuthenticated) {
     return null;
   }
@@ -22,34 +24,38 @@ export function SiteHeader() {
           </Link>
           <span className="hidden items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-primary sm:inline-flex">
             <span className="size-1.5 rounded-full bg-primary animate-pulse" />
-            Closed Beta
+            {t("nav.closedBeta")}
           </span>
         </div>
-        <nav className="flex items-center gap-5 sm:gap-6">
+        <nav className="flex items-center gap-4 sm:gap-5">
           <Link to="/" className={navLinkClass} activeProps={{ className: "text-foreground" }}>
-            Home
+            {t("nav.home")}
           </Link>
           <Link to="/leaderboard" className={navLinkClass} activeProps={{ className: "text-foreground" }}>
-            Leaderboard
+            {t("nav.leaderboard")}
           </Link>
           <Link to="/clubs" className={navLinkClass} activeProps={{ className: "text-foreground" }}>
-            Clubs
+            {t("nav.clubs")}
           </Link>
           <Link to="/news" className={navLinkClass} activeProps={{ className: "text-foreground" }}>
-            News
+            {t("nav.news")}
+          </Link>
+          <Link to="/plans" className={navLinkClass} activeProps={{ className: "text-foreground" }}>
+            {t("nav.plans")}
           </Link>
           <Link
             to="/register"
             className={navLinkClass}
             activeProps={{ className: "text-foreground" }}
           >
-            Join Beta
+            {t("nav.joinBeta")}
           </Link>
+          <LanguageSwitcher compact />
           <Link
             to="/login"
-            className="rounded-lg bg-primary px-5 py-2.5 font-display text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary/90"
+            className="rounded-lg bg-primary px-4 py-2 font-display text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Sign in
+            {t("nav.signIn")}
           </Link>
         </nav>
       </div>
@@ -58,6 +64,8 @@ export function SiteHeader() {
 }
 
 export function SiteFooter() {
+  const { t } = useI18n();
+
   return (
     <footer className="border-t border-border/60">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-12 sm:flex-row sm:items-end sm:justify-between">
@@ -66,27 +74,30 @@ export function SiteFooter() {
           <p className="eyebrow mt-3">Friendly Neighborhood Riding Companion</p>
         </div>
         <div className="flex flex-col gap-2 sm:items-end">
-          <div className="flex flex-wrap gap-5">
+          <div className="flex flex-wrap items-center gap-5">
             <Link to="/" className={navLinkClass}>
-              Home
+              {t("nav.home")}
             </Link>
             <Link to="/leaderboard" className={navLinkClass}>
-              Leaderboard
+              {t("nav.leaderboard")}
             </Link>
             <Link to="/clubs" className={navLinkClass}>
-              Clubs
+              {t("nav.clubs")}
             </Link>
             <Link to="/news" className={navLinkClass}>
-              News
+              {t("nav.news")}
+            </Link>
+            <Link to="/plans" className={navLinkClass}>
+              {t("nav.plans")}
             </Link>
             <Link to="/register" className={navLinkClass}>
-              Join Beta
+              {t("nav.joinBeta")}
             </Link>
             <Link to="/privacy" className={navLinkClass}>
-              Privacy
+              {t("nav.privacy")}
             </Link>
             <Link to="/login" className={navLinkClass}>
-              Sign in
+              {t("nav.signIn")}
             </Link>
           </div>
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground/75">

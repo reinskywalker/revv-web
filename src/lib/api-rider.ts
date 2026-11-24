@@ -120,6 +120,12 @@ export interface CommunitySummary {
   my_role?: string | null;
   my_status?: string | null;
   created_at: string;
+  is_official?: boolean;
+  is_system_managed?: boolean;
+  country_code?: string | null;
+  post_slow_mode_seconds?: number;
+  boost_count?: number;
+  member_limit?: number;
 }
 
 export interface CommunityEventItem {
@@ -419,6 +425,7 @@ export interface CommunityMemberItem {
   username: string;
   display_name: string;
   avatar_url?: string | null;
+  equipped_frame_code?: string | null;
   role: string;
   status: string;
   joined_at: string;
@@ -445,6 +452,9 @@ export interface CommunityChatChannelItem {
   name: string;
   description?: string | null;
   visibility?: string;
+  channel_type?: "text" | "voice" | string;
+  slow_mode_seconds?: number;
+  max_voice_participants?: number;
   is_locked: boolean;
   last_message_preview?: string | null;
   last_message_sender?: string | null;
@@ -562,6 +572,8 @@ export async function createCommunityChannel(
     name: string;
     description?: string | undefined;
     visibility?: "member" | "administrator" | undefined;
+    channel_type?: "text" | "voice" | undefined;
+    slow_mode_seconds?: number | undefined;
   },
 ): Promise<CommunityChatChannelItem> {
   return authRequest<CommunityChatChannelItem>(

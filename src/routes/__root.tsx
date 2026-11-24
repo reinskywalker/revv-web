@@ -12,6 +12,7 @@ import { type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "../lib/auth-context";
+import { I18nProvider } from "../lib/i18n";
 import { AppShellLayout } from "../components/revv/app-shell-layout";
 
 function NotFoundComponent() {
@@ -197,11 +198,13 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AppShellLayout>
-          <Outlet />
-        </AppShellLayout>
-      </AuthProvider>
+      <I18nProvider>
+        <AuthProvider>
+          <AppShellLayout>
+            <Outlet />
+          </AppShellLayout>
+        </AuthProvider>
+      </I18nProvider>
     </QueryClientProvider>
   );
 }

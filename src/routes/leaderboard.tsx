@@ -13,13 +13,13 @@ import {
   Zap,
 } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/revv/chrome";
+import { RevvAvatar } from "@/components/revv/RevvAvatar";
 import {
   adminRefreshLeaderboard,
   fetchMyProfile,
   fetchPublicLeaderboard,
   type LeaderboardEntry,
   type LeaderboardResponse,
-  resolveMediaUrl,
   updateMyPreferences,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -370,7 +370,6 @@ function LeaderboardPage() {
                   </thead>
                   <tbody className="divide-y divide-border/60 text-sm">
                     {sortedEntries.map((item, idx) => {
-                      const avatar = resolveMediaUrl(item.avatar_url);
                       return (
                         <tr
                           key={item.user_id}
@@ -398,17 +397,12 @@ function LeaderboardPage() {
                               params={{ username: item.username }}
                               className="flex items-center gap-3 group"
                             >
-                              {avatar ? (
-                                <img
-                                  src={avatar}
-                                  alt={item.display_name}
-                                  className="size-9 rounded-full object-cover border border-border"
-                                />
-                              ) : (
-                                <div className="flex size-9 items-center justify-center rounded-full bg-primary/15 text-primary font-mono text-xs font-bold">
-                                  {item.display_name.charAt(0).toUpperCase()}
-                                </div>
-                              )}
+                              <RevvAvatar
+                                src={item.avatar_url}
+                                name={item.display_name}
+                                frameCode={item.equipped_frame_code}
+                                size={36}
+                              />
                               <div className="min-w-0">
                                 <div className="font-display font-bold text-foreground group-hover:text-primary transition-colors truncate">
                                   {item.display_name}
@@ -468,7 +462,6 @@ function PodiumCard({
   rankNum: number;
   badgeColors: string;
 }) {
-  const avatar = resolveMediaUrl(rider.avatar_url);
   return (
     <Link
       to="/id/$username"
@@ -477,17 +470,12 @@ function PodiumCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          {avatar ? (
-            <img
-              src={avatar}
-              alt={rider.display_name}
-              className="size-12 rounded-full object-cover border border-border"
-            />
-          ) : (
-            <div className="flex size-12 items-center justify-center rounded-full bg-primary/20 text-primary font-mono text-base font-black">
-              {rider.display_name.charAt(0).toUpperCase()}
-            </div>
-          )}
+          <RevvAvatar
+            src={rider.avatar_url}
+            name={rider.display_name}
+            frameCode={rider.equipped_frame_code}
+            size={48}
+          />
           <div className="min-w-0">
             <h3 className="font-display text-base font-black text-foreground truncate">
               {rider.display_name}

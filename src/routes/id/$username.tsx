@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
+import { RevvAvatar } from "@/components/revv/RevvAvatar";
 import {
   ProfileEditorForm,
   type AccountVisibility,
@@ -552,19 +553,14 @@ function ProfilePage() {
                     avatarInputRef.current?.click();
                   }
                 }}
-                className={cn(
-                  "group relative size-24 sm:size-32 rounded-2xl border-4 border-card bg-secondary/80 shadow-2xl flex items-center justify-center overflow-hidden font-display text-4xl font-black text-primary cursor-pointer",
-                )}
+                className="group relative flex items-center justify-center cursor-pointer"
               >
-                {resolvedAvatarUrl ? (
-                  <img
-                    src={resolvedAvatarUrl}
-                    alt={displayName}
-                    className="size-full object-cover"
-                  />
-                ) : (
-                  profile.username.charAt(0).toUpperCase()
-                )}
+                <RevvAvatar
+                  src={profile.avatar_url}
+                  name={displayName}
+                  frameCode={profile.equipped_frame_code}
+                  size={104}
+                />
                 {isSelf && (
                   <div className="absolute bottom-1 right-1 flex items-center gap-1">
                     {resolvedAvatarUrl && (

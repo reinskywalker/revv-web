@@ -28,6 +28,7 @@ import {
   Settings,
   ShieldCheck,
   Sliders,
+  Sparkles,
   Trash2,
   Trophy,
   User,
@@ -38,6 +39,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Wordmark } from "./wordmark";
+import { RevvAvatar } from "./RevvAvatar";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useAuth } from "@/lib/auth-context";
 import {
   clearAllMyNotifications,
@@ -233,6 +236,13 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
           icon: Crown,
         },
         {
+          id: "admin-cosmetics",
+          label: "Cosmetics & Pricing",
+          to: "/admin",
+          search: { tab: "cosmetics" },
+          icon: Sparkles,
+        },
+        {
           id: "admin-trips",
           label: "Trip Records",
           to: "/trip-records",
@@ -348,6 +358,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
         { id: "clubs", label: "Clubs", to: "/clubs", icon: Users },
         { id: "leaderboard", label: "Leaderboard", to: "/leaderboard", icon: Trophy },
         { id: "news", label: "News", to: "/news", icon: FileText },
+        { id: "plans", label: "Plans & Cosmetics", to: "/plans", icon: Crown },
         { id: "profile", label: "My Profile", to: myProfilePath, icon: User },
       ],
     },
@@ -598,20 +609,12 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
               to={myProfilePath}
               className="flex items-center gap-2 rounded-full border border-border/80 bg-secondary/40 px-2.5 py-1 text-xs font-mono"
             >
-              <div className="flex size-6 items-center justify-center rounded-full bg-primary/20 text-primary font-bold text-[10px] overflow-hidden">
-                {userAvatarSrc ? (
-                  <img
-                    src={userAvatarSrc}
-                    alt={user.username ?? "Rider"}
-                    className="size-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                ) : (
-                  user.username?.charAt(0).toUpperCase() || "R"
-                )}
-              </div>
+              <RevvAvatar
+                src={user.avatar_url}
+                name={user.username ?? "Rider"}
+                frameCode={user.equipped_frame_code}
+                size={26}
+              />
               <span className="max-w-[90px] truncate font-medium">@{user.username}</span>
             </Link>
           ) : (
@@ -750,12 +753,12 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
             </button>
           </div>
           {!sidebarCollapsed && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-400">
                 <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 Rider Cockpit
               </span>
-              <span className="text-xs text-muted-foreground">v1.0.1</span>
+              <LanguageSwitcher compact />
             </div>
           )}
         </div>

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
+  BadgeCheck,
   Calendar,
   Check,
   CheckCircle2,
   Clock,
   Copy,
+  Flame,
   Hash,
   HelpCircle,
   Loader2,
@@ -17,9 +19,12 @@ import {
   Share2,
   Shield,
   Users,
+  Volume2,
   XCircle,
 } from "lucide-react";
 import { AppOpenBanner } from "@/components/revv/AppOpenBanner";
+import { ClubMembersPopupModal } from "@/components/revv/ClubMembersPopupModal";
+import { RevvAvatar } from "@/components/revv/RevvAvatar";
 import { resolveMediaUrl, type FeedPostItem } from "@/lib/api";
 import {
   AuthApiError,
@@ -116,7 +121,10 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
   const [newChannelVisibility, setNewChannelVisibility] = useState<"member" | "administrator">(
     "member",
   );
+  const [newChannelType, setNewChannelType] = useState<"text" | "voice">("text");
+  const [newChannelSlowMode, setNewChannelSlowMode] = useState<number>(0);
   const [creatingChannel, setCreatingChannel] = useState(false);
+  const [showMembersPopup, setShowMembersPopup] = useState(false);
 
   const [sharingEventId, setSharingEventId] = useState<string | null>(null);
 
@@ -300,10 +308,14 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
         name: newChannelName.trim(),
         description: newChannelDesc.trim() || undefined,
         visibility: newChannelVisibility,
+        channel_type: newChannelType,
+        slow_mode_seconds: newChannelType === "text" ? newChannelSlowMode : 0,
       });
       setNewChannelName("");
       setNewChannelDesc("");
       setNewChannelVisibility("member");
+      setNewChannelType("text");
+      setNewChannelSlowMode(0);
       setShowCreateChannel(false);
       setSelectedChannelId(ch.id);
       await loadClub();
@@ -449,6 +461,12 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                         {isPrivate && <Lock className="h-3 w-3" />}
                         {isPrivate ? "Private Club" : "Public Club"}
                       </span>
+                      {community.is_official && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-sky-400/40 bg-sky-500/15 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-sky-300">
+                          <BadgeCheck className="h-3.5 w-3.5" />
+                          Official REVV{community.country_code ? ` · ${community.country_code}` : ""}
+                        </span>
+                      )}
                       {community.my_role && isApproved && (
                         <span className="inline-flex items-center gap-1 rounded-full border border-primary/35 bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">
                           <Shield className="h-3 w-3" />
@@ -521,10 +539,33 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                     {community.location_name}
                   </span>
                 )}
-                <span className="inline-flex items-center gap-1.5">
-                  <Users className="h-4 w-4 text-primary" />
-                  {community.member_count} members
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowMembersPopup(true)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/50 px-3 py-1 font-mono text-xs font-semibold text-foreground transition hover:border-primary/50 hover:bg-secondary"
+                >
+                  <Users className="h-3.5 w-3.5 text-primary" />
+                  <span>
+                    {community.member_count} / {(community.member_limit ?? 30).toLocaleString()}{" "}
+                    members
+                  </span>
+                </button>
+                {!community.is_official && (
+                  <Link
+                    to="/plans"
+                    search={{ boostClub: community.id } as never}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-3 py-1 font-mono text-xs font-bold text-primary transition hover:bg-primary/25"
+                  >
+                    <Flame className="h-3.5 w-3.5" />
+                    {community.boost_count ? `Boosted (${community.boost_count})` : "Boost Club"}
+                  </Link>
+                )}
+                {(community.post_slow_mode_seconds ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-2.5 py-1 font-mono text-xs text-warning">
+                    <Clock className="h-3 w-3" />
+                    Post Slow Mode: {community.post_slow_mode_seconds}s
+                  </span>
+                )}
                 <span className="inline-flex items-center gap-1.5">
                   <Calendar className="h-4 w-4 text-primary" />
                   {community.event_count} events
@@ -736,6 +777,41 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                             </option>
                           </select>
                         </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                              Channel Type
+                            </label>
+                            <select
+                              value={newChannelType}
+                              onChange={(e) =>
+                                setNewChannelType(e.target.value as "text" | "voice")
+                              }
+                              className="w-full rounded-lg border border-border bg-background px-2 py-2 text-xs text-foreground"
+                            >
+                              <option value="text"># Text Chat</option>
+                              <option value="voice">🔊 Voice Channel (Boost)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                              Slow Mode
+                            </label>
+                            <select
+                              value={newChannelSlowMode}
+                              disabled={newChannelType === "voice"}
+                              onChange={(e) => setNewChannelSlowMode(Number(e.target.value))}
+                              className="w-full rounded-lg border border-border bg-background px-2 py-2 text-xs text-foreground disabled:opacity-50"
+                            >
+                              <option value={0}>Off</option>
+                              <option value={5}>5s</option>
+                              <option value={10}>10s</option>
+                              <option value={30}>30s</option>
+                              <option value={60}>1m</option>
+                              <option value={300}>5m</option>
+                            </select>
+                          </div>
+                        </div>
                         <button
                           type="submit"
                           disabled={creatingChannel}
@@ -793,8 +869,17 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                                   : "text-foreground/85 hover:bg-secondary",
                               )}
                             >
-                              <Hash className="h-4 w-4 shrink-0 text-muted-foreground" />
+                              {ch.channel_type === "voice" ? (
+                                <Volume2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                              ) : (
+                                <Hash className="h-4 w-4 shrink-0 text-muted-foreground" />
+                              )}
                               <span className="truncate">{ch.name}</span>
+                              {(ch.slow_mode_seconds ?? 0) > 0 && (
+                                <span className="ml-auto rounded bg-warning/15 px-1.5 py-0.5 font-mono text-[10px] text-warning">
+                                  {ch.slow_mode_seconds}s
+                                </span>
+                              )}
                             </button>
                           ))}
                         </div>
@@ -1128,17 +1213,12 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                         params={{ username: m.username }}
                         className="flex items-center gap-3.5 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40"
                       >
-                        {m.avatar_url ? (
-                          <img
-                            src={resolveMediaUrl(m.avatar_url) || ""}
-                            alt={m.display_name}
-                            className="h-11 w-11 rounded-full object-cover border border-border"
-                          />
-                        ) : (
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-bold text-foreground">
-                            {(m.display_name || m.username || "R").slice(0, 2).toUpperCase()}
-                          </div>
-                        )}
+                        <RevvAvatar
+                          src={m.avatar_url}
+                          name={m.display_name || m.username}
+                          frameCode={m.equipped_frame_code}
+                          size={44}
+                        />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-foreground">
                             {m.display_name}
@@ -1154,6 +1234,12 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
               )}
             </>
           )}
+          <ClubMembersPopupModal
+            open={showMembersPopup}
+            onClose={() => setShowMembersPopup(false)}
+            community={community}
+            members={detail?.members ?? []}
+          />
         </div>
       )}
     </div>

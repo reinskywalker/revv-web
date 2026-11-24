@@ -32,6 +32,7 @@ import {
 import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
 import { RichTextEditor } from "@/components/revv/RichTextEditor";
 import { AdminOverviewAnalyticsPanel } from "@/components/admin/AdminOverviewAnalyticsPanel";
+import { AdminCosmeticsPanel } from "@/components/admin/AdminCosmeticsPanel";
 import { AdminSubscriptionsPanel } from "@/components/admin/AdminSubscriptionsPanel";
 import { AdminUsersTablePanel } from "@/components/admin/AdminUsersTablePanel";
 import { AdminMasterDataPanel, type MasterSubTab } from "@/components/admin/AdminMasterDataPanel";
@@ -97,6 +98,7 @@ type AdminSubTab =
   | "overview"
   | "users"
   | "subscriptions"
+  | "cosmetics"
   | "master"
   | "news"
   | "broadcast"
@@ -170,6 +172,7 @@ function AdminPage() {
       t === "overview" ||
       t === "users" ||
       t === "subscriptions" ||
+      t === "cosmetics" ||
       t === "master" ||
       t === "news" ||
       t === "broadcast" ||
@@ -486,6 +489,9 @@ function AdminPage() {
               }}
             />
           )}
+
+          {/* TAB 2C: DB LOTTIE COSMETICS & LIVE PRICING */}
+          {isSuperuser && activeSubTab === "cosmetics" && <AdminCosmeticsPanel />}
 
           {/* TAB 3: MASTER DATA SUB-SUBMENUS */}
           {isSuperuser && activeSubTab === "master" && (

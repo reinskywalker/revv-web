@@ -61,6 +61,7 @@ export interface RiderProfile {
   middle_name?: string | null;
   last_name?: string | null;
   avatar_url?: string | null;
+  equipped_frame_code?: string | null;
   banner_url?: string | null;
   date_of_birth?: string | null;
   bio?: string | null;
@@ -172,6 +173,7 @@ export interface FeedPostItem {
   author_username: string;
   author_display_name: string;
   author_avatar_url?: string | null;
+  author_frame_code?: string | null;
   author_avatar?: string | null;
   post_type: string;
   caption?: string | null;
@@ -958,6 +960,7 @@ export interface PublicProfileResponse {
   middle_name: string | null;
   last_name: string | null;
   avatar_url: string | null;
+  equipped_frame_code?: string | null;
   banner_url: string | null;
   bio: string | null;
   city: string | null;
@@ -986,6 +989,7 @@ export interface FriendUserItem {
   username: string;
   display_name: string;
   avatar_url?: string | null;
+  equipped_frame_code?: string | null;
   city?: string | null;
   job?: string | null;
   connected_since: string;
@@ -1007,6 +1011,7 @@ export interface SocialRiderSearchResult {
   username: string;
   display_name: string;
   avatar_url?: string | null;
+  equipped_frame_code?: string | null;
   city?: string | null;
   friendship_status: "friends" | "outgoing_request" | "incoming_request" | "none";
 }
@@ -2126,6 +2131,7 @@ export interface LeaderboardEntry {
   username: string;
   display_name: string;
   avatar_url?: string | null;
+  equipped_frame_code?: string | null;
   city?: string | null;
   country?: string | null;
   primary_bike?: string | null;
