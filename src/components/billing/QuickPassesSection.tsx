@@ -1,16 +1,30 @@
 import { Loader2, Zap } from "lucide-react";
-import { formatDbPrice, type PlanPriceOption } from "@/lib/api-billing";
+import {
+  formatDbPrice,
+  getBillingTierRank,
+  type PlanPriceOption,
+  type UserEntitlementsDto,
+} from "@/lib/api-billing";
 import { useI18n } from "@/lib/i18n";
 
 interface QuickPassesSectionProps {
   passes: PlanPriceOption[];
+  entitlements?: UserEntitlementsDto | null;
   busyAction: string | null;
   onCheckout: (pass: PlanPriceOption) => void;
 }
 
-export function QuickPassesSection({ passes, busyAction, onCheckout }: QuickPassesSectionProps) {
+export function QuickPassesSection({
+  passes,
+  entitlements,
+  busyAction,
+  onCheckout,
+}: QuickPassesSectionProps) {
   const { t } = useI18n();
   if (passes.length === 0) return null;
+
+  const coveredByPaidTier =
+    Boolean(entitlements?.is_paid) && getBillingTierRank(entitlements?.tier_code) > 0;
 
   return (
     <section className="space-y-4">
@@ -42,12 +56,12 @@ export function QuickPassesSection({ passes, busyAction, onCheckout }: QuickPass
               </div>
               <button
                 type="button"
-                disabled={Boolean(busyAction)}
+                disabled={Boolean(busyAction) || coveredByPaidTier}
                 onClick={() => onCheckout(pass)}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 font-display text-xs font-bold uppercase tracking-wide text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
                 {busy && <Loader2 className="size-3.5 animate-spin" />}
-                {t("billing.activatePass")}
+                {coveredByPaidTier ? t("billing.includedInPlan") : t("billing.activatePass")}
               </button>
             </div>
           );

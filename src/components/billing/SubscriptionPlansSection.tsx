@@ -1,10 +1,18 @@
 import { Crown, Loader2 } from "lucide-react";
-import { formatDbPrice, type PlanPriceOption, type SubscriptionPlanGroup } from "@/lib/api-billing";
+import {
+  formatDbPrice,
+  getBillingPeriodRank,
+  getBillingTierRank,
+  type PlanPriceOption,
+  type SubscriptionPlanGroup,
+  type UserEntitlementsDto,
+} from "@/lib/api-billing";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 interface SubscriptionPlansSectionProps {
   plans: SubscriptionPlanGroup[];
+  entitlements?: UserEntitlementsDto | null;
   selectedPeriod: "weekly" | "monthly" | "yearly";
   onSelectPeriod: (period: "weekly" | "monthly" | "yearly") => void;
   busyAction: string | null;
@@ -13,6 +21,7 @@ interface SubscriptionPlansSectionProps {
 
 export function SubscriptionPlansSection({
   plans,
+  entitlements,
   selectedPeriod,
   onSelectPeriod,
   busyAction,
@@ -25,6 +34,10 @@ export function SubscriptionPlansSection({
     { id: "monthly", label: t("billing.periodMonthly") },
     { id: "yearly", label: t("billing.periodYearly") },
   ];
+
+  const isPaid = Boolean(entitlements?.is_paid);
+  const curTierRank = isPaid ? getBillingTierRank(entitlements?.tier_code) : 0;
+  const curPeriodRank = isPaid ? getBillingPeriodRank(entitlements?.billing_period) : 0;
 
   return (
     <section className="space-y-4">
@@ -59,10 +72,38 @@ export function SubscriptionPlansSection({
           const key = `plan_${group.tier_code}_${activeOption?.billing_period ?? "free"}`;
           const busy = busyAction === key;
 
+          const targetTierRank = getBillingTierRank(group.tier_code);
+          const targetPeriodRank = getBillingPeriodRank(activeOption?.billing_period);
+
+          let buttonLabel = t("billing.subscribe");
+          let actionDisabled = false;
+          let isSubscribedCard = false;
+
+          if (group.is_paid && activeOption && isPaid && curTierRank > 0) {
+            if (targetTierRank < curTierRank) {
+              buttonLabel = t("billing.unsubscribeToDowngrade");
+              actionDisabled = true;
+            } else if (targetTierRank > curTierRank) {
+              buttonLabel = t("billing.upgrade");
+            } else if (curPeriodRank > 0 && targetPeriodRank === curPeriodRank) {
+              buttonLabel = t("billing.subscribed");
+              actionDisabled = true;
+              isSubscribedCard = true;
+            } else if (curPeriodRank > 0 && targetPeriodRank < curPeriodRank) {
+              buttonLabel = t("billing.unsubscribeToDowngrade");
+              actionDisabled = true;
+            } else {
+              buttonLabel = t("billing.extendDuration");
+            }
+          }
+
           return (
             <div
               key={group.tier_code}
-              className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-card p-5"
+              className={cn(
+                "flex flex-col justify-between gap-4 rounded-2xl border bg-card p-5",
+                isSubscribedCard ? "border-primary ring-1 ring-primary/40" : "border-border",
+              )}
             >
               <div className="space-y-2">
                 <h3 className="font-display text-lg font-black">{group.name}</h3>
@@ -76,12 +117,17 @@ export function SubscriptionPlansSection({
               {group.is_paid && activeOption && (
                 <button
                   type="button"
-                  disabled={Boolean(busyAction)}
+                  disabled={Boolean(busyAction) || actionDisabled}
                   onClick={() => onSubscribe(group.tier_code, activeOption)}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 font-display text-xs font-bold uppercase text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  className={cn(
+                    "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-display text-xs font-bold uppercase disabled:opacity-60",
+                    isSubscribedCard
+                      ? "border border-primary/50 bg-primary/15 text-primary"
+                      : "bg-primary text-primary-foreground hover:bg-primary/90",
+                  )}
                 >
                   {busy && <Loader2 className="size-3.5 animate-spin" />}
-                  {t("billing.subscribe")}
+                  {buttonLabel}
                 </button>
               )}
             </div>

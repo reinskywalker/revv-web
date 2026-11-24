@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link, useLocation } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { AlertTriangle, Check, Loader2, ShieldCheck } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/revv/chrome";
 import { AccountDeletionCard } from "@/components/billing/AccountDeletionCard";
@@ -10,6 +10,7 @@ import { QuickPassesSection } from "@/components/billing/QuickPassesSection";
 import { SubscriptionPlansSection } from "@/components/billing/SubscriptionPlansSection";
 import {
   cancelMySubscription,
+  cancelPaymentOrder,
   createPaymentCheckout,
   equipMyAvatarFrame,
   equipMyCosmeticBadges,
@@ -20,7 +21,6 @@ import {
   requestAccountDeletion,
   type SubscriptionPlansCatalogResponse,
 } from "@/lib/api-billing";
-import { fetchCommunities, type CommunitySummary } from "@/lib/api-rider";
 import { useAuth } from "@/lib/auth-context";
 import {
   clearCosmeticsMemoryCache,
@@ -46,17 +46,13 @@ export const Route = createFileRoute("/plans")({
 function PlansPage() {
   const { user, isAuthenticated } = useAuth();
   const { t } = useI18n();
-  const location = useLocation();
-  const searchObj = (location.search ?? {}) as Record<string, string | undefined>;
-  const preselectedClubId = searchObj["boostClub"] ?? "";
 
   const [billingCatalog, setBillingCatalog] = useState<SubscriptionPlansCatalogResponse | null>(
     null,
   );
   const [cosmetics, setCosmetics] = useState<CosmeticsCatalogResponse | null>(null);
-  const [myClubs, setMyClubs] = useState<CommunitySummary[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<"weekly" | "monthly" | "yearly">("monthly");
-  const [selectedBoostClubId, setSelectedBoostClubId] = useState(preselectedClubId);
+  const [boostQuantity, setBoostQuantity] = useState(1);
   const [selectedProvider, setSelectedProvider] = useState<"midtrans" | "doku">("midtrans");
   const [selectedChannel, setSelectedChannel] = useState("qris");
   const [loading, setLoading] = useState(true);
@@ -71,19 +67,14 @@ function PlansPage() {
     try {
       const cosPromise = fetchCosmeticsCatalogCached(true);
       if (isAuthenticated) {
-        const [plansRes, cosRes, clubsRes] = await Promise.all([
-          fetchSubscriptionPlansCatalog(),
-          cosPromise,
-          fetchCommunities({ joined_only: true }).catch(() => []),
-        ]);
+        const [plansRes, cosRes] = await Promise.all([fetchSubscriptionPlansCatalog(), cosPromise]);
         setBillingCatalog(plansRes);
         setCosmetics(cosRes);
-        setMyClubs(clubsRes);
-        if (!selectedBoostClubId && clubsRes.length > 0) {
-          setSelectedBoostClubId(preselectedClubId || clubsRes[0]!.id);
-        }
-        if (plansRes.pending_orders.length > 0 && !activeOrder) {
-          setActiveOrder(plansRes.pending_orders[0]!);
+        const nonPlayPending = plansRes.pending_orders.filter(
+          (o) => o.provider !== "google_play" && o.status === "PENDING",
+        );
+        if (nonPlayPending.length > 0 && !activeOrder) {
+          setActiveOrder(nonPlayPending[0]!);
         }
       } else {
         setCosmetics(await cosPromise);
@@ -93,7 +84,7 @@ function PlansPage() {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, preselectedClubId, selectedBoostClubId, activeOrder]);
+  }, [isAuthenticated, activeOrder]);
 
   useEffect(() => {
     void loadData();
@@ -103,7 +94,7 @@ function PlansPage() {
     item_type: "subscription" | "club_boost" | "cosmetic_frame" | "cosmetic_badge";
     item_code: string;
     billing_period?: string;
-    target_community_id?: string;
+    quantity?: number;
     key: string;
   }) => {
     if (!isAuthenticated) {
@@ -120,7 +111,7 @@ function PlansPage() {
         item_type: params.item_type,
         item_code: params.item_code,
         billing_period: params.billing_period,
-        target_community_id: params.target_community_id,
+        quantity: params.quantity && params.quantity > 1 ? params.quantity : undefined,
         payment_channel: selectedChannel,
         idempotency_key: idemKey,
       });
@@ -137,6 +128,21 @@ function PlansPage() {
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handleCancelOrder = async (orderCode: string) => {
+    setBusyAction(`cancel_${orderCode}`);
+    setError(null);
+    try {
+      await cancelPaymentOrder(orderCode);
+      setActiveOrder(null);
+      setNotice(t("billing.orderCancelled", { code: orderCode }));
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to cancel pending order.");
     } finally {
       setBusyAction(null);
     }
@@ -335,13 +341,19 @@ function PlansPage() {
           </div>
         )}
 
-        {activeOrder && activeOrder.status === "PENDING" && (
-          <PendingOrderBanner
-            order={activeOrder}
-            busy={busyAction === `poll_${activeOrder.order_code}`}
-            onCheckStatus={(code) => void handleCheckOrderStatus(code)}
-          />
-        )}
+        {activeOrder &&
+          activeOrder.status === "PENDING" &&
+          activeOrder.provider !== "google_play" && (
+            <PendingOrderBanner
+              order={activeOrder}
+              busy={
+                busyAction === `poll_${activeOrder.order_code}` ||
+                busyAction === `cancel_${activeOrder.order_code}`
+              }
+              onCheckStatus={(code) => void handleCheckOrderStatus(code)}
+              onCancelOrder={(code) => void handleCancelOrder(code)}
+            />
+          )}
 
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
@@ -354,6 +366,7 @@ function PlansPage() {
               <>
                 <QuickPassesSection
                   passes={billingCatalog.passes}
+                  entitlements={billingCatalog.entitlements}
                   busyAction={busyAction}
                   onCheckout={(pass) =>
                     void handleCheckout({
@@ -367,6 +380,7 @@ function PlansPage() {
 
                 <SubscriptionPlansSection
                   plans={billingCatalog.plans}
+                  entitlements={billingCatalog.entitlements}
                   selectedPeriod={selectedPeriod}
                   onSelectPeriod={setSelectedPeriod}
                   busyAction={busyAction}
@@ -383,16 +397,18 @@ function PlansPage() {
                 <ClubBoostSection
                   options={billingCatalog.club_boost.options}
                   levels={billingCatalog.club_boost.levels}
-                  myClubs={myClubs}
-                  selectedClubId={selectedBoostClubId}
-                  onSelectClub={setSelectedBoostClubId}
+                  quantity={boostQuantity}
+                  onQuantityChange={setBoostQuantity}
+                  itemOnlyEligible={Boolean(billingCatalog.club_boost.item_only_eligible)}
+                  itemAddonMonthly={billingCatalog.club_boost.item_addon_monthly}
+                  itemAddonYearly={billingCatalog.club_boost.item_addon_yearly}
                   busyAction={busyAction}
                   onBoost={(opt) =>
                     void handleCheckout({
                       item_type: "club_boost",
                       item_code: opt.tier_code,
                       billing_period: opt.billing_period,
-                      target_community_id: selectedBoostClubId,
+                      quantity: boostQuantity,
                       key: `boost_${opt.plan_key}`,
                     })
                   }

@@ -72,6 +72,7 @@ export interface PaymentOrderDto {
   item_code: string;
   billing_period?: string | null;
   target_community_id?: string | null;
+  quantity?: number;
   currency: string;
   expected_amount: number;
   status: string;
@@ -92,9 +93,41 @@ export interface SubscriptionPlansCatalogResponse {
   club_boost: {
     name: string;
     tagline: string;
+    item_only_eligible?: boolean;
+    item_addon_monthly?: PlanPriceOption | null;
+    item_addon_yearly?: PlanPriceOption | null;
     options: PlanPriceOption[];
     levels: ClubBoostLevelInfo[];
   };
+}
+
+export function getBillingTierRank(tierCode?: string | null): number {
+  switch ((tierCode ?? "").trim().toLowerCase()) {
+    case "street":
+    case "throttle":
+      return 1;
+    case "apex":
+      return 2;
+    case "grand_tourer":
+      return 3;
+    default:
+      return 0;
+  }
+}
+
+export function getBillingPeriodRank(period?: string | null): number {
+  switch ((period ?? "").trim().toLowerCase()) {
+    case "weekly":
+      return 1;
+    case "monthly":
+      return 2;
+    case "yearly":
+    case "annual":
+    case "annually":
+      return 3;
+    default:
+      return 0;
+  }
 }
 
 export function formatDbPrice(currency: string, amount: number): string {
@@ -117,6 +150,7 @@ export async function createPaymentCheckout(payload: {
   item_code: string;
   billing_period?: string;
   target_community_id?: string;
+  quantity?: number;
   payment_channel?: string;
   idempotency_key: string;
 }): Promise<{ order: PaymentOrderDto; reused: boolean }> {
@@ -133,6 +167,13 @@ export async function fetchPaymentOrderStatus(
   return authRequest<{ order: PaymentOrderDto }>(
     `/payments/orders/${encodeURIComponent(orderCode)}`,
   );
+}
+
+export async function cancelPaymentOrder(orderCode: string): Promise<void> {
+  await authRequest(`/payments/orders/${encodeURIComponent(orderCode)}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 }
 
 export async function cancelMySubscription(
