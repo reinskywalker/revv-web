@@ -75,6 +75,15 @@ export interface CosmeticsCatalogResponse {
   equipped_frame_code?: string | null;
   frames: CosmeticFrameItem[];
   badges: CosmeticBadgeItem[];
+  ui_assets?: Record<
+    string,
+    {
+      code: string;
+      category: string;
+      asset_hash: string;
+      lottie_url: string;
+    }
+  >;
 }
 
 const STORAGE_CATALOG_KEY = "revv_cosmetics_catalog_v2";
@@ -84,6 +93,22 @@ const LOTTIE_CACHE_NAME = "revv-lottie-v2";
 let memoryCatalog: CosmeticsCatalogResponse | null = null;
 let memoryCatalogFetchedAt = 0;
 let inflightCatalogPromise: Promise<CosmeticsCatalogResponse | null> | null = null;
+const catalogSubscribers = new Set<(catalog: CosmeticsCatalogResponse | null) => void>();
+
+function notifyCatalogSubscribers(catalog: CosmeticsCatalogResponse | null): void {
+  for (const listener of catalogSubscribers) {
+    listener(catalog);
+  }
+}
+
+export function subscribeCosmeticsCatalog(
+  listener: (catalog: CosmeticsCatalogResponse | null) => void,
+): () => void {
+  catalogSubscribers.add(listener);
+  return () => {
+    catalogSubscribers.delete(listener);
+  };
+}
 
 const memoryLottieMap = new Map<string, Record<string, unknown>>();
 const inflightLottieMap = new Map<string, Promise<Record<string, unknown> | null>>();
@@ -118,6 +143,26 @@ export function clearCosmeticsMemoryCache(): void {
   inflightCatalogPromise = null;
   memoryLottieMap.clear();
   inflightLottieMap.clear();
+  notifyCatalogSubscribers(null);
+}
+
+function prewarmWebLotties(catalog: CosmeticsCatalogResponse): void {
+  if (typeof window === "undefined" || !("caches" in window)) return;
+  for (const uiAsset of Object.values(catalog.ui_assets ?? {})) {
+    if (uiAsset?.asset_hash) {
+      void fetchLottieByHashCached(uiAsset.asset_hash, uiAsset.lottie_url);
+    }
+  }
+  for (const f of catalog.frames ?? []) {
+    if (f.asset_hash && (f.unlocked || f.equipped)) {
+      void fetchLottieByHashCached(f.asset_hash, f.lottie_url);
+    }
+  }
+  for (const b of catalog.badges ?? []) {
+    if (b.asset_hash && (b.unlocked || b.equipped)) {
+      void fetchLottieByHashCached(b.asset_hash, b.lottie_url);
+    }
+  }
 }
 
 export async function fetchCosmeticsCatalogCached(
@@ -148,6 +193,8 @@ export async function fetchCosmeticsCatalogCached(
       if (res.status === 304 && stored.catalog) {
         memoryCatalog = stored.catalog;
         memoryCatalogFetchedAt = Date.now();
+        notifyCatalogSubscribers(stored.catalog);
+        prewarmWebLotties(stored.catalog);
         return stored.catalog;
       }
       if (!res.ok) {
@@ -160,6 +207,8 @@ export async function fetchCosmeticsCatalogCached(
         memoryCatalog = catalog;
         memoryCatalogFetchedAt = Date.now();
         writeStoredCatalog(catalog, etag);
+        notifyCatalogSubscribers(catalog);
+        prewarmWebLotties(catalog);
       }
       return catalog;
     } catch {
@@ -199,8 +248,11 @@ export async function fetchLottieByHashCached(
         const cachedResp = await cache.match(targetUrl);
         if (cachedResp) {
           const parsed = (await cachedResp.json()) as Record<string, unknown>;
-          memoryLottieMap.set(hash, parsed);
-          return parsed;
+          if (parsed && typeof parsed === "object" && Array.isArray(parsed.layers)) {
+            memoryLottieMap.set(hash, parsed);
+            return parsed;
+          }
+          await cache.delete(targetUrl);
         }
       } catch {
         // CacheStorage may be disabled in private browsing
@@ -212,6 +264,9 @@ export async function fetchLottieByHashCached(
       if (!resp.ok) return null;
       const cloned = resp.clone();
       const parsed = (await resp.json()) as Record<string, unknown>;
+      if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.layers)) {
+        return null;
+      }
       memoryLottieMap.set(hash, parsed);
       if (typeof window !== "undefined" && "caches" in window) {
         window.caches
@@ -238,6 +293,9 @@ export function useCosmeticsCatalog(): CosmeticsCatalogResponse | null {
 
   useEffect(() => {
     let active = true;
+    const unsub = subscribeCosmeticsCatalog((next) => {
+      if (active) setCatalog(next);
+    });
     void fetchCosmeticsCatalogCached().then((data) => {
       if (active && data) {
         setCatalog(data);
@@ -245,6 +303,7 @@ export function useCosmeticsCatalog(): CosmeticsCatalogResponse | null {
     });
     return () => {
       active = false;
+      unsub();
     };
   }, []);
 
