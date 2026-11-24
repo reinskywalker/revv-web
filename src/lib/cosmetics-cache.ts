@@ -30,6 +30,8 @@ export interface CosmeticFrameItem {
   is_animated: boolean;
   asset_hash?: string | null;
   lottie_url?: string | null;
+  bundled_badge_code?: string | null;
+  bundled_badge_title?: string | null;
   unlocked: boolean;
   equipped: boolean;
   granted_reason?: string | null;
@@ -54,6 +56,8 @@ export interface CosmeticBadgeItem {
   is_animated: boolean;
   asset_hash?: string | null;
   lottie_url?: string | null;
+  bundled_badge_code?: string | null;
+  bundled_badge_title?: string | null;
   unlocked: boolean;
   equipped: boolean;
   granted_reason?: string | null;
@@ -73,9 +77,9 @@ export interface CosmeticsCatalogResponse {
   badges: CosmeticBadgeItem[];
 }
 
-const STORAGE_CATALOG_KEY = "revv_cosmetics_catalog_v1";
-const STORAGE_ETAG_KEY = "revv_cosmetics_etag_v1";
-const LOTTIE_CACHE_NAME = "revv-lottie-v1";
+const STORAGE_CATALOG_KEY = "revv_cosmetics_catalog_v2";
+const STORAGE_ETAG_KEY = "revv_cosmetics_etag_v2";
+const LOTTIE_CACHE_NAME = "revv-lottie-v2";
 
 let memoryCatalog: CosmeticsCatalogResponse | null = null;
 let memoryCatalogFetchedAt = 0;

@@ -90,6 +90,7 @@ export const WEB_MESSAGES = {
     "billing.equip": "Equip",
     "billing.unequip": "Unequip",
     "billing.buyNow": "Buy {price}",
+    "billing.includesBadgePill": "Includes badge: {badge}",
     "billing.freeTrack": "Earned via Milestone / Event",
     "billing.deletionTitle": "Request Account Deletion (Soft-Delete First)",
     "billing.deletionSubtitle":
@@ -195,6 +196,7 @@ export const WEB_MESSAGES = {
     "billing.equip": "Pakai",
     "billing.unequip": "Lepas",
     "billing.buyNow": "Beli {price}",
+    "billing.includesBadgePill": "Bonus badge: {badge}",
     "billing.freeTrack": "Diraih dari Milestone / Event",
     "billing.deletionTitle": "Ajukan Penghapusan Akun (Soft-Delete Dahulu)",
     "billing.deletionSubtitle":
@@ -303,6 +305,7 @@ export const WEB_MESSAGES = {
     "billing.equip": "装備する",
     "billing.unequip": "外す",
     "billing.buyNow": "{price} で購入",
+    "billing.includesBadgePill": "付属バッジ: {badge}",
     "billing.freeTrack": "マイルストーン / イベント獲得",
     "billing.deletionTitle": "アカウント削除リクエスト（ソフトデリート優先）",
     "billing.deletionSubtitle":
@@ -409,6 +412,7 @@ export const WEB_MESSAGES = {
     "billing.equip": "Anlegen",
     "billing.unequip": "Ablegen",
     "billing.buyNow": "Kaufen ({price})",
+    "billing.includesBadgePill": "Inkl. Badge: {badge}",
     "billing.freeTrack": "Über Meilenstein / Event verdient",
     "billing.deletionTitle": "Kontolöschung anfordern (Soft-Delete zuerst)",
     "billing.deletionSubtitle":

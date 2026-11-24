@@ -67,6 +67,13 @@ export function CosmeticsShopSection({
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="truncate font-display text-sm font-black">{frame.title}</div>
                   <p className="line-clamp-2 text-xs text-muted-foreground">{frame.description}</p>
+                  {frame.bundled_badge_code && (
+                    <span className="inline-block rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                      {t("billing.includesBadgePill", {
+                        badge: frame.bundled_badge_title ?? frame.bundled_badge_code,
+                      })}
+                    </span>
+                  )}
                   {frame.unlocked ? (
                     <button
                       type="button"
