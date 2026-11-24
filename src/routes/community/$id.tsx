@@ -1,26 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ClubDetailView } from "@/components/revv/ClubDetailView";
-import { SiteFooter, SiteHeader } from "@/components/revv/chrome";
-import { useAuth } from "@/lib/auth-context";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/community/$id")({
-  head: () => ({
-    meta: [{ title: "Club Detail — REVV" }],
-  }),
-  component: LegacyCommunityDetailRoutePage,
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: "/clubs/$id",
+      params: { id: params.id },
+      replace: true,
+    });
+  },
+  component: () => null,
 });
-
-function LegacyCommunityDetailRoutePage() {
-  const { id } = Route.useParams();
-  const { isAuthenticated } = useAuth();
-
-  return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <SiteHeader />
-      <main className="flex-1">
-        <ClubDetailView communityId={id} />
-      </main>
-      {!isAuthenticated && <SiteFooter />}
-    </div>
-  );
-}
