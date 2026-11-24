@@ -139,7 +139,8 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
       setFallbackSummary(data.community);
 
       const isPrivate = (data.community.visibility || "public").toLowerCase() === "private";
-      const approved = isApprovedMemberStatus(data.community.my_status) ||
+      const approved =
+        isApprovedMemberStatus(data.community.my_status) ||
         Boolean(user?.id && data.community.owner_id === user.id);
 
       if (!isPrivate || approved) {
@@ -173,9 +174,7 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
 
   const community = detail?.community ?? fallbackSummary;
   const isOwner = Boolean(user?.id && community && community.owner_id === user.id);
-  const isApproved = Boolean(
-    community && (isOwner || isApprovedMemberStatus(community.my_status)),
-  );
+  const isApproved = Boolean(community && (isOwner || isApprovedMemberStatus(community.my_status)));
   const isPending = Boolean(community && isPendingMemberStatus(community.my_status));
   const isPrivate = (community?.visibility || "public").toLowerCase() === "private";
   const canManage = Boolean(community && (isOwner || isAdminRole(community.my_role)));
@@ -188,11 +187,13 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
   }, [detail?.channels]);
 
   const adminChannels = useMemo(
-    () => sortedChannels.filter((c) => (c.visibility || "member").toLowerCase() === "administrator"),
+    () =>
+      sortedChannels.filter((c) => (c.visibility || "member").toLowerCase() === "administrator"),
     [sortedChannels],
   );
   const memberChannels = useMemo(
-    () => sortedChannels.filter((c) => (c.visibility || "member").toLowerCase() !== "administrator"),
+    () =>
+      sortedChannels.filter((c) => (c.visibility || "member").toLowerCase() !== "administrator"),
     [sortedChannels],
   );
 
@@ -350,7 +351,13 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
     }
   };
 
-  const handleShareEventLink = async (eventId: string) => {
+  const handleShareEventLink = async (eventId: string, existingToken?: string | null) => {
+    if (existingToken && existingToken.trim().length > 0) {
+      const url = `${window.location.origin}/e/${existingToken.trim()}`;
+      await navigator.clipboard?.writeText(url).catch(() => undefined);
+      setActionNotice(`Event view link copied: ${url}`);
+      return;
+    }
     setSharingEventId(eventId);
     try {
       const res = await createEventShareLink(eventId);
@@ -464,7 +471,8 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                       {community.is_official && (
                         <span className="inline-flex items-center gap-1 rounded-full border border-sky-400/40 bg-sky-500/15 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-sky-300">
                           <BadgeCheck className="h-3.5 w-3.5" />
-                          Official REVV{community.country_code ? ` · ${community.country_code}` : ""}
+                          Official REVV
+                          {community.country_code ? ` · ${community.country_code}` : ""}
                         </span>
                       )}
                       {community.my_role && isApproved && (
@@ -486,7 +494,11 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                     onClick={() => void handleCopyClubLink()}
                     className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-border bg-secondary/70 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-secondary"
                   >
-                    {copiedUrl ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                    {copiedUrl ? (
+                      <Check className="h-4 w-4 text-emerald-400" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
                     {copiedUrl ? "Link Copied" : "Share URL"}
                   </button>
 
@@ -581,7 +593,7 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
           </section>
 
           {/* Private Lock Gate */}
-          {(isPrivateBlocked || (isPrivate && !isApproved)) ? (
+          {isPrivateBlocked || (isPrivate && !isApproved) ? (
             <section className="rounded-2xl border border-amber-500/30 bg-card p-8 text-center">
               <Lock className="mx-auto h-10 w-10 text-amber-400" />
               <h2 className="mt-3 text-xl font-bold text-foreground">Members-Only Club</h2>
@@ -601,7 +613,13 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                   [
                     { id: "feed", label: "Feed", count: posts.length },
                     ...(isApproved
-                      ? [{ id: "channels" as const, label: "Channels", count: sortedChannels.length }]
+                      ? [
+                          {
+                            id: "channels" as const,
+                            label: "Channels",
+                            count: sortedChannels.length,
+                          },
+                        ]
                       : []),
                     { id: "events", label: "Events", count: detail?.events.length ?? 0 },
                     { id: "threads", label: "Threads", count: detail?.threads.length ?? 0 },
@@ -719,6 +737,31 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                       </article>
                     ))
                   )}
+                </div>
+              )}
+
+              {/* CHANNELS TAB (Non-member public preview: list only, cannot enter) */}
+              {activeTab === "channels" && !isApproved && (
+                <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    Join this club to enter channels and participate in chat or voice rooms.
+                  </p>
+                  <div className="space-y-2">
+                    {memberChannels.map((ch) => (
+                      <div
+                        key={ch.id}
+                        className="flex items-center justify-between rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm text-foreground/80"
+                      >
+                        <span className="inline-flex items-center gap-2 font-semibold">
+                          <Hash className="h-4 w-4 text-muted-foreground" />
+                          {ch.name}
+                        </span>
+                        <span className="text-[11px] font-semibold text-muted-foreground">
+                          Members only
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -1059,7 +1102,9 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                               <button
                                 type="button"
                                 disabled={sharingEventId === ev.id}
-                                onClick={() => void handleShareEventLink(ev.id)}
+                                onClick={() =>
+                                  void handleShareEventLink(ev.id, ev.active_share_token)
+                                }
                                 className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-border bg-secondary px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary/80"
                               >
                                 <Share2 className="h-3.5 w-3.5" />
