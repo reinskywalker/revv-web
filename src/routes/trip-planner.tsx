@@ -20,6 +20,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+import { TripMapPicker, type MapPoint } from "@/components/revv/TripMapPicker";
 import { authRequest } from "@/lib/api";
 import {
   addTripPlanCollaborator,
@@ -32,8 +33,10 @@ import {
   submitTripPlanForReview,
   updateTripPlan,
   type TripChecklistItem,
+  type TripChecklistSection,
   type TripPlanItem,
   type TripPlanStatus,
+  type TripWaypointStop,
 } from "@/lib/api-trip-plans";
 import { useAuth } from "@/lib/auth-context";
 import { cn, getErrorMessage } from "@/lib/utils";
@@ -44,6 +47,9 @@ export const Route = createFileRoute("/trip-planner")({
   }),
   component: TripPlannerPage,
 });
+
+const MAX_SECTIONS = 5;
+const MAX_ITEMS_PER_SECTION = 10;
 
 interface ClubOption {
   id: string;
@@ -73,6 +79,29 @@ const STATUS_BADGE: Record<TripPlanStatus, { label: string; className: string }>
   },
 };
 
+function uid(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function normalizeWaypointsList(raw: TripPlanItem["waypoints"]): TripWaypointStop[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((entry): TripWaypointStop | null => {
+      if (typeof entry === "string") {
+        return entry.trim() ? { name: entry.trim() } : null;
+      }
+      if (entry && typeof entry === "object" && entry.name) {
+        return {
+          name: entry.name,
+          lat: typeof entry.lat === "number" ? entry.lat : null,
+          lng: typeof entry.lng === "number" ? entry.lng : null,
+        };
+      }
+      return null;
+    })
+    .filter((x): x is TripWaypointStop => x !== null);
+}
+
 function TripPlannerPage() {
   const { isAuthenticated, user } = useAuth();
   const [plans, setPlans] = useState<TripPlanItem[]>([]);
@@ -82,17 +111,20 @@ function TripPlannerPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"mine" | "review">("mine");
 
-  // Create / Edit form state
+  // Create / Edit form state with coordinates
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [clubId, setClubId] = useState("");
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
   const [departureDate, setDepartureDate] = useState("");
-  const [meetingPoint, setMeetingPoint] = useState("");
-  const [destinationName, setDestinationName] = useState("");
-  const [waypointsText, setWaypointsText] = useState("");
+  const [meeting, setMeeting] = useState<MapPoint | null>(null);
+  const [meetingNameInput, setMeetingNameInput] = useState("");
+  const [destination, setDestination] = useState<MapPoint | null>(null);
+  const [destinationNameInput, setDestinationNameInput] = useState("");
+  const [waypoints, setWaypoints] = useState<TripWaypointStop[]>([]);
   const [notes, setNotes] = useState("");
+  const [editorSections, setEditorSections] = useState<TripChecklistSection[]>([]);
+  const [newSectionTitle, setNewSectionTitle] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Collaborator invite input per plan
@@ -106,10 +138,11 @@ function TripPlannerPage() {
   const [reviewReason, setReviewReason] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
 
-  // Local-first checklist state per plan (sent to backend only on Save)
-  const [localChecklists, setLocalChecklists] = useState<Record<string, TripChecklistItem[]>>({});
+  // Local-first sectioned checklists per plan (synced explicitly on Save)
+  const [localChecklists, setLocalChecklists] = useState<Record<string, TripChecklistSection[]>>({});
   const [dirtyChecklists, setDirtyChecklists] = useState<Record<string, boolean>>({});
-  const [newChecklistLabel, setNewChecklistLabel] = useState<Record<string, string>>({});
+  const [newSectionDrafts, setNewSectionDrafts] = useState<Record<string, string>>({});
+  const [newItemDrafts, setNewItemDrafts] = useState<Record<string, string>>({});
   const [savingChecklistId, setSavingChecklistId] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
@@ -130,7 +163,7 @@ function TripPlannerPage() {
         const next = { ...prev };
         for (const p of planList) {
           if (!dirtyChecklists[p.id]) {
-            next[p.id] = Array.isArray(p.checklist_items) ? p.checklist_items : [];
+            next[p.id] = Array.isArray(p.checklist_sections) ? p.checklist_sections : [];
           }
         }
         return next;
@@ -150,7 +183,7 @@ function TripPlannerPage() {
     () => plans.filter((p) => p.can_review && p.status === "pending_review"),
     [plans],
   );
-  const myPlans = useMemo(() => {
+  const visiblePlans = useMemo(() => {
     if (activeTab === "review") return pendingReviewPlans;
     return plans;
   }, [activeTab, pendingReviewPlans, plans]);
@@ -159,12 +192,15 @@ function TripPlannerPage() {
     setEditingId(null);
     setClubId(clubs[0]?.id ?? "");
     setTitle("");
-    setDescription("");
     setDepartureDate("");
-    setMeetingPoint("");
-    setDestinationName("");
-    setWaypointsText("");
+    setMeeting(null);
+    setMeetingNameInput("");
+    setDestination(null);
+    setDestinationNameInput("");
+    setWaypoints([]);
     setNotes("");
+    setEditorSections([{ id: uid("sec"), title: "Medical", items: [] }]);
+    setNewSectionTitle("");
     setEditorOpen(true);
   };
 
@@ -172,12 +208,30 @@ function TripPlannerPage() {
     setEditingId(plan.id);
     setClubId(plan.community_id ?? "");
     setTitle(plan.title);
-    setDescription(plan.description ?? "");
     setDepartureDate(plan.departure_date ? plan.departure_date.slice(0, 16) : "");
-    setMeetingPoint(plan.meeting_point ?? "");
-    setDestinationName(plan.destination_name ?? "");
-    setWaypointsText(Array.isArray(plan.waypoints) ? plan.waypoints.join("\n") : "");
+    if (typeof plan.meeting_lat === "number" && typeof plan.meeting_lng === "number") {
+      setMeeting({
+        name: plan.meeting_point ?? "Meeting Point",
+        lat: plan.meeting_lat,
+        lng: plan.meeting_lng,
+      });
+    } else {
+      setMeeting(null);
+    }
+    setMeetingNameInput(plan.meeting_point ?? "");
+    if (typeof plan.destination_lat === "number" && typeof plan.destination_lng === "number") {
+      setDestination({
+        name: plan.destination_name ?? "Destination",
+        lat: plan.destination_lat,
+        lng: plan.destination_lng,
+      });
+    } else {
+      setDestination(null);
+    }
+    setDestinationNameInput(plan.destination_name ?? "");
+    setWaypoints(normalizeWaypointsList(plan.waypoints));
     setNotes(plan.notes ?? "");
+    setEditorSections(Array.isArray(plan.checklist_sections) ? plan.checklist_sections : []);
     setEditorOpen(true);
   };
 
@@ -187,25 +241,29 @@ function TripPlannerPage() {
       setError("Trip plan title must be at least 3 characters.");
       return;
     }
+    if (!meeting || !destination) {
+      setError("Pick both a Meeting Point and Destination pin on the map so Mobile can render the route thumbnail.");
+      return;
+    }
     setSaving(true);
     setError(null);
     setNotice(null);
-    const waypoints = waypointsText
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean);
     const isoDate = departureDate ? new Date(departureDate).toISOString() : null;
     try {
       if (editingId) {
         await updateTripPlan(editingId, {
           title: cleanTitle,
-          description: description.trim() || undefined,
           departure_date: isoDate,
-          meeting_point: meetingPoint.trim() || undefined,
-          destination_name: destinationName.trim() || undefined,
+          meeting_point: meetingNameInput.trim() || meeting.name,
+          meeting_lat: meeting.lat,
+          meeting_lng: meeting.lng,
+          destination_name: destinationNameInput.trim() || destination.name,
+          destination_lat: destination.lat,
+          destination_lng: destination.lng,
           waypoints,
           notes: notes.trim() || undefined,
         });
+        await saveTripPlanChecklist(editingId, editorSections);
         if (submitForReview) {
           const res = await submitTripPlanForReview(editingId);
           setNotice(
@@ -220,13 +278,17 @@ function TripPlannerPage() {
         const res = await createTripPlan({
           community_id: clubId || null,
           title: cleanTitle,
-          description: description.trim() || undefined,
           departure_date: isoDate,
-          meeting_point: meetingPoint.trim() || undefined,
-          destination_name: destinationName.trim() || undefined,
+          meeting_point: meetingNameInput.trim() || meeting.name,
+          meeting_lat: meeting.lat,
+          meeting_lng: meeting.lng,
+          destination_name: destinationNameInput.trim() || destination.name,
+          destination_lat: destination.lat,
+          destination_lng: destination.lng,
           waypoints,
           notes: notes.trim() || undefined,
           submit_for_review: submitForReview,
+          checklist_sections: editorSections.filter((s) => s.title.trim().length > 0),
         });
         setNotice(
           res.status === "pending_review"
@@ -307,48 +369,53 @@ function TripPlannerPage() {
     }
   };
 
-  const toggleLocalChecklistItem = (planId: string, itemId: string) => {
+  const updatePlanSections = (
+    planId: string,
+    updater: (prev: TripChecklistSection[]) => TripChecklistSection[],
+  ) => {
     setLocalChecklists((prev) => ({
       ...prev,
-      [planId]: (prev[planId] ?? []).map((item) =>
-        item.id === itemId ? { ...item, checked: !item.checked } : item,
-      ),
+      [planId]: updater(prev[planId] ?? []),
     }));
     setDirtyChecklists((prev) => ({ ...prev, [planId]: true }));
   };
 
-  const addLocalChecklistItem = (planId: string) => {
-    const label = (newChecklistLabel[planId] ?? "").trim();
+  const handleAddCardSection = (planId: string) => {
+    const label = (newSectionDrafts[planId] ?? "").trim();
     if (!label) return;
-    const item: TripChecklistItem = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      label,
-      checked: false,
-    };
-    setLocalChecklists((prev) => ({
-      ...prev,
-      [planId]: [...(prev[planId] ?? []), item],
-    }));
-    setNewChecklistLabel((prev) => ({ ...prev, [planId]: "" }));
-    setDirtyChecklists((prev) => ({ ...prev, [planId]: true }));
+    const current = localChecklists[planId] ?? [];
+    if (current.length >= MAX_SECTIONS) {
+      setError(`Maximum ${MAX_SECTIONS} checklist sections allowed per trip plan.`);
+      return;
+    }
+    updatePlanSections(planId, (prev) => [...prev, { id: uid("sec"), title: label, items: [] }]);
+    setNewSectionDrafts((prev) => ({ ...prev, [planId]: "" }));
   };
 
-  const removeLocalChecklistItem = (planId: string, itemId: string) => {
-    setLocalChecklists((prev) => ({
-      ...prev,
-      [planId]: (prev[planId] ?? []).filter((item) => item.id !== itemId),
-    }));
-    setDirtyChecklists((prev) => ({ ...prev, [planId]: true }));
+  const handleAddCardItem = (planId: string, sectionId: string) => {
+    const key = `${planId}:${sectionId}`;
+    const label = (newItemDrafts[key] ?? "").trim();
+    if (!label) return;
+    const currentSec = (localChecklists[planId] ?? []).find((s) => s.id === sectionId);
+    if (currentSec && currentSec.items.length >= MAX_ITEMS_PER_SECTION) {
+      setError(`Maximum ${MAX_ITEMS_PER_SECTION} checkboxes per section.`);
+      return;
+    }
+    const newItem: TripChecklistItem = { id: uid("chk"), label, checked: false };
+    updatePlanSections(planId, (prev) =>
+      prev.map((s) => (s.id === sectionId ? { ...s, items: [...s.items, newItem] } : s)),
+    );
+    setNewItemDrafts((prev) => ({ ...prev, [key]: "" }));
   };
 
   const handleSaveChecklist = async (planId: string) => {
     setSavingChecklistId(planId);
     setError(null);
     try {
-      const items = localChecklists[planId] ?? [];
-      await saveTripPlanChecklist(planId, items);
+      const sections = localChecklists[planId] ?? [];
+      await saveTripPlanChecklist(planId, sections);
       setDirtyChecklists((prev) => ({ ...prev, [planId]: false }));
-      setNotice("Checklist saved to server.");
+      setNotice("Sectioned checklist saved to backend.");
     } catch (err) {
       setError(getErrorMessage(err, "Failed to save checklist."));
     } finally {
@@ -362,8 +429,8 @@ function TripPlannerPage() {
         <ClipboardList className="mx-auto size-10 text-primary" />
         <h1 className="mt-4 font-display text-2xl font-black uppercase">Trip Planner</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Sign in to create collaborative touring drafts, invite co-planners, and submit club trips
-          for moderator review.
+          Sign in to pick touring waypoints on the map, build 5×10 checklists, invite
+          collaborators, and submit club trips for moderator review.
         </p>
         <Link
           to="/login"
@@ -377,19 +444,18 @@ function TripPlannerPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-wider text-primary">
             <MapPin className="size-3.5" />
-            Collaborative Trip Planner
+            Map &amp; Checklist Planner
           </div>
           <h1 className="mt-2 font-display text-2xl sm:text-3xl font-black tracking-tight text-foreground">
             Trip Plans &amp; Drafts
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Draft routes with invited collaborators, submit club trips to moderators, and manage
-            pre-ride checklists.
+            Pick real GPS pins for Mobile map thumbnails, create sectioned checklists (max 5
+            sections × 10 items), and collaborate with moderators.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -412,7 +478,6 @@ function TripPlannerPage() {
         </div>
       </div>
 
-      {/* Alerts */}
       {error && (
         <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-300">
           {error}
@@ -424,7 +489,6 @@ function TripPlannerPage() {
         </div>
       )}
 
-      {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-border pb-3">
         <button
           type="button"
@@ -458,9 +522,8 @@ function TripPlannerPage() {
         </button>
       </div>
 
-      {/* Create / Edit Draft Form */}
       {editorOpen && (
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-lg space-y-4">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-lg space-y-5">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-lg font-black uppercase">
               {editingId ? "Edit Trip Plan Draft" : "Create Trip Plan Draft"}
@@ -510,32 +573,6 @@ function TripPlannerPage() {
 
             <div>
               <label className="block text-xs font-bold text-muted-foreground mb-1">
-                Meeting Point
-              </label>
-              <input
-                type="text"
-                value={meetingPoint}
-                onChange={(e) => setMeetingPoint(e.target.value)}
-                placeholder="Shell Senayan / Rest Area KM 10"
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-muted-foreground mb-1">
-                Destination
-              </label>
-              <input
-                type="text"
-                value={destinationName}
-                onChange={(e) => setDestinationName(e.target.value)}
-                placeholder="Rindu Alam / Kopi Daong"
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-muted-foreground mb-1">
                 Departure Date &amp; Time
               </label>
               <input
@@ -548,24 +585,153 @@ function TripPlannerPage() {
 
             <div>
               <label className="block text-xs font-bold text-muted-foreground mb-1">
-                Waypoints / Stops (one per line)
+                Meeting Point Label
               </label>
-              <textarea
-                rows={2}
-                value={waypointsText}
-                onChange={(e) => setWaypointsText(e.target.value)}
-                placeholder={"Fuel Stop Cibubur\nPhoto Spot Puncak Pass"}
+              <input
+                type="text"
+                value={meetingNameInput}
+                onChange={(e) => setMeetingNameInput(e.target.value)}
+                placeholder="Pick on map below or customize label"
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-muted-foreground mb-1">
+                Destination Label
+              </label>
+              <input
+                type="text"
+                value={destinationNameInput}
+                onChange={(e) => setDestinationNameInput(e.target.value)}
+                placeholder="Pick on map below or customize label"
                 className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
               />
             </div>
           </div>
 
+          <TripMapPicker
+            meeting={meeting}
+            destination={destination}
+            waypoints={waypoints
+              .filter((w): w is MapPoint & TripWaypointStop => typeof w.lat === "number" && typeof w.lng === "number")
+              .map((w) => ({ name: w.name, lat: w.lat!, lng: w.lng! }))}
+            onPickMeeting={(pt) => {
+              setMeeting(pt);
+              setMeetingNameInput(pt.name);
+            }}
+            onPickDestination={(pt) => {
+              setDestination(pt);
+              setDestinationNameInput(pt.name);
+            }}
+            onAddWaypoint={(pt) =>
+              setWaypoints((prev) => [...prev.slice(0, 19), { name: pt.name, lat: pt.lat, lng: pt.lng }])
+            }
+          />
+
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <span>
+              Meeting GPS:{" "}
+              <strong className="text-foreground">
+                {meeting ? `${meeting.lat.toFixed(4)}, ${meeting.lng.toFixed(4)}` : "Not pinned"}
+              </strong>
+            </span>
+            <span>
+              Dest GPS:{" "}
+              <strong className="text-foreground">
+                {destination
+                  ? `${destination.lat.toFixed(4)}, ${destination.lng.toFixed(4)}`
+                  : "Not pinned"}
+              </strong>
+            </span>
+            {waypoints.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {waypoints.map((wp, idx) => (
+                  <span
+                    key={`ed-wp-${idx}`}
+                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-foreground"
+                  >
+                    Stop {idx + 1}: {wp.name}
+                    <button
+                      type="button"
+                      onClick={() => setWaypoints((prev) => prev.filter((_, i) => i !== idx))}
+                      className="hover:text-red-500"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sectioned Checklist Builder in Form */}
+          <div className="rounded-xl border border-border/80 bg-background/50 p-3.5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-foreground">
+                Checklist Sections ({editorSections.length}/{MAX_SECTIONS}) — max{" "}
+                {MAX_ITEMS_PER_SECTION} boxes each
+              </span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={newSectionTitle}
+                  onChange={(e) => setNewSectionTitle(e.target.value)}
+                  placeholder="Section name (e.g. Medical)..."
+                  className="w-44 rounded-lg border border-border bg-card px-2.5 py-1 text-xs text-foreground"
+                />
+                <button
+                  type="button"
+                  disabled={editorSections.length >= MAX_SECTIONS}
+                  onClick={() => {
+                    const clean = newSectionTitle.trim();
+                    if (!clean || editorSections.length >= MAX_SECTIONS) return;
+                    setEditorSections((prev) => [...prev, { id: uid("sec"), title: clean, items: [] }]);
+                    setNewSectionTitle("");
+                  }}
+                  className="rounded-lg bg-secondary px-3 py-1 text-xs font-bold text-foreground disabled:opacity-40"
+                >
+                  + Add Section
+                </button>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {editorSections.map((sec) => (
+                <EditorSectionCard
+                  key={sec.id}
+                  section={sec}
+                  onRemoveSection={() =>
+                    setEditorSections((prev) => prev.filter((s) => s.id !== sec.id))
+                  }
+                  onAddItem={(label) =>
+                    setEditorSections((prev) =>
+                      prev.map((s) =>
+                        s.id === sec.id && s.items.length < MAX_ITEMS_PER_SECTION
+                          ? { ...s, items: [...s.items, { id: uid("chk"), label, checked: false }] }
+                          : s,
+                      ),
+                    )
+                  }
+                  onRemoveItem={(itemId) =>
+                    setEditorSections((prev) =>
+                      prev.map((s) =>
+                        s.id === sec.id
+                          ? { ...s, items: s.items.filter((i) => i.id !== itemId) }
+                          : s,
+                      ),
+                    )
+                  }
+                />
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-bold text-muted-foreground mb-1">
-              Description &amp; Notes
+              Notes / Briefing
             </label>
             <textarea
-              rows={3}
+              rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Pace group, intercom channel, mandatory riding gear..."
@@ -598,25 +764,26 @@ function TripPlannerPage() {
         </div>
       )}
 
-      {/* Plans List */}
       {loading ? (
         <div className="py-16 text-center text-sm text-muted-foreground">Loading trip plans…</div>
-      ) : myPlans.length === 0 ? (
+      ) : visiblePlans.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-card/50 p-10 text-center">
           <ClipboardList className="mx-auto size-10 text-muted-foreground/60" />
           <p className="mt-3 text-sm font-semibold text-foreground">
             {activeTab === "review"
               ? "No trip plans waiting for moderator review."
-              : "No trip drafts yet. Start planning your next ride!"}
+              : "No trip drafts yet. Pick your route pins and start planning!"}
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {myPlans.map((plan) => {
+          {visiblePlans.map((plan) => {
             const badge = STATUS_BADGE[plan.status] ?? STATUS_BADGE.draft;
-            const checklist = localChecklists[plan.id] ?? [];
+            const sections = localChecklists[plan.id] ?? [];
             const isChecklistDirty = Boolean(dirtyChecklists[plan.id]);
             const isCreator = user?.id === plan.creator_id;
+            const stops = normalizeWaypointsList(plan.waypoints);
+
             return (
               <div
                 key={plan.id}
@@ -668,7 +835,6 @@ function TripPlannerPage() {
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
                   <div className="flex flex-wrap items-center gap-2">
                     {plan.can_edit && (
                       <button
@@ -715,7 +881,6 @@ function TripPlannerPage() {
                   </div>
                 </div>
 
-                {/* Moderator Revision / Rejection Reason Callout */}
                 {plan.review_note &&
                   (plan.status === "needs_revision" || plan.status === "rejected") && (
                     <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2">
@@ -729,24 +894,19 @@ function TripPlannerPage() {
                     </div>
                   )}
 
-                {plan.notes && (
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{plan.notes}</p>
-                )}
-
-                {Array.isArray(plan.waypoints) && plan.waypoints.length > 0 && (
+                {stops.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {plan.waypoints.map((wp, i) => (
+                    {stops.map((wp, i) => (
                       <span
                         key={`${plan.id}-wp-${i}`}
                         className="rounded-lg border border-border bg-secondary/50 px-2.5 py-1 text-xs font-medium text-foreground"
                       >
-                        Stop {i + 1}: {wp}
+                        Stop {i + 1}: {wp.name}
                       </span>
                     ))}
                   </div>
                 )}
 
-                {/* Moderator Review Controls */}
                 {plan.can_review && plan.status === "pending_review" && (
                   <div className="flex flex-wrap items-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 p-3">
                     <span className="text-xs font-bold text-sky-700 dark:text-sky-300 mr-auto">
@@ -788,7 +948,6 @@ function TripPlannerPage() {
                   </div>
                 )}
 
-                {/* Collaborators Section */}
                 <div className="border-t border-border/60 pt-3 space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -839,84 +998,167 @@ function TripPlannerPage() {
                   )}
                 </div>
 
-                {/* Local-First Personal Checklist (syncs to backend on Save) */}
-                <div className="border-t border-border/60 pt-3 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
+                {/* Sectioned Checklists (Max 5 sections x 10 checkboxes) */}
+                <div className="border-t border-border/60 pt-3 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Pre-Ride Checklist ({checklist.filter((i) => i.checked).length}/
-                      {checklist.length})
+                      Pre-Ride Checklists ({sections.length}/{MAX_SECTIONS} sections)
                     </span>
-                    {isChecklistDirty && (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={newSectionDrafts[plan.id] ?? ""}
+                        onChange={(e) =>
+                          setNewSectionDrafts((prev) => ({ ...prev, [plan.id]: e.target.value }))
+                        }
+                        placeholder="New section (e.g. Medical)..."
+                        className="w-44 rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground"
+                      />
                       <button
                         type="button"
-                        disabled={savingChecklistId === plan.id}
-                        onClick={() => void handleSaveChecklist(plan.id)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
+                        disabled={sections.length >= MAX_SECTIONS}
+                        onClick={() => handleAddCardSection(plan.id)}
+                        className="rounded-lg border border-border bg-secondary px-2.5 py-1 text-xs font-bold text-foreground disabled:opacity-40"
                       >
-                        <Save className="size-3" />
-                        {savingChecklistId === plan.id ? "Saving…" : "Save Checklist"}
+                        + Section
                       </button>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    {checklist.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between rounded-lg bg-secondary/40 px-2.5 py-1.5 text-xs"
-                      >
+                      {isChecklistDirty && (
                         <button
                           type="button"
-                          onClick={() => toggleLocalChecklistItem(plan.id, item.id)}
-                          className="flex items-center gap-2 text-left flex-1"
+                          disabled={savingChecklistId === plan.id}
+                          onClick={() => void handleSaveChecklist(plan.id)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
                         >
-                          {item.checked ? (
-                            <CheckSquare className="size-4 text-emerald-500 shrink-0" />
-                          ) : (
-                            <Square className="size-4 text-muted-foreground shrink-0" />
-                          )}
-                          <span
-                            className={cn(
-                              "text-foreground",
-                              item.checked && "line-through text-muted-foreground",
-                            )}
+                          <Save className="size-3" />
+                          {savingChecklistId === plan.id ? "Saving…" : "Save"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {sections.length > 0 && (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {sections.map((sec) => {
+                        const inputKey = `${plan.id}:${sec.id}`;
+                        return (
+                          <div
+                            key={sec.id}
+                            className="rounded-xl border border-border bg-secondary/30 p-3 space-y-2"
                           >
-                            {item.label}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeLocalChecklistItem(plan.id, item.id)}
-                          className="text-muted-foreground hover:text-red-500 p-1"
-                        >
-                          <X className="size-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="text"
-                      value={newChecklistLabel[plan.id] ?? ""}
-                      onChange={(e) =>
-                        setNewChecklistLabel((prev) => ({ ...prev, [plan.id]: e.target.value }))
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addLocalChecklistItem(plan.id);
-                        }
-                      }}
-                      placeholder="Add checklist item (e.g. Tire pressure, Raincoat, Intercom)..."
-                      className="flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => addLocalChecklistItem(plan.id)}
-                      className="rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-bold text-foreground hover:bg-secondary/80"
-                    >
-                      Add
-                    </button>
-                  </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-black uppercase tracking-wide text-foreground">
+                                {sec.title} ({sec.items.length}/{MAX_ITEMS_PER_SECTION})
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updatePlanSections(plan.id, (prev) =>
+                                    prev.filter((s) => s.id !== sec.id),
+                                  )
+                                }
+                                className="text-muted-foreground hover:text-red-500 p-0.5"
+                              >
+                                <X className="size-3.5" />
+                              </button>
+                            </div>
+                            <div className="space-y-1">
+                              {sec.items.map((item) => (
+                                <div
+                                  key={item.id}
+                                  className={cn(
+                                    "flex items-center justify-between rounded-lg px-2 py-1 text-xs transition-all duration-200",
+                                    item.checked ? "bg-emerald-500/10 opacity-75" : "bg-background/70",
+                                  )}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updatePlanSections(plan.id, (prev) =>
+                                        prev.map((s) =>
+                                          s.id === sec.id
+                                            ? {
+                                                ...s,
+                                                items: s.items.map((i) =>
+                                                  i.id === item.id
+                                                    ? { ...i, checked: !i.checked }
+                                                    : i,
+                                                ),
+                                              }
+                                            : s,
+                                        ),
+                                      )
+                                    }
+                                    className="flex items-center gap-2 text-left flex-1"
+                                  >
+                                    {item.checked ? (
+                                      <CheckSquare className="size-4 text-emerald-500 shrink-0 transition-transform duration-150 scale-105" />
+                                    ) : (
+                                      <Square className="size-4 text-muted-foreground shrink-0" />
+                                    )}
+                                    <span
+                                      className={cn(
+                                        "text-foreground transition-opacity duration-200",
+                                        item.checked && "line-through text-muted-foreground",
+                                      )}
+                                    >
+                                      {item.label}
+                                    </span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updatePlanSections(plan.id, (prev) =>
+                                        prev.map((s) =>
+                                          s.id === sec.id
+                                            ? {
+                                                ...s,
+                                                items: s.items.filter((i) => i.id !== item.id),
+                                              }
+                                            : s,
+                                        ),
+                                      )
+                                    }
+                                    className="text-muted-foreground hover:text-red-500 p-0.5"
+                                  >
+                                    <X className="size-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-1.5 pt-1">
+                              <input
+                                type="text"
+                                value={newItemDrafts[inputKey] ?? ""}
+                                onChange={(e) =>
+                                  setNewItemDrafts((prev) => ({
+                                    ...prev,
+                                    [inputKey]: e.target.value,
+                                  }))
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    handleAddCardItem(plan.id, sec.id);
+                                  }
+                                }}
+                                disabled={sec.items.length >= MAX_ITEMS_PER_SECTION}
+                                placeholder="Add item..."
+                                className="flex-1 rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground disabled:opacity-40"
+                              />
+                              <button
+                                type="button"
+                                disabled={sec.items.length >= MAX_ITEMS_PER_SECTION}
+                                onClick={() => handleAddCardItem(plan.id, sec.id)}
+                                className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-bold text-foreground disabled:opacity-40"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -924,7 +1166,6 @@ function TripPlannerPage() {
         </div>
       )}
 
-      {/* Moderator Revise / Reject Reason Modal */}
       {reviewTarget && (
         <div
           role="dialog"
@@ -984,6 +1225,74 @@ function TripPlannerPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function EditorSectionCard({
+  section,
+  onRemoveSection,
+  onAddItem,
+  onRemoveItem,
+}: {
+  section: TripChecklistSection;
+  onRemoveSection: () => void;
+  onAddItem: (label: string) => void;
+  onRemoveItem: (id: string) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  return (
+    <div className="rounded-xl border border-border bg-card p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-black uppercase text-foreground">
+          {section.title} ({section.items.length}/{MAX_ITEMS_PER_SECTION})
+        </span>
+        <button type="button" onClick={onRemoveSection} className="text-muted-foreground hover:text-red-500">
+          <X className="size-3.5" />
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {section.items.map((item) => (
+          <span
+            key={item.id}
+            className="inline-flex items-center gap-1 rounded-lg border border-border bg-secondary/60 px-2 py-0.5 text-xs text-foreground"
+          >
+            {item.label}
+            <button type="button" onClick={() => onRemoveItem(item.id)} className="hover:text-red-500">
+              <X className="size-3" />
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex items-center gap-1.5">
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && draft.trim()) {
+              e.preventDefault();
+              onAddItem(draft.trim());
+              setDraft("");
+            }
+          }}
+          disabled={section.items.length >= MAX_ITEMS_PER_SECTION}
+          placeholder="Add checkbox item..."
+          className="flex-1 rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground"
+        />
+        <button
+          type="button"
+          disabled={section.items.length >= MAX_ITEMS_PER_SECTION}
+          onClick={() => {
+            if (!draft.trim()) return;
+            onAddItem(draft.trim());
+            setDraft("");
+          }}
+          className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-bold text-foreground disabled:opacity-40"
+        >
+          Add
+        </button>
+      </div>
     </div>
   );
 }

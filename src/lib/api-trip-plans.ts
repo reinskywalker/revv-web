@@ -12,6 +12,18 @@ export interface TripChecklistItem {
   checked: boolean;
 }
 
+export interface TripChecklistSection {
+  id: string;
+  title: string;
+  items: TripChecklistItem[];
+}
+
+export interface TripWaypointStop {
+  name: string;
+  lat?: number | null | undefined;
+  lng?: number | null | undefined;
+}
+
 export type TripPlanStatus =
   | "draft"
   | "pending_review"
@@ -29,8 +41,12 @@ export interface TripPlanItem {
   description?: string | null;
   departure_date?: string | null;
   meeting_point?: string | null;
+  meeting_lat?: number | null;
+  meeting_lng?: number | null;
   destination_name?: string | null;
-  waypoints: string[];
+  destination_lat?: number | null;
+  destination_lng?: number | null;
+  waypoints: Array<TripWaypointStop | string>;
   notes?: string | null;
   status: TripPlanStatus;
   review_note?: string | null;
@@ -41,7 +57,7 @@ export interface TripPlanItem {
   can_edit: boolean;
   can_review: boolean;
   collaborators: TripPlanCollaborator[];
-  checklist_items: TripChecklistItem[];
+  checklist_sections: TripChecklistSection[];
 }
 
 export async function fetchTripPlans(): Promise<TripPlanItem[]> {
@@ -54,10 +70,15 @@ export async function createTripPlan(payload: {
   description?: string | undefined;
   departure_date?: string | null | undefined;
   meeting_point?: string | undefined;
+  meeting_lat?: number | null | undefined;
+  meeting_lng?: number | null | undefined;
   destination_name?: string | undefined;
-  waypoints?: string[] | undefined;
+  destination_lat?: number | null | undefined;
+  destination_lng?: number | null | undefined;
+  waypoints?: TripWaypointStop[] | undefined;
   notes?: string | undefined;
   submit_for_review?: boolean | undefined;
+  checklist_sections?: TripChecklistSection[] | undefined;
 }): Promise<{ id: string; status: TripPlanStatus }> {
   return authRequest<{ id: string; status: TripPlanStatus }>("/trip-plans", {
     method: "POST",
@@ -72,8 +93,12 @@ export async function updateTripPlan(
     description?: string | undefined;
     departure_date?: string | null | undefined;
     meeting_point?: string | undefined;
+    meeting_lat?: number | null | undefined;
+    meeting_lng?: number | null | undefined;
     destination_name?: string | undefined;
-    waypoints?: string[] | undefined;
+    destination_lat?: number | null | undefined;
+    destination_lng?: number | null | undefined;
+    waypoints?: TripWaypointStop[] | undefined;
     notes?: string | undefined;
   },
 ): Promise<{ id: string }> {
@@ -132,13 +157,13 @@ export async function reviewTripPlan(
 
 export async function saveTripPlanChecklist(
   planId: string,
-  items: TripChecklistItem[],
-): Promise<{ trip_plan_id: string; items: TripChecklistItem[] }> {
-  return authRequest<{ trip_plan_id: string; items: TripChecklistItem[] }>(
+  sections: TripChecklistSection[],
+): Promise<{ trip_plan_id: string; sections: TripChecklistSection[] }> {
+  return authRequest<{ trip_plan_id: string; sections: TripChecklistSection[] }>(
     `/trip-plans/${planId}/checklist`,
     {
       method: "PUT",
-      body: JSON.stringify({ items }),
+      body: JSON.stringify({ sections }),
     },
   );
 }
