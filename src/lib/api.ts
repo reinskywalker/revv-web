@@ -1024,8 +1024,13 @@ export interface UserAchievementItem {
   max_level: number;
   current_value: number;
   next_threshold?: number | null;
+  progress_ratio?: number;
+  achieved?: boolean;
   achieved_at?: string | null;
+  is_pinned?: boolean;
+  pinned_slot?: number | null;
   pin_slot?: number | null;
+  xp_earned?: number;
   tiers: AchievementTierProgress[];
 }
 
@@ -1038,8 +1043,11 @@ export interface UserAchievementsPayload {
     milestones_achieved: number;
     total_milestones: number;
     total_xp: number;
+    rank_title?: string;
+    pinned_codes: string[];
   };
   pinned_codes: string[];
+  achievements: UserAchievementItem[];
   items: UserAchievementItem[];
 }
 
@@ -1065,7 +1073,47 @@ export async function fetchPublicUserAchievements(
     );
   }
   const body = await res.json();
-  return body?.data ?? body;
+  const raw = (body?.data ?? body ?? {}) as {
+    summary?: Partial<UserAchievementsPayload["summary"]>;
+    pinned_codes?: string[];
+    achievements?: UserAchievementItem[];
+    items?: UserAchievementItem[];
+  };
+  const rawSummary: Partial<UserAchievementsPayload["summary"]> = raw.summary ?? {};
+  const pinnedCodes = Array.isArray(rawSummary.pinned_codes)
+    ? rawSummary.pinned_codes
+    : Array.isArray(raw.pinned_codes)
+      ? raw.pinned_codes
+      : [];
+  const rawList = Array.isArray(raw.achievements)
+    ? raw.achievements
+    : Array.isArray(raw.items)
+      ? raw.items
+      : [];
+  const normalizedList: UserAchievementItem[] = rawList.map((item) => ({
+    ...item,
+    current_value: Number(item.current_value ?? 0),
+    highest_level: Number(item.highest_level ?? 0),
+    max_level: Number(item.max_level ?? 1),
+    tiers: Array.isArray(item.tiers) ? item.tiers : [],
+  }));
+
+  return {
+    summary: {
+      total_achieved: Number(rawSummary.total_achieved ?? 0),
+      total_categories: Number(rawSummary.total_categories ?? normalizedList.length),
+      badges_unlocked: Number(rawSummary.badges_unlocked ?? 0),
+      total_badge_tiers: Number(rawSummary.total_badge_tiers ?? 0),
+      milestones_achieved: Number(rawSummary.milestones_achieved ?? 0),
+      total_milestones: Number(rawSummary.total_milestones ?? 0),
+      total_xp: Number(rawSummary.total_xp ?? 0),
+      ...(rawSummary.rank_title ? { rank_title: rawSummary.rank_title } : {}),
+      pinned_codes: pinnedCodes,
+    },
+    pinned_codes: pinnedCodes,
+    achievements: normalizedList,
+    items: normalizedList,
+  };
 }
 
 export interface FriendUserItem {

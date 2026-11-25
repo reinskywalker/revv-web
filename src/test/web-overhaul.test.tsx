@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { AppOpenBanner } from "@/components/revv/AppOpenBanner";
 import { RevvAvatar } from "@/components/revv/RevvAvatar";
-import { saveAuthSession, clearSavedSession } from "@/lib/api";
+import { saveAuthSession, clearSavedSession, fetchPublicUserAchievements } from "@/lib/api";
 import {
   clearCosmeticsMemoryCache,
   fetchCosmeticsCatalogCached,
@@ -152,5 +152,62 @@ describe("Web Overhaul: AppOpenBanner, ThemeProvider, RevvAvatar & Country Curre
     expect(second?.currency).toBe("USD");
     const secondHeaders = fetchMock.mock.calls[1]?.[1]?.headers as Record<string, string>;
     expect(secondHeaders["If-None-Match"]).toBeUndefined();
+  });
+
+  it("normalizes Rust backend AchievementsPayload (summary.pinned_codes & achievements[]) without crashing", async () => {
+    const backendPayload = {
+      data: {
+        summary: {
+          total_achieved: 2,
+          total_categories: 10,
+          badges_unlocked: 3,
+          total_badge_tiers: 25,
+          milestones_achieved: 1,
+          total_milestones: 5,
+          total_xp: 450,
+          rank_title: "Tourer",
+          pinned_codes: ["special_founding_rider"],
+        },
+        achievements: [
+          {
+            code: "special_founding_rider",
+            title: "Founding Throttle",
+            description: "Closed beta rider.",
+            category: "special",
+            kind: "badge",
+            has_badge: true,
+            icon_key: "founding_throttle",
+            unit_label: "",
+            highest_level: 1,
+            max_level: 1,
+            current_value: 1,
+            next_threshold: null,
+            tiers: [
+              {
+                level: 1,
+                name: "Founder",
+                threshold: 1,
+                xp: 250,
+                unlocked: true,
+                unlocked_at: "2026-01-01T00:00:00Z",
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => backendPayload,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const parsed = await fetchPublicUserAchievements("reinskywalker");
+    expect(parsed.summary.pinned_codes).toEqual(["special_founding_rider"]);
+    expect(parsed.pinned_codes).toEqual(["special_founding_rider"]);
+    expect(parsed.achievements).toHaveLength(1);
+    expect(parsed.items).toHaveLength(1);
+    expect(parsed.items[0]?.code).toBe("special_founding_rider");
   });
 });

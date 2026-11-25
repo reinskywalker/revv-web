@@ -887,7 +887,7 @@ function ProfilePage() {
               )}
             >
               <Trophy className="size-4" />
-              Achievements{achievements ? ` (${achievements.summary.total_achieved})` : ""}
+              Achievements{achievements ? ` (${achievements.summary?.total_achieved ?? 0})` : ""}
             </button>
             <button
               type="button"
@@ -950,145 +950,153 @@ function ProfilePage() {
                   Loading rider achievements...
                 </div>
               ) : (
-                <>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="rounded-xl border border-border bg-card p-4">
-                      <div className="text-xs text-muted-foreground">Total XP</div>
-                      <div className="mt-1 text-xl font-extrabold text-primary">
-                        {achievements.summary.total_xp.toLocaleString()}
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-border bg-card p-4">
-                      <div className="text-xs text-muted-foreground">Badges Unlocked</div>
-                      <div className="mt-1 text-xl font-extrabold text-foreground">
-                        {achievements.summary.badges_unlocked} /{" "}
-                        {achievements.summary.total_badge_tiers}
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-border bg-card p-4">
-                      <div className="text-xs text-muted-foreground">Milestones</div>
-                      <div className="mt-1 text-xl font-extrabold text-foreground">
-                        {achievements.summary.milestones_achieved} /{" "}
-                        {achievements.summary.total_milestones}
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-border bg-card p-4">
-                      <div className="text-xs text-muted-foreground">Categories Completed</div>
-                      <div className="mt-1 text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
-                        {achievements.summary.total_achieved} /{" "}
-                        {achievements.summary.total_categories}
-                      </div>
-                    </div>
-                  </div>
-
-                  {achievements.pinned_codes.length > 0 && (
-                    <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
-                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        <Award className="size-4 text-primary" />
-                        Pinned Showcase Badges
-                      </div>
-                      <div className="flex flex-wrap gap-3">
-                        {achievements.pinned_codes.map((code) => {
-                          const item = achievements.items.find((i) => i.code === code);
-                          if (!item) return null;
-                          return (
-                            <div
-                              key={code}
-                              className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-2.5"
-                            >
-                              {item.icon_key ? (
-                                <img
-                                  src={`/badges/${item.icon_key}.webp`}
-                                  alt={item.title}
-                                  className="size-10 shrink-0 rounded-lg object-contain"
-                                />
-                              ) : (
-                                <Trophy className="size-8 shrink-0 text-primary" />
-                              )}
-                              <div className="min-w-0">
-                                <div className="text-xs font-bold text-foreground truncate">
-                                  {item.title}
-                                </div>
-                                <div className="text-[11px] text-primary font-medium">
-                                  Level {item.highest_level} / {item.max_level}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {achievements.items
-                      .slice()
-                      .sort((a, b) => (b.highest_level > 0 ? 1 : 0) - (a.highest_level > 0 ? 1 : 0))
-                      .map((item) => {
-                        const unlocked = item.highest_level >= 1;
-                        const activeTier =
-                          item.tiers.find((tr) => tr.level === item.highest_level) ?? item.tiers[0];
-                        return (
-                          <div
-                            key={item.code}
-                            className={cn(
-                              "flex items-start gap-3.5 rounded-2xl border p-4 transition",
-                              unlocked
-                                ? "border-border bg-card shadow-xs"
-                                : "border-border/60 bg-card/40 opacity-65",
-                            )}
-                          >
-                            <div className="flex size-14 shrink-0 items-center justify-center rounded-xl border border-border bg-secondary/50 p-1.5">
-                              {item.has_badge && item.icon_key ? (
-                                <img
-                                  src={`/badges/${item.icon_key}.webp`}
-                                  alt={item.title}
-                                  className={cn(
-                                    "size-full object-contain",
-                                    !unlocked && "grayscale opacity-60",
-                                  )}
-                                />
-                              ) : (
-                                <Trophy
-                                  className={cn(
-                                    "size-6",
-                                    unlocked ? "text-primary" : "text-muted-foreground",
-                                  )}
-                                />
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <div className="flex items-start justify-between gap-2">
-                                <h4 className="text-sm font-bold text-foreground truncate">
-                                  {item.title}
-                                </h4>
-                                <span
-                                  className={cn(
-                                    "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
-                                    unlocked
-                                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                                      : "bg-secondary text-muted-foreground",
-                                  )}
-                                >
-                                  {unlocked
-                                    ? activeTier?.name || `Lv.${item.highest_level}`
-                                    : "Locked"}
-                                </span>
-                              </div>
-                              <p className="text-xs text-muted-foreground line-clamp-2">
-                                {item.description}
-                              </p>
-                              <div className="text-[11px] font-medium text-muted-foreground">
-                                {item.current_value.toFixed(item.current_value % 1 === 0 ? 0 : 1)}
-                                {item.next_threshold ? ` / ${item.next_threshold}` : ""}{" "}
-                                {item.unit_label || ""}
-                              </div>
-                            </div>
+                (() => {
+                  const summary = achievements.summary;
+                  const pinnedCodes = summary?.pinned_codes ?? achievements.pinned_codes ?? [];
+                  const achievementItems = achievements.achievements ?? achievements.items ?? [];
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="rounded-xl border border-border bg-card p-4">
+                          <div className="text-xs text-muted-foreground">Total XP</div>
+                          <div className="mt-1 text-xl font-extrabold text-primary">
+                            {(summary?.total_xp ?? 0).toLocaleString()}
                           </div>
-                        );
-                      })}
-                  </div>
-                </>
+                        </div>
+                        <div className="rounded-xl border border-border bg-card p-4">
+                          <div className="text-xs text-muted-foreground">Badges Unlocked</div>
+                          <div className="mt-1 text-xl font-extrabold text-foreground">
+                            {summary?.badges_unlocked ?? 0} / {summary?.total_badge_tiers ?? 0}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-border bg-card p-4">
+                          <div className="text-xs text-muted-foreground">Milestones</div>
+                          <div className="mt-1 text-xl font-extrabold text-foreground">
+                            {summary?.milestones_achieved ?? 0} / {summary?.total_milestones ?? 0}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-border bg-card p-4">
+                          <div className="text-xs text-muted-foreground">Categories Completed</div>
+                          <div className="mt-1 text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                            {summary?.total_achieved ?? 0} / {summary?.total_categories ?? 0}
+                          </div>
+                        </div>
+                      </div>
+
+                      {pinnedCodes.length > 0 && (
+                        <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+                          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                            <Award className="size-4 text-primary" />
+                            Pinned Showcase Badges
+                          </div>
+                          <div className="flex flex-wrap gap-3">
+                            {pinnedCodes.map((code) => {
+                              const item = achievementItems.find((i) => i.code === code);
+                              if (!item) return null;
+                              return (
+                                <div
+                                  key={code}
+                                  className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-2.5"
+                                >
+                                  {item.icon_key ? (
+                                    <img
+                                      src={`/badges/${item.icon_key}.webp`}
+                                      alt={item.title}
+                                      className="size-10 shrink-0 rounded-lg object-contain"
+                                    />
+                                  ) : (
+                                    <Trophy className="size-8 shrink-0 text-primary" />
+                                  )}
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-bold text-foreground truncate">
+                                      {item.title}
+                                    </div>
+                                    <div className="text-[11px] text-primary font-medium">
+                                      Level {item.highest_level} / {item.max_level}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {achievementItems
+                          .slice()
+                          .sort(
+                            (a, b) => (b.highest_level > 0 ? 1 : 0) - (a.highest_level > 0 ? 1 : 0),
+                          )
+                          .map((item) => {
+                            const unlocked = item.highest_level >= 1;
+                            const tiers = Array.isArray(item.tiers) ? item.tiers : [];
+                            const activeTier =
+                              tiers.find((tr) => tr.level === item.highest_level) ?? tiers[0];
+                            const currentValue = Number(item.current_value ?? 0);
+                            return (
+                              <div
+                                key={item.code}
+                                className={cn(
+                                  "flex items-start gap-3.5 rounded-2xl border p-4 transition",
+                                  unlocked
+                                    ? "border-border bg-card shadow-xs"
+                                    : "border-border/60 bg-card/40 opacity-65",
+                                )}
+                              >
+                                <div className="flex size-14 shrink-0 items-center justify-center rounded-xl border border-border bg-secondary/50 p-1.5">
+                                  {item.has_badge && item.icon_key ? (
+                                    <img
+                                      src={`/badges/${item.icon_key}.webp`}
+                                      alt={item.title}
+                                      className={cn(
+                                        "size-full object-contain",
+                                        !unlocked && "grayscale opacity-60",
+                                      )}
+                                    />
+                                  ) : (
+                                    <Trophy
+                                      className={cn(
+                                        "size-6",
+                                        unlocked ? "text-primary" : "text-muted-foreground",
+                                      )}
+                                    />
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1 space-y-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <h4 className="text-sm font-bold text-foreground truncate">
+                                      {item.title}
+                                    </h4>
+                                    <span
+                                      className={cn(
+                                        "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
+                                        unlocked
+                                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                          : "bg-secondary text-muted-foreground",
+                                      )}
+                                    >
+                                      {unlocked
+                                        ? activeTier?.name || `Lv.${item.highest_level}`
+                                        : "Locked"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground line-clamp-2">
+                                    {item.description}
+                                  </p>
+                                  <div className="text-[11px] font-medium text-muted-foreground">
+                                    {currentValue.toFixed(currentValue % 1 === 0 ? 0 : 1)}
+                                    {item.next_threshold ? ` / ${item.next_threshold}` : ""}{" "}
+                                    {item.unit_label || ""}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </>
+                  );
+                })()
               )}
             </div>
           )}
