@@ -28,7 +28,7 @@ import {
   type SystemHealthStatus,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { cn } from "@/lib/utils";
+import { cn, isAdminRole } from "@/lib/utils";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -81,7 +81,7 @@ function LoginPage() {
       });
   }, []);
 
-  // 1. Check if OAuth callback passed tokens or error via URL query parameters
+  // Check if OAuth callback passed tokens or an allowlisted error code.
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const errParam = searchParams.get("error");
@@ -90,7 +90,11 @@ function LoginPage() {
         "System is currently under maintenance. Only administrators can sign in at this time.",
       );
     } else if (errParam) {
-      setErrorMessage(decodeURIComponent(errParam));
+      setErrorMessage(
+        errParam === "oauth_failed" || errParam === "access_denied"
+          ? "OAuth sign-in was cancelled or denied. Please try again."
+          : errParam.replace(/[<>]/g, "").slice(0, 160),
+      );
     }
 
     const oauthSession = checkUrlForAuthTokens();
@@ -102,8 +106,7 @@ function LoginPage() {
             fetchMyProfile(),
           ]);
 
-          // If maintenance mode is active, reject non-administrators immediately
-          if (health?.maintenance && prof.role !== "administrator") {
+          if (health?.maintenance && !isAdminRole(prof.role)) {
             logout();
             setErrorMessage(
               health.message ||
@@ -519,7 +522,7 @@ function LoginPage() {
                   Passcode dispatched to <strong className="text-foreground">{identifier}</strong>.
                 </p>
 
-                {devOtpEcho && (
+                {import.meta.env.DEV && devOtpEcho && (
                   <div className="mt-3 rounded-lg border border-primary/30 bg-primary/10 p-3 font-mono text-xs text-primary">
                     <span className="font-bold">Dev/Echo OTP:</span> {devOtpEcho}
                   </div>

@@ -45,16 +45,18 @@ function escapeText(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function safeFromCodePoint(code: number): string {
+  // Guard against surrogate and out-of-range code points that throw RangeError.
+  if (!Number.isFinite(code) || code < 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) {
+    return "";
+  }
+  return String.fromCodePoint(code);
+}
+
 function decodeHtmlEntities(value: string): string {
   return value
-    .replace(/&#x([0-9a-f]+);?/gi, (_m, hex: string) => {
-      const code = Number.parseInt(hex, 16);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : "";
-    })
-    .replace(/&#(\d+);?/g, (_m, dec: string) => {
-      const code = Number.parseInt(dec, 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : "";
-    })
+    .replace(/&#x([0-9a-f]+);?/gi, (_m, hex: string) => safeFromCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);?/g, (_m, dec: string) => safeFromCodePoint(Number.parseInt(dec, 10)))
     .replace(/&colon;/gi, ":")
     .replace(/&quot;/gi, '"')
     .replace(/&apos;/gi, "'")
@@ -114,7 +116,7 @@ function sanitizeWithWhitelistSerializer(rawHtml: string): string {
 
   while ((match = tokenRegex.exec(withoutComments)) !== null) {
     if (match.index > cursor && !skipDepthTag) {
-      out += withoutComments.slice(cursor, match.index);
+      out += withoutComments.slice(cursor, match.index).replace(/</g, "&lt;");
     }
     cursor = match.index + match[0].length;
 
@@ -167,11 +169,11 @@ function sanitizeWithWhitelistSerializer(rawHtml: string): string {
     }
 
     const attrSuffix = serializedAttrs.length > 0 ? ` ${serializedAttrs.join(" ")}` : "";
-    out += VOID_TAGS.has(tag) ? `<${tag}${attrSuffix}>` : `<${tag}${attrSuffix}>`;
+    out += `<${tag}${attrSuffix}>`;
   }
 
   if (cursor < withoutComments.length && !skipDepthTag) {
-    out += withoutComments.slice(cursor);
+    out += withoutComments.slice(cursor).replace(/</g, "&lt;");
   }
 
   return out;

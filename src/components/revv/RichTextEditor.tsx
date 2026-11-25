@@ -133,8 +133,22 @@ export function RichTextEditor({
   const toggleSourceMode = () => {
     if (sourceMode) {
       onChange(normalizePlainTextToHtml(value || ""));
+    } else {
+      onChange(sanitizeRichHtml(value || ""));
     }
     setSourceMode((prev) => !prev);
+  };
+
+  const handleEditorPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const htmlClip = e.clipboardData.getData("text/html");
+    const textClip = e.clipboardData.getData("text/plain");
+    const safeClip = htmlClip
+      ? normalizePlainTextToHtml(htmlClip)
+      : escapeHtmlText(textClip).replace(/\n/g, "<br/>");
+    if (!safeClip) return;
+    document.execCommand("insertHTML", false, safeClip);
+    syncFromEditor();
   };
 
   const execFormat = (command: string, arg?: string) => {
@@ -369,6 +383,7 @@ export function RichTextEditor({
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={() => onChange(sanitizeRichHtml(value || ""))}
           placeholder={placeholder}
           className={`w-full resize-y bg-card p-5 font-mono text-xs leading-relaxed text-foreground outline-none ${minHeightClass}`}
         />
@@ -378,6 +393,7 @@ export function RichTextEditor({
           contentEditable
           suppressContentEditableWarning
           onInput={syncFromEditor}
+          onPaste={handleEditorPaste}
           onKeyUp={refreshActiveFormats}
           onMouseUp={() => {
             saveCurrentSelection();

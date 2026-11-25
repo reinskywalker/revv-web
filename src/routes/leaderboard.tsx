@@ -23,7 +23,8 @@ import {
   updateMyPreferences,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { cn } from "@/lib/utils";
+import { formatDuration as formatDurationHours } from "@/lib/date";
+import { cn, isAdminRole } from "@/lib/utils";
 
 export const Route = createFileRoute("/leaderboard")({
   head: () => ({
@@ -41,15 +42,9 @@ export const Route = createFileRoute("/leaderboard")({
 
 type SortMetric = "distance" | "trips" | "max_speed" | "avg_speed";
 
-function formatDurationHours(seconds: number): string {
-  const hrs = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  return hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
-}
-
 function LeaderboardPage() {
   const { user, isAuthenticated } = useAuth();
-  const isAdmin = user?.role?.toLowerCase() === "administrator";
+  const isAdmin = isAdminRole(user?.role);
 
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [loading, setLoading] = useState(true);

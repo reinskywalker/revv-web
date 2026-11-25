@@ -530,7 +530,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
       items: [
         { id: "garage", label: "Garage", to: "/garage", icon: Wrench },
         { id: "rides", label: "Routes & Radar", to: "/rides", icon: Compass },
-        { id: "plans", label: "Plans & Shop", to: "/plans", icon: Crown },
+        { id: "plans", label: "Plans & Wardrobe", to: "/plans", icon: Crown },
       ],
     },
     {

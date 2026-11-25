@@ -2,7 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { AppOpenBanner } from "@/components/revv/AppOpenBanner";
 import { RevvAvatar } from "@/components/revv/RevvAvatar";
-import { saveAuthSession, clearSavedSession, fetchPublicUserAchievements } from "@/lib/api";
+import {
+  clearSavedSession,
+  fetchPublicUserAchievements,
+  resolveMediaUrl,
+  sanitizeRichHtml,
+  saveAuthSession,
+} from "@/lib/api";
+import * as apiBilling from "@/lib/api-billing";
+import { formatDuration } from "@/lib/date";
+import { formatRiderFullName, getErrorMessage, isAdminRole } from "@/lib/utils";
 import {
   clearCosmeticsMemoryCache,
   fetchCosmeticsCatalogCached,
@@ -209,5 +218,30 @@ describe("Web Overhaul: AppOpenBanner, ThemeProvider, RevvAvatar & Country Curre
     expect(parsed.achievements).toHaveLength(1);
     expect(parsed.items).toHaveLength(1);
     expect(parsed.items[0]?.code).toBe("special_founding_rider");
+  });
+
+  it("hardens sanitizer against out-of-range entities, blocks SVG data URIs, and removes Web checkout APIs", () => {
+    // Regression check for RangeError DoS on out-of-bounds numeric HTML entities.
+    expect(() =>
+      sanitizeRichHtml('<a href="&#99999999;javascript:alert(1)">bad</a><p>Safe</p>'),
+    ).not.toThrow();
+    expect(sanitizeRichHtml("<p>Hello</p><script>evil()</script>")).toBe("<p>Hello</p>");
+
+    expect(resolveMediaUrl("data:image/svg+xml;base64,PHN2Zz4=")).toBeNull();
+    expect(resolveMediaUrl("javascript:alert(1)")).toBeNull();
+    expect(resolveMediaUrl("data:image/png;base64,iVBOR")).toBe("data:image/png;base64,iVBOR");
+
+    expect("createPaymentCheckout" in apiBilling).toBe(false);
+    expect("fetchPaymentOrderStatus" in apiBilling).toBe(false);
+    expect("cancelPaymentOrder" in apiBilling).toBe(false);
+
+    expect(isAdminRole("Administrator")).toBe(true);
+    expect(isAdminRole("member")).toBe(false);
+    expect(getErrorMessage(new Error("Boom"), "Fallback")).toBe("Boom");
+    expect(getErrorMessage(null, "Fallback")).toBe("Fallback");
+    expect(formatRiderFullName({ first_name: "Rey", last_name: "Skywalker" })).toBe(
+      "Rey Skywalker",
+    );
+    expect(formatDuration(3900)).toBe("1h 5m");
   });
 });

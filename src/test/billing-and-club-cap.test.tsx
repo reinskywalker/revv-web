@@ -66,6 +66,6 @@ describe("billing formatting & localized ClubMembersPopupModal", () => {
     expect(screen.getByText("Skuad Klub")).toBeTruthy();
     expect(screen.getByText(/30 \/ 30 Anggota/)).toBeTruthy();
     expect(screen.getByText("Parkiran Penuh (Mode Tunggu)")).toBeTruthy();
-    expect(screen.getByText("Boost Klub")).toBeTruthy();
+    expect(screen.getByText("Boost di App")).toBeTruthy();
   });
 });

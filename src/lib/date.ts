@@ -21,3 +21,31 @@ export function formatRelativeTime(dateInput: string | Date | number): string {
   const y = Math.floor(diffDays / 365);
   return `${y} ${y === 1 ? "year" : "years"} ago`;
 }
+
+export function formatShortDate(iso?: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+export function formatDateTime(iso?: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function formatDuration(seconds?: number | null): string {
+  if (!seconds || seconds <= 0) return "0 min";
+  const mins = Math.max(0, Math.floor(seconds / 60));
+  const hrs = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return hrs > 0 ? `${hrs}h ${rem}m` : `${rem} min`;
+}

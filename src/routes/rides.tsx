@@ -31,6 +31,7 @@ import {
 } from "@/lib/api-rider";
 import { useAuth } from "@/lib/auth-context";
 import { formatRelativeTime } from "@/lib/date";
+import { getErrorMessage } from "@/lib/utils";
 
 export const Route = createFileRoute("/rides")({
   head: () => ({
@@ -48,6 +49,7 @@ function RidesHubPage() {
   // Communities
   const [communities, setCommunities] = useState<CommunitySummary[]>([]);
   const [clubSearch, setClubSearch] = useState("");
+  const [debouncedClubSearch, setDebouncedClubSearch] = useState("");
   const [joinedOnly, setJoinedOnly] = useState(false);
   const [clubLoading, setClubLoading] = useState(false);
   const [clubError, setClubError] = useState<string | null>(null);
@@ -64,23 +66,34 @@ function RidesHubPage() {
   const [tripsPage, setTripsPage] = useState(1);
   const [tripsTotalPages, setTripsTotalPages] = useState(1);
   const [tripQuery, setTripQuery] = useState("");
+  const [debouncedTripQuery, setDebouncedTripQuery] = useState("");
   const [tripsLoading, setTripsLoading] = useState(false);
   const [tripsError, setTripsError] = useState<string | null>(null);
   const [deleteTripTarget, setDeleteTripTarget] = useState<RideTripSummary | null>(null);
   const [deleteTripBusy, setDeleteTripBusy] = useState(false);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedClubSearch(clubSearch.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [clubSearch]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedTripQuery(tripQuery.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [tripQuery]);
+
   const loadCommunities = useCallback(async () => {
     setClubLoading(true);
     setClubError(null);
     try {
-      const data = await fetchCommunities({ search: clubSearch, joined_only: joinedOnly });
+      const data = await fetchCommunities({ search: debouncedClubSearch, joined_only: joinedOnly });
       setCommunities(data);
     } catch (err) {
-      setClubError(err instanceof Error ? err.message : "Failed to load communities.");
+      setClubError(getErrorMessage(err, "Failed to load communities."));
     } finally {
       setClubLoading(false);
     }
-  }, [clubSearch, joinedOnly]);
+  }, [debouncedClubSearch, joinedOnly]);
 
   const loadEvents = useCallback(async () => {
     setEventsLoading(true);
@@ -89,7 +102,7 @@ function RidesHubPage() {
       const data = await fetchCommunityEvents();
       setEvents(data);
     } catch (err) {
-      setEventsError(err instanceof Error ? err.message : "Failed to load ride events.");
+      setEventsError(getErrorMessage(err, "Failed to load ride events."));
     } finally {
       setEventsLoading(false);
     }
@@ -99,15 +112,15 @@ function RidesHubPage() {
     setTripsLoading(true);
     setTripsError(null);
     try {
-      const res = await fetchMyTrips({ page: tripsPage, limit: 10, q: tripQuery });
+      const res = await fetchMyTrips({ page: tripsPage, limit: 10, q: debouncedTripQuery });
       setTrips(res.trips);
       setTripsTotalPages(Math.max(1, res.totalPages));
     } catch (err) {
-      setTripsError(err instanceof Error ? err.message : "Failed to load trips.");
+      setTripsError(getErrorMessage(err, "Failed to load trips."));
     } finally {
       setTripsLoading(false);
     }
-  }, [tripsPage, tripQuery]);
+  }, [tripsPage, debouncedTripQuery]);
 
   useEffect(() => {
     if (!isAuthenticated) return;

@@ -639,8 +639,11 @@ function AdminPage() {
 
                       {adminNews.length > 0 && (
                         <optgroup label="Motorcycle News Articles">
-                          {adminNews.map((article) => (
-                            <option key={article.slug} value={`news/${article.slug}`}>
+                          {adminNews.map((article, idx) => (
+                            <option
+                              key={article.id || article.slug || `news-${idx}`}
+                              value={`news/${article.slug}`}
+                            >
                               📖 News:{" "}
                               {article.title.length > 55
                                 ? `${article.title.slice(0, 52)}...`

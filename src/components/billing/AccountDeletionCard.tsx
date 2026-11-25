@@ -4,7 +4,7 @@ import { useI18n } from "@/lib/i18n";
 
 interface AccountDeletionCardProps {
   busy: boolean;
-  onSubmit: (reason: string) => Promise<void>;
+  onSubmit: (reason: string) => Promise<boolean>;
 }
 
 export function AccountDeletionCard({ busy, onSubmit }: AccountDeletionCardProps) {
@@ -13,9 +13,11 @@ export function AccountDeletionCard({ busy, onSubmit }: AccountDeletionCardProps
   const [reason, setReason] = useState("");
 
   const handleSubmit = async () => {
-    await onSubmit(reason);
-    setReason("");
-    setExpanded(false);
+    const succeeded = await onSubmit(reason);
+    if (succeeded) {
+      setReason("");
+      setExpanded(false);
+    }
   };
 
   return (

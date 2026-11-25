@@ -1,4 +1,4 @@
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Smartphone, Sparkles } from "lucide-react";
 import { RevvAvatar } from "@/components/revv/RevvAvatar";
 import { RevvBadge } from "@/components/revv/RevvBadge";
 import { formatDbPrice } from "@/lib/api-billing";
@@ -11,9 +11,7 @@ interface CosmeticsShopSectionProps {
   userDisplayName: string;
   busyAction: string | null;
   onEquipFrame: (frameCode: string | null) => void;
-  onBuyFrame: (frameCode: string) => void;
   onToggleBadge: (badgeCode: string) => void;
-  onBuyBadge: (badgeCode: string) => void;
 }
 
 export function CosmeticsShopSection({
@@ -22,9 +20,7 @@ export function CosmeticsShopSection({
   userDisplayName,
   busyAction,
   onEquipFrame,
-  onBuyFrame,
   onToggleBadge,
-  onBuyBadge,
 }: CosmeticsShopSectionProps) {
   const { t } = useI18n();
   if (!cosmetics) return null;
@@ -45,13 +41,11 @@ export function CosmeticsShopSection({
         </h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {cosmetics.frames.map((frame) => {
-            const canBuy =
+            const isPaidItem =
               !frame.unlocked &&
               (frame.source_type === "purchase" || frame.source_type === "shop") &&
               frame.effective_amount > 0;
-            const busy =
-              busyAction === `equip_frame_${frame.code}` ||
-              busyAction === `buy_frame_${frame.code}`;
+            const busy = busyAction === `equip_frame_${frame.code}`;
 
             return (
               <div
@@ -84,17 +78,12 @@ export function CosmeticsShopSection({
                       {busy && <Loader2 className="size-3 animate-spin" />}
                       {frame.equipped ? t("billing.unequip") : t("billing.equip")}
                     </button>
-                  ) : canBuy ? (
-                    <button
-                      type="button"
-                      disabled={Boolean(busyAction)}
-                      onClick={() => onBuyFrame(frame.code)}
-                      className="mt-1 inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                    >
-                      {t("billing.buyNow", {
-                        price: formatDbPrice(frame.effective_currency, frame.effective_amount),
-                      })}
-                    </button>
+                  ) : isPaidItem ? (
+                    <span className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-primary">
+                      <Smartphone className="size-3 shrink-0" />
+                      {formatDbPrice(frame.effective_currency, frame.effective_amount)} ·{" "}
+                      {t("billing.mobileOnlyShort")}
+                    </span>
                   ) : (
                     <span className="inline-block font-mono text-[11px] text-muted-foreground">
                       {t("billing.freeTrack")}
@@ -113,7 +102,7 @@ export function CosmeticsShopSection({
         </h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {cosmetics.badges.map((badge) => {
-            const canBuy =
+            const isPaidItem =
               !badge.unlocked &&
               (badge.source_type === "purchase" || badge.source_type === "shop") &&
               badge.effective_amount > 0;
@@ -135,17 +124,12 @@ export function CosmeticsShopSection({
                     >
                       {badge.equipped ? t("billing.equipped") : t("billing.equip")}
                     </button>
-                  ) : canBuy ? (
-                    <button
-                      type="button"
-                      disabled={Boolean(busyAction)}
-                      onClick={() => onBuyBadge(badge.code)}
-                      className="mt-1 inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                    >
-                      {t("billing.buyNow", {
-                        price: formatDbPrice(badge.effective_currency, badge.effective_amount),
-                      })}
-                    </button>
+                  ) : isPaidItem ? (
+                    <span className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-primary">
+                      <Smartphone className="size-3 shrink-0" />
+                      {formatDbPrice(badge.effective_currency, badge.effective_amount)} ·{" "}
+                      {t("billing.mobileOnlyShort")}
+                    </span>
                   ) : (
                     <span className="inline-block font-mono text-[11px] text-muted-foreground">
                       {t("billing.freeTrack")}

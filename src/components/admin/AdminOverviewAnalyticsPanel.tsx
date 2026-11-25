@@ -13,20 +13,9 @@ import {
   Zap,
 } from "lucide-react";
 import { type AdminAnalyticsResponse, type AdminDashboardStats } from "@/lib/api";
+import { formatDateTime as formatShortDate } from "@/lib/date";
 
 type UserSortKey = "last_active" | "last_login" | "logins" | "distance" | "trips";
-
-function formatShortDate(iso?: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function KpiCard({
   label,

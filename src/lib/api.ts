@@ -329,6 +329,8 @@ export function getApiBaseUrl(): string {
   return isProd ? "https://revv.asteralabs.digital/api/v1" : "http://localhost:8000/api/v1";
 }
 
+const SAFE_RASTER_DATA_IMAGE_RE = /^data:image\/(png|jpeg|jpg|webp|gif);base64,/i;
+
 export function resolveMediaUrl(path?: string | null): string | null {
   if (!path) return null;
   const trimmed = path.trim();
@@ -336,10 +338,16 @@ export function resolveMediaUrl(path?: string | null): string | null {
   if (
     trimmed.startsWith("http://") ||
     trimmed.startsWith("https://") ||
-    trimmed.startsWith("data:") ||
-    trimmed.startsWith("blob:")
+    trimmed.startsWith("blob:") ||
+    SAFE_RASTER_DATA_IMAGE_RE.test(trimmed)
   ) {
     return trimmed;
+  }
+  if (
+    trimmed.toLowerCase().startsWith("data:") ||
+    trimmed.toLowerCase().startsWith("javascript:")
+  ) {
+    return null;
   }
   const origin = getApiBaseUrl().replace(/\/api\/v1\/?$/, "");
   const clean = trimmed.replace(/^\/+/, "");
@@ -1069,7 +1077,7 @@ export async function fetchPublicUserAchievements(
     throw new AuthApiError(
       body?.meta?.message || `Unable to load achievements (${res.status})`,
       res.status,
-      body?.meta?.code,
+      res.status === 404,
     );
   }
   const body = await res.json();

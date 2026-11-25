@@ -19,8 +19,8 @@ import {
   type UserTelemetryMetricItem,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { formatRelativeTime } from "@/lib/date";
-import { cn } from "@/lib/utils";
+import { formatDateTime as formatShortDate, formatRelativeTime } from "@/lib/date";
+import { cn, isAdminRole } from "@/lib/utils";
 
 export const Route = createFileRoute("/analytics")({
   head: () => ({
@@ -38,26 +38,10 @@ export const Route = createFileRoute("/analytics")({
 
 type UserSortKey = "last_active" | "last_login" | "logins" | "distance" | "trips";
 
-function formatShortDate(iso?: string | null): string {
-  if (!iso) return "Never";
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return "Never";
-    return d.toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "Never";
-  }
-}
-
 function AdminAnalyticsPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = user?.role?.toLowerCase() === "administrator";
+  const isAdmin = isAdminRole(user?.role);
 
   const [data, setData] = useState<AdminAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);

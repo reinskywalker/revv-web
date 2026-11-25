@@ -571,14 +571,15 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                   </span>
                 </button>
                 {!community.is_official && (
-                  <Link
-                    to="/plans"
-                    search={{ boostClub: community.id } as never}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-3 py-1 font-mono text-xs font-bold text-primary transition hover:bg-primary/25"
+                  <span
+                    title="Boost this club inside REVV Mobile App"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-3 py-1 font-mono text-xs font-bold text-primary"
                   >
                     <Flame className="h-3.5 w-3.5" />
-                    {community.boost_count ? `Boosted (${community.boost_count})` : "Boost Club"}
-                  </Link>
+                    {community.boost_count
+                      ? `Boosted (${community.boost_count})`
+                      : "Boost via Mobile App"}
+                  </span>
                 )}
                 {(community.post_slow_mode_seconds ?? 0) > 0 && (
                   <span className="inline-flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-2.5 py-1 font-mono text-xs text-warning">

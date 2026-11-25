@@ -1,43 +1,37 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertTriangle, Check, Loader2, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Check, Flame, Loader2, ShieldCheck, Smartphone, Zap } from "lucide-react";
+import { AccountDeletionCard } from "@/components/billing/AccountDeletionCard";
+import { CosmeticsShopSection } from "@/components/billing/CosmeticsShopSection";
 import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
 import { SiteFooter, SiteHeader } from "@/components/revv/chrome";
-import { AccountDeletionCard } from "@/components/billing/AccountDeletionCard";
-import { ClubBoostSection } from "@/components/billing/ClubBoostSection";
-import { CosmeticsShopSection } from "@/components/billing/CosmeticsShopSection";
-import { PendingOrderBanner } from "@/components/billing/PendingOrderBanner";
-import { QuickPassesSection } from "@/components/billing/QuickPassesSection";
-import { SubscriptionPlansSection } from "@/components/billing/SubscriptionPlansSection";
+import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/api";
 import {
   cancelMySubscription,
-  cancelPaymentOrder,
-  createPaymentCheckout,
   equipMyAvatarFrame,
   equipMyCosmeticBadges,
-  fetchPaymentOrderStatus,
   fetchSubscriptionPlansCatalog,
   formatDbPrice,
-  type PaymentOrderDto,
   requestAccountDeletion,
   type SubscriptionPlansCatalogResponse,
 } from "@/lib/api-billing";
 import { useAuth } from "@/lib/auth-context";
 import {
-  invalidateCosmeticsCatalogCache,
   type CosmeticsCatalogResponse,
   fetchCosmeticsCatalogCached,
+  invalidateCosmeticsCatalogCache,
 } from "@/lib/cosmetics-cache";
 import { useI18n } from "@/lib/i18n";
+import { getErrorMessage } from "@/lib/utils";
 
 export const Route = createFileRoute("/plans")({
   head: () => ({
     meta: [
-      { title: "Plans, Passes, Club Boost & Cosmetics — REVV" },
+      { title: "Plans & Wardrobe — REVV" },
       {
         name: "description",
         content:
-          "REVV Weekday/Weekend traffic navigation passes, Throttle & Apex subscriptions, Paddock Club Boost, and animated cosmetics.",
+          "View REVV local plans, Paddock Club Boost perks, and equip unlocked cosmetics. Purchases are handled in REVV Mobile App.",
       },
     ],
   }),
@@ -47,20 +41,16 @@ export const Route = createFileRoute("/plans")({
 function PlansPage() {
   const { user, isAuthenticated } = useAuth();
   const { t } = useI18n();
+  const userCountry = user?.country ?? null;
+  const prevCountryRef = useRef<string | null>(userCountry);
 
   const [billingCatalog, setBillingCatalog] = useState<SubscriptionPlansCatalogResponse | null>(
     null,
   );
   const [cosmetics, setCosmetics] = useState<CosmeticsCatalogResponse | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<"weekly" | "monthly" | "yearly">("monthly");
-  const [boostQuantity, setBoostQuantity] = useState(1);
-  const [selectedProvider, setSelectedProvider] = useState<"midtrans" | "doku">("midtrans");
-  const [selectedChannel, setSelectedChannel] = useState("qris");
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [activeOrder, setActiveOrder] = useState<PaymentOrderDto | null>(null);
-  const activeOrderRef = useRef<PaymentOrderDto | null>(null);
-  activeOrderRef.current = activeOrder;
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,107 +64,23 @@ function PlansPage() {
         const [plansRes, cosRes] = await Promise.all([fetchSubscriptionPlansCatalog(), cosPromise]);
         setBillingCatalog(plansRes);
         setCosmetics(cosRes);
-        const nonPlayPending = plansRes.pending_orders.filter(
-          (o) => o.provider !== "google_play" && o.status === "PENDING",
-        );
-        if (nonPlayPending.length > 0 && !activeOrderRef.current) {
-          setActiveOrder(nonPlayPending[0]!);
-        }
       } else {
         setCosmetics(await cosPromise);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load pricing catalog.");
+      setError(getErrorMessage(err, "Could not load pricing catalog."));
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, user?.country]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    invalidateCosmeticsCatalogCache();
+    if (prevCountryRef.current !== userCountry) {
+      prevCountryRef.current = userCountry;
+      invalidateCosmeticsCatalogCache();
+    }
     void loadData();
-  }, [loadData]);
-
-  const handleCheckout = async (params: {
-    item_type: "subscription" | "club_boost" | "cosmetic_frame" | "cosmetic_badge";
-    item_code: string;
-    billing_period?: string;
-    quantity?: number;
-    key: string;
-  }) => {
-    if (!isAuthenticated) {
-      setError(t("billing.checkoutSignInRequired"));
-      return;
-    }
-    setBusyAction(params.key);
-    setError(null);
-    setNotice(null);
-    try {
-      const idemKey = `web_${params.item_type}_${params.item_code}_${params.billing_period ?? "once"}_${Date.now()}`;
-      const res = await createPaymentCheckout({
-        provider: selectedProvider,
-        item_type: params.item_type,
-        item_code: params.item_code,
-        billing_period: params.billing_period,
-        quantity: params.quantity && params.quantity > 1 ? params.quantity : undefined,
-        payment_channel: selectedChannel,
-        idempotency_key: idemKey,
-      });
-      setActiveOrder(res.order);
-      setNotice(
-        res.reused
-          ? t("billing.orderResumed", { code: res.order.order_code })
-          : t("billing.orderCreated", {
-              code: res.order.order_code,
-              amount: formatDbPrice(res.order.currency, res.order.expected_amount),
-              provider: `${selectedProvider.toUpperCase()} (${selectedChannel.toUpperCase()})`,
-            }),
-      );
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Checkout failed.");
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const handleCancelOrder = async (orderCode: string) => {
-    setBusyAction(`cancel_${orderCode}`);
-    setError(null);
-    try {
-      await cancelPaymentOrder(orderCode);
-      setActiveOrder(null);
-      setNotice(t("billing.orderCancelled", { code: orderCode }));
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to cancel pending order.");
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const handleCheckOrderStatus = async (orderCode: string) => {
-    setBusyAction(`poll_${orderCode}`);
-    setError(null);
-    try {
-      const res = await fetchPaymentOrderStatus(orderCode);
-      setActiveOrder(res.order);
-      setNotice(
-        t("billing.orderStatusUpdated", {
-          code: res.order.order_code,
-          status: res.order.status,
-        }),
-      );
-      if (res.order.status === "SETTLED") {
-        invalidateCosmeticsCatalogCache();
-        await loadData();
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to check payment status.");
-    } finally {
-      setBusyAction(null);
-    }
-  };
+  }, [loadData, userCountry]);
 
   const handleCancelRenewal = async () => {
     setBusyAction("cancel_sub");
@@ -187,7 +93,7 @@ function PlansPage() {
       setNotice(t("billing.cancelSuccess", { date: dateStr }));
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not cancel renewal.");
+      setError(getErrorMessage(err, "Could not cancel renewal."));
     } finally {
       setBusyAction(null);
     }
@@ -209,7 +115,7 @@ function PlansPage() {
       setNotice(t("billing.badgesUpdated"));
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update equipped badges.");
+      setError(getErrorMessage(err, "Could not update equipped badges."));
     } finally {
       setBusyAction(null);
     }
@@ -223,20 +129,22 @@ function PlansPage() {
       setNotice(t("billing.frameUpdated"));
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update avatar frame.");
+      setError(getErrorMessage(err, "Could not update avatar frame."));
     } finally {
       setBusyAction(null);
     }
   };
 
-  const handleRequestDeletion = async (reason: string) => {
+  const handleRequestDeletion = async (reason: string): Promise<boolean> => {
     setBusyAction("delete_account");
     setError(null);
     try {
       await requestAccountDeletion(reason.trim() || undefined);
       setNotice(t("billing.deletionSubmitted"));
+      return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not submit deletion request.");
+      setError(getErrorMessage(err, "Could not submit deletion request."));
+      return false;
     } finally {
       setBusyAction(null);
     }
@@ -249,7 +157,7 @@ function PlansPage() {
     <div className="min-h-screen bg-background text-foreground">
       <SiteHeader />
       <main className="mx-auto max-w-6xl space-y-10 px-6 pb-20 pt-24">
-        <header className="space-y-3">
+        <header className="space-y-4">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-mono text-xs font-bold uppercase text-primary">
             <ShieldCheck className="size-3.5" />
             {t("billing.heroEyebrow")}
@@ -260,6 +168,38 @@ function PlansPage() {
           <p className="text-sm text-muted-foreground">
             {t("billing.heroSubtitle", { region, currency })}
           </p>
+
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-primary/30 bg-primary/5 p-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                <Smartphone className="size-4" />
+              </div>
+              <div>
+                <h2 className="font-display text-sm font-bold text-foreground">
+                  {t("billing.mobileOnlyTitle")}
+                </h2>
+                <p className="text-xs text-muted-foreground">{t("billing.mobileOnlySubtitle")}</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href={PLAY_STORE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-lg bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90"
+              >
+                Google Play
+              </a>
+              <a
+                href={APP_STORE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-lg border border-border bg-card px-3.5 py-2 text-xs font-bold text-foreground hover:border-primary/40"
+              >
+                App Store
+              </a>
+            </div>
+          </div>
 
           {!isAuthenticated ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
@@ -292,41 +232,16 @@ function PlansPage() {
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
-                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{t("billing.paymentGateway")}</span>
-                    <select
-                      value={selectedProvider}
-                      onChange={(e) => setSelectedProvider(e.target.value as "midtrans" | "doku")}
-                      className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-bold text-foreground"
-                    >
-                      <option value="midtrans">Midtrans</option>
-                      <option value="doku">DOKU</option>
-                    </select>
-                  </label>
-                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{t("billing.channel")}</span>
-                    <select
-                      value={selectedChannel}
-                      onChange={(e) => setSelectedChannel(e.target.value)}
-                      className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-bold text-foreground"
-                    >
-                      <option value="qris">QRIS</option>
-                      <option value="va">Virtual Account</option>
-                      <option value="card">Card</option>
-                    </select>
-                  </label>
-                  {billingCatalog.entitlements.auto_renew && (
-                    <button
-                      type="button"
-                      disabled={Boolean(busyAction)}
-                      onClick={() => setConfirmCancelOpen(true)}
-                      className="rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                    >
-                      {t("billing.cancelAutoRenew")}
-                    </button>
-                  )}
-                </div>
+                {billingCatalog.entitlements.auto_renew && (
+                  <button
+                    type="button"
+                    disabled={Boolean(busyAction)}
+                    onClick={() => setConfirmCancelOpen(true)}
+                    className="rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                  >
+                    {t("billing.cancelAutoRenew")}
+                  </button>
+                )}
               </div>
             )
           )}
@@ -346,20 +261,6 @@ function PlansPage() {
           </div>
         )}
 
-        {activeOrder &&
-          activeOrder.status === "PENDING" &&
-          activeOrder.provider !== "google_play" && (
-            <PendingOrderBanner
-              order={activeOrder}
-              busy={
-                busyAction === `poll_${activeOrder.order_code}` ||
-                busyAction === `cancel_${activeOrder.order_code}`
-              }
-              onCheckStatus={(code) => void handleCheckOrderStatus(code)}
-              onCancelOrder={(code) => void handleCancelOrder(code)}
-            />
-          )}
-
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
             <Loader2 className="size-5 animate-spin" />
@@ -369,55 +270,162 @@ function PlansPage() {
           <>
             {billingCatalog && (
               <>
-                <QuickPassesSection
-                  passes={billingCatalog.passes}
-                  entitlements={billingCatalog.entitlements}
-                  busyAction={busyAction}
-                  onCheckout={(pass) =>
-                    void handleCheckout({
-                      item_type: "subscription",
-                      item_code: pass.tier_code,
-                      billing_period: pass.billing_period,
-                      key: `pass_${pass.plan_key}`,
-                    })
-                  }
-                />
+                {billingCatalog.passes.length > 0 && (
+                  <section className="space-y-3">
+                    <div>
+                      <h2 className="flex items-center gap-2 font-display text-lg font-black">
+                        <Zap className="size-4 text-primary" />
+                        {t("billing.quickPassesTitle")}
+                      </h2>
+                      <p className="text-xs text-muted-foreground">
+                        {t("billing.quickPassesSubtitle")}
+                      </p>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {billingCatalog.passes.map((pass) => (
+                        <div
+                          key={pass.plan_key}
+                          className="flex flex-col justify-between gap-3 rounded-2xl border border-border bg-card p-5"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h3 className="font-display text-base font-black">{pass.label}</h3>
+                              <p className="text-xs text-muted-foreground">{pass.tagline}</p>
+                            </div>
+                            <span className="shrink-0 font-display text-lg font-black text-primary">
+                              {formatDbPrice(pass.currency, pass.amount)}
+                            </span>
+                          </div>
+                          <span className="font-mono text-[11px] text-muted-foreground">
+                            {t("billing.mobileOnlyShort")}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
-                <SubscriptionPlansSection
-                  plans={billingCatalog.plans}
-                  entitlements={billingCatalog.entitlements}
-                  selectedPeriod={selectedPeriod}
-                  onSelectPeriod={setSelectedPeriod}
-                  busyAction={busyAction}
-                  onSubscribe={(tierCode, opt) =>
-                    void handleCheckout({
-                      item_type: "subscription",
-                      item_code: tierCode,
-                      billing_period: opt.billing_period,
-                      key: `plan_${tierCode}_${opt.billing_period}`,
-                    })
-                  }
-                />
+                <section className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="font-display text-xl font-black">{t("billing.plansTitle")}</h2>
+                    <div className="inline-flex rounded-xl border border-border bg-card p-1">
+                      {(["weekly", "monthly", "yearly"] as const).map((period) => (
+                        <button
+                          key={period}
+                          type="button"
+                          onClick={() => setSelectedPeriod(period)}
+                          className={
+                            selectedPeriod === period
+                              ? "rounded-lg bg-primary px-3 py-1.5 text-xs font-bold uppercase text-primary-foreground"
+                              : "rounded-lg px-3 py-1.5 text-xs font-bold uppercase text-muted-foreground hover:text-foreground"
+                          }
+                        >
+                          {t(
+                            `billing.period${period.charAt(0).toUpperCase()}${period.slice(1)}` as
+                              | "billing.periodWeekly"
+                              | "billing.periodMonthly"
+                              | "billing.periodYearly",
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-                <ClubBoostSection
-                  options={billingCatalog.club_boost.options}
-                  levels={billingCatalog.club_boost.levels}
-                  quantity={boostQuantity}
-                  onQuantityChange={setBoostQuantity}
-                  itemOnlyEligible={Boolean(billingCatalog.club_boost.item_only_eligible)}
-                  itemAddonMonthly={billingCatalog.club_boost.item_addon_monthly}
-                  itemAddonYearly={billingCatalog.club_boost.item_addon_yearly}
-                  busyAction={busyAction}
-                  onBoost={(opt) =>
-                    void handleCheckout({
-                      item_type: "club_boost",
-                      item_code: opt.tier_code,
-                      billing_period: opt.billing_period,
-                      quantity: boostQuantity,
-                      key: `boost_${opt.plan_key}`,
-                    })
-                  }
-                />
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    {billingCatalog.plans.map((tier) => {
+                      const opt =
+                        tier.options.find((o) => o.billing_period === selectedPeriod) ??
+                        tier.options[0];
+                      const isCurrent =
+                        billingCatalog.entitlements.tier_code.toLowerCase() ===
+                        tier.tier_code.toLowerCase();
+                      const perks = [
+                        tier.limits.radar_radius_km != null
+                          ? `${tier.limits.radar_radius_km} km live radar`
+                          : null,
+                        tier.limits.hosted_voice_riders != null
+                          ? `Up to ${tier.limits.hosted_voice_riders} convoy voice riders`
+                          : null,
+                        tier.limits.garage_bikes != null
+                          ? `${tier.limits.garage_bikes} garage bikes`
+                          : null,
+                        tier.limits.saved_routes != null
+                          ? `${tier.limits.saved_routes} saved routes`
+                          : null,
+                        tier.limits.has_google_traffic_nav ? "Live traffic navigation" : null,
+                      ].filter((p): p is string => Boolean(p));
+
+                      return (
+                        <div
+                          key={tier.tier_code}
+                          className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-card p-5"
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-mono text-xs font-bold uppercase text-primary">
+                                {tier.name}
+                              </span>
+                              {isCurrent && (
+                                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                                  {t("billing.subscribed")}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">{tier.tagline}</p>
+                            <div className="font-display text-xl font-black">
+                              {opt
+                                ? formatDbPrice(opt.currency, opt.amount)
+                                : t("billing.freeForever")}
+                            </div>
+                            <ul className="space-y-1.5 pt-2 text-xs text-muted-foreground">
+                              {perks.map((perk) => (
+                                <li key={perk} className="flex items-start gap-2">
+                                  <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                                  <span>{perk}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                          <span className="font-mono text-[11px] text-muted-foreground">
+                            {t("billing.mobileOnlyShort")}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                {billingCatalog.club_boost.levels.length > 0 && (
+                  <section className="space-y-3 rounded-2xl border border-primary/30 bg-card p-6">
+                    <div>
+                      <h2 className="flex items-center gap-2 font-display text-lg font-black">
+                        <Flame className="size-4 text-primary" />
+                        {t("billing.clubBoostTitle")}
+                      </h2>
+                      <p className="text-xs text-muted-foreground">
+                        {t("billing.clubBoostSubtitle")}
+                      </p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {billingCatalog.club_boost.levels.map((lvl) => (
+                        <div
+                          key={lvl.boost_level}
+                          className="rounded-xl border border-border bg-secondary/40 p-3.5"
+                        >
+                          <div className="font-display text-sm font-black text-foreground">
+                            {lvl.level_name}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {t("billing.boostLevelMeta", {
+                              members: lvl.member_limit,
+                              voice: lvl.max_voice_channels,
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
               </>
             )}
 
@@ -427,21 +435,7 @@ function PlansPage() {
               userDisplayName={user?.name || user?.first_name || user?.username || "Rider"}
               busyAction={busyAction}
               onEquipFrame={(code) => void handleEquipFrame(code)}
-              onBuyFrame={(code) =>
-                void handleCheckout({
-                  item_type: "cosmetic_frame",
-                  item_code: code,
-                  key: `buy_frame_${code}`,
-                })
-              }
               onToggleBadge={(code) => void toggleEquipBadge(code)}
-              onBuyBadge={(code) =>
-                void handleCheckout({
-                  item_type: "cosmetic_badge",
-                  item_code: code,
-                  key: `buy_badge_${code}`,
-                })
-              }
             />
 
             {isAuthenticated && (

@@ -33,6 +33,7 @@ import {
 import { RevvAvatar } from "@/components/revv/RevvAvatar";
 import { useAuth } from "@/lib/auth-context";
 import { formatRelativeTime } from "@/lib/date";
+import { getErrorMessage } from "@/lib/utils";
 
 export const Route = createFileRoute("/messages")({
   head: () => ({
@@ -90,18 +91,27 @@ function MessagesPage() {
     }
   }, []);
 
+  const activePeerIdRef = useRef<string | null>(null);
+  const pollRequestSeqRef = useRef(0);
+
   const loadMessages = useCallback(async (peerId: string, silent = false) => {
+    const requestSeq = ++pollRequestSeqRef.current;
     if (!silent) setChatLoading(true);
     setChatError(null);
     try {
       const list = await fetchDirectMessages(peerId, 60);
+      if (activePeerIdRef.current !== peerId || pollRequestSeqRef.current !== requestSeq) {
+        return;
+      }
       setMessages(list);
     } catch (err) {
-      if (!silent) {
-        setChatError(err instanceof Error ? err.message : "Failed to load thread.");
+      if (!silent && activePeerIdRef.current === peerId) {
+        setChatError(getErrorMessage(err, "Failed to load thread."));
       }
     } finally {
-      if (!silent) setChatLoading(false);
+      if (!silent && activePeerIdRef.current === peerId) {
+        setChatLoading(false);
+      }
     }
   }, []);
 
@@ -112,6 +122,7 @@ function MessagesPage() {
 
   // Foreground-only 5s polling for the open DM thread
   useEffect(() => {
+    activePeerIdRef.current = activePeer?.id ?? null;
     if (!isAuthenticated || !activePeer) return;
     void loadMessages(activePeer.id);
 
@@ -335,6 +346,8 @@ function MessagesPage() {
                                 x.id === r.id ? { ...x, friendship_status: "outgoing_request" } : x,
                               ),
                             );
+                          } catch (err) {
+                            setSidebarError(getErrorMessage(err, "Could not send friend request."));
                           } finally {
                             setBusyActionId(null);
                           }
@@ -480,6 +493,8 @@ function MessagesPage() {
                           try {
                             await acceptFriendRequest(req.id);
                             await loadSocialData();
+                          } catch (err) {
+                            setSidebarError(getErrorMessage(err, "Could not accept request."));
                           } finally {
                             setBusyActionId(null);
                           }
@@ -497,6 +512,8 @@ function MessagesPage() {
                           try {
                             await rejectFriendRequest(req.id);
                             await loadSocialData();
+                          } catch (err) {
+                            setSidebarError(getErrorMessage(err, "Could not decline request."));
                           } finally {
                             setBusyActionId(null);
                           }

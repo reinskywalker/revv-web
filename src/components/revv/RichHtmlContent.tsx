@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { resolveMediaUrl, sanitizeRichHtml } from "@/lib/api";
+import { normalizePlainTextToHtml } from "@/components/revv/RichTextEditor";
 
 interface RichHtmlContentProps {
   html: string;
@@ -8,24 +8,7 @@ interface RichHtmlContentProps {
 }
 
 export function RichHtmlContent({ html, variant = "light", className = "" }: RichHtmlContentProps) {
-  const safeHtml = useMemo(() => {
-    const trimmed = html.trim();
-    if (!trimmed) return "";
-    // Convert legacy plain-text articles safely into paragraph blocks.
-    const looksLikeHtml = /<\/?[a-z][\s\S]*>/i.test(trimmed);
-    const prepared = looksLikeHtml
-      ? trimmed
-      : trimmed
-          .split(/\n{2,}/)
-          .map((block) => `<p>${block.replace(/\n/g, "<br/>")}</p>`)
-          .join("");
-    const sanitized = sanitizeRichHtml(prepared);
-    // Resolve relative /uploads/... image paths against the API origin.
-    return sanitized.replace(/src="(\/uploads\/[^"]+)"/gi, (_m, path: string) => {
-      const resolved = resolveMediaUrl(path) ?? path;
-      return `src="${resolved}"`;
-    });
-  }, [html]);
+  const safeHtml = useMemo(() => normalizePlainTextToHtml(html), [html]);
 
   const variantClasses =
     variant === "dark"

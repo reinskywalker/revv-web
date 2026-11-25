@@ -37,6 +37,7 @@ import {
   type MasterComponentItemPublic,
 } from "@/lib/api-rider";
 import { useAuth } from "@/lib/auth-context";
+import { getErrorMessage } from "@/lib/utils";
 
 export const Route = createFileRoute("/garage")({
   head: () => ({
@@ -110,6 +111,14 @@ function GaragePage() {
     }
   }, []);
 
+  const handleMaintenanceError = useCallback((message: string) => {
+    setNotice({ type: "error", message });
+  }, []);
+
+  const handleMaintenanceNotice = useCallback((message: string) => {
+    setNotice({ type: "success", message });
+  }, []);
+
   const handleSelectCatalogBrand = async (brandIdStr: string) => {
     setSelectedBrandId(brandIdStr);
     setSelectedMasterBikeId("");
@@ -121,6 +130,11 @@ function GaragePage() {
     try {
       const models = await fetchMasterMotorcycles(Number(brandIdStr));
       setMasterCatalog(models);
+    } catch (err) {
+      setNotice({
+        type: "error",
+        message: getErrorMessage(err, "Failed to load motorcycle models."),
+      });
     } finally {
       setLoadingModels(false);
     }
@@ -742,8 +756,8 @@ function GaragePage() {
                       currentMileage={bike.current_mileage}
                       transmissionType={bike.transmission}
                       masterComponents={masterComponents}
-                      onError={(message) => setNotice({ type: "error", message })}
-                      onNotice={(message) => setNotice({ type: "success", message })}
+                      onError={handleMaintenanceError}
+                      onNotice={handleMaintenanceNotice}
                     />
                   )}
 

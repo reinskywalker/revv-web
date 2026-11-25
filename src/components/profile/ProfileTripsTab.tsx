@@ -3,14 +3,8 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, Clock, Gauge, Navigation, RefreshCw, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
 import { deleteMyTrip, fetchMyTrips, type RideTripSummary } from "@/lib/api-rider";
-import { formatRelativeTime } from "@/lib/date";
-
-function formatDuration(seconds: number): string {
-  const mins = Math.max(0, Math.floor(seconds / 60));
-  const hrs = Math.floor(mins / 60);
-  const rem = mins % 60;
-  return hrs > 0 ? `${hrs}h ${rem}m` : `${rem}m`;
-}
+import { formatDuration, formatRelativeTime } from "@/lib/date";
+import { getErrorMessage } from "@/lib/utils";
 
 export function ProfileTripsTab() {
   const [trips, setTrips] = useState<RideTripSummary[]>([]);
@@ -26,7 +20,7 @@ export function ProfileTripsTab() {
       const res = await fetchMyTrips({ page: 1, limit: 8 });
       setTrips(res.trips);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load recorded trips.");
+      setError(getErrorMessage(err, "Failed to load recorded trips."));
     } finally {
       setLoading(false);
     }

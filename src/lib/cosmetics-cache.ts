@@ -252,11 +252,21 @@ export async function fetchLottieByHashCached(
 
   const promise = (async () => {
     const baseOrigin = getApiBaseUrl().replace(/\/api\/v1\/?$/, "");
-    const targetUrl = lottieUrl
-      ? lottieUrl.startsWith("http")
-        ? lottieUrl
-        : `${baseOrigin}${lottieUrl}`
-      : `${getApiBaseUrl()}/cosmetics/lottie/${encodeURIComponent(hash)}`;
+    let targetUrl = `${getApiBaseUrl()}/cosmetics/lottie/${encodeURIComponent(hash)}`;
+    if (lottieUrl) {
+      if (lottieUrl.startsWith("/")) {
+        targetUrl = `${baseOrigin}${lottieUrl}`;
+      } else if (lottieUrl.startsWith("http")) {
+        // Reject third-party Lottie URLs outside the configured API origin.
+        try {
+          if (new URL(lottieUrl).origin === new URL(baseOrigin).origin) {
+            targetUrl = lottieUrl;
+          }
+        } catch {
+          // Fall back to canonical API endpoint for malformed URLs.
+        }
+      }
+    }
 
     if (typeof window !== "undefined" && "caches" in window) {
       try {

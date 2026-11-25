@@ -26,7 +26,8 @@ import {
   resolveMediaUrl,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { cn } from "@/lib/utils";
+import { formatDateTime, formatDuration } from "@/lib/date";
+import { cn, getErrorMessage, isAdminRole } from "@/lib/utils";
 
 export const Route = createFileRoute("/trip-records")({
   head: () => ({
@@ -42,36 +43,14 @@ export const Route = createFileRoute("/trip-records")({
   component: AdminTripRecordsPage,
 });
 
-function formatDuration(seconds: number): string {
-  const mins = Math.max(0, Math.floor(seconds / 60));
-  const hrs = Math.floor(mins / 60);
-  const rem = mins % 60;
-  return hrs > 0 ? `${hrs}h ${rem}m` : `${rem} min`;
-}
-
-function formatDateTime(iso?: string | null): string {
-  if (!iso) return "—";
-  try {
-    const d = new Date(iso);
-    return d.toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
-
 function AdminTripRecordsPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = user?.role?.toLowerCase() === "administrator";
+  const isAdmin = isAdminRole(user?.role);
 
   const [activeTab, setActiveTab] = useState<"recent" | "riders">("recent");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   // Tab 1: Top Recent 10 + View More
   const [recentTrips, setRecentTrips] = useState<AdminTripRecordItem[]>([]);
@@ -111,7 +90,7 @@ function AdminTripRecordsPage() {
       setRecentTotal(res.total);
       setRecentHasMore(res.has_more);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load trip records.");
+      setError(getErrorMessage(err, "Failed to load trip records."));
     } finally {
       setLoadingRecent(false);
       setLoadingMoreRecent(false);
@@ -133,7 +112,7 @@ function AdminTripRecordsPage() {
       setRiderTotal(res.total);
       setRiderHasMore(res.has_more);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load rider trips.");
+      setError(getErrorMessage(err, "Failed to load rider trips."));
     } finally {
       setLoadingRiders(false);
       setLoadingMoreRiders(false);
@@ -141,13 +120,18 @@ function AdminTripRecordsPage() {
   }, []);
 
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
     if (!isAuthenticated || !isAdmin) return;
     if (activeTab === "recent") {
-      void loadRecent(1, false, search);
+      void loadRecent(1, false, debouncedSearch);
     } else {
-      void loadRiders(1, false, search);
+      void loadRiders(1, false, debouncedSearch);
     }
-  }, [isAuthenticated, isAdmin, activeTab, search, loadRecent, loadRiders]);
+  }, [isAuthenticated, isAdmin, activeTab, debouncedSearch, loadRecent, loadRiders]);
 
   const handleOpenTripDetail = async (tripId: string) => {
     setSelectedTripId(tripId);

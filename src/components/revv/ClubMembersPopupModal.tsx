@@ -85,15 +85,10 @@ export function ClubMembersPopupModal({
             </div>
             <div className="flex items-center justify-between gap-3 pt-1">
               <p className="text-xs text-muted-foreground">{t("clubCap.boostPitch")}</p>
-              <Link
-                to="/plans"
-                search={{ boostClub: community.id } as never}
-                onClick={onClose}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 font-display text-xs font-bold uppercase text-primary-foreground hover:bg-primary/90"
-              >
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-primary/35 bg-primary/10 px-3 py-1.5 font-display text-xs font-bold uppercase text-primary">
                 <Flame className="size-3.5" />
                 {t("clubCap.boostCta")}
-              </Link>
+              </span>
             </div>
           </div>
         )}

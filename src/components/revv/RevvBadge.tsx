@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Lottie, type LottieHandle } from "lottie-react";
+import type { LottieHandle } from "lottie-react";
 import { Sparkles } from "lucide-react";
+import { LazyLottie } from "@/components/revv/LazyLottie";
 import { useCosmeticsCatalog, useLottieAsset } from "@/lib/cosmetics-cache";
 import { cn } from "@/lib/utils";
 
@@ -69,7 +70,7 @@ export function RevvBadge({
       )}
     >
       {lottieData ? (
-        <Lottie
+        <LazyLottie
           lottieRef={lottieRef}
           src={lottieData}
           loop

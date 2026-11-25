@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   MessageSquare,
@@ -105,12 +105,19 @@ export function GarageMaintenancePanel({
   const [workshop, setWorkshop] = useState("");
   const [notes, setNotes] = useState("");
 
-  const filteredMaster = masterComponents.filter((m) => {
-    if (!transmissionType || m.applicable_transmission.length === 0) return true;
-    return m.applicable_transmission.some(
-      (t) => t.toLowerCase() === transmissionType.toLowerCase(),
-    );
-  });
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+
+  const filteredMaster = useMemo(
+    () =>
+      masterComponents.filter((m) => {
+        if (!transmissionType || m.applicable_transmission.length === 0) return true;
+        return m.applicable_transmission.some(
+          (t) => t.toLowerCase() === transmissionType.toLowerCase(),
+        );
+      }),
+    [masterComponents, transmissionType],
+  );
 
   useEffect(() => {
     const first = filteredMaster[0];
@@ -129,11 +136,11 @@ export function GarageMaintenancePanel({
       setComponents(compList);
       setLogs(logList);
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Failed to load maintenance data.");
+      onErrorRef.current(err instanceof Error ? err.message : "Failed to load maintenance data.");
     } finally {
       setLoading(false);
     }
-  }, [garageId, onError]);
+  }, [garageId]);
 
   useEffect(() => {
     void loadData();

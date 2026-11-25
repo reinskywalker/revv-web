@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Lottie, type LottieHandle } from "lottie-react";
+import type { LottieHandle } from "lottie-react";
 import { Sparkles } from "lucide-react";
+import { LazyLottie } from "@/components/revv/LazyLottie";
 import { resolveMediaUrl } from "@/lib/api";
 import { useCosmeticsCatalog, useLottieAsset } from "@/lib/cosmetics-cache";
 import { cn } from "@/lib/utils";
@@ -255,7 +256,7 @@ export function RevvCosmeticBadge({
         className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-background/70"
       >
         {lottieData ? (
-          <Lottie src={lottieData} loop autoplay className="h-full w-full" />
+          <LazyLottie src={lottieData} loop autoplay className="h-full w-full" />
         ) : (
           <Sparkles className="size-3.5 text-primary" />
         )}
@@ -390,7 +391,7 @@ export function RevvAvatar({
       {/* Optional subtle animated DB Lottie accents if custom admin frame (clipped outside photo via CSS mask or small badge) */}
       {hasFrame && !framePngUrl && lottieData && !reducedMotion && (
         <div className="pointer-events-none absolute -top-1 -left-1 z-20 size-4 opacity-90">
-          <Lottie lottieRef={lottieRef} src={lottieData} loop autoplay />
+          <LazyLottie lottieRef={lottieRef} src={lottieData} loop autoplay />
         </div>
       )}
 

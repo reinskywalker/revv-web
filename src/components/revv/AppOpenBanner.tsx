@@ -59,8 +59,12 @@ export function AppOpenBanner({
 
   if (!eligibleMobile || dismissed) return null;
 
-  const cleanPath = deepLinkPath.replace(/^\/+/, "");
-  const deepLinkUrl = `revv://${cleanPath}`;
+  const cleanSegments = deepLinkPath
+    .split("/")
+    .map((seg) => seg.trim())
+    .filter(Boolean)
+    .map((seg) => encodeURIComponent(seg));
+  const deepLinkUrl = `revv://${cleanSegments.join("/")}`;
   const isIos = typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent);
   const storeUrl = isIos ? APP_STORE_URL : PLAY_STORE_URL;
 
