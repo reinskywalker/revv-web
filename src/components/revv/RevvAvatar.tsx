@@ -40,6 +40,28 @@ export function hasVerifiedFrame(frameCode?: string | null): boolean {
   return VERIFIED_FRAME_CODES.has(norm);
 }
 
+const GRAND_PAID_FRAMES = new Set([
+  "apex_gold_6m",
+  "patron_wave_2m",
+  "carbon_track_shop",
+  "retro_arcade_card",
+  "cyber_grid_volt",
+  "crimson_pulse_edge",
+  "manga_speed_burst",
+  "inferno_shard_oni",
+  "pastel_heart_drift",
+  "phantom_wisp_flame",
+]);
+
+function isGrandPaidFrame(frameCode?: string | null, sourceType?: string | null): boolean {
+  const norm = (frameCode ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/^frame_/, "");
+  if (GRAND_PAID_FRAMES.has(norm)) return true;
+  return sourceType === "purchase" || sourceType === "shop";
+}
+
 type FrameVisualStyle = {
   gradient: string;
   glow: string;
@@ -330,6 +352,10 @@ export function RevvAvatar({
     () => resolveFrameStyle(frameCode, frameMeta?.metadata),
     [frameCode, frameMeta?.metadata],
   );
+  const grandPaid = useMemo(
+    () => isGrandPaidFrame(frameCode, frameMeta?.source_type),
+    [frameCode, frameMeta?.source_type],
+  );
 
   const badgeSize = Math.max(14, Math.min(28, Math.round(size * 0.3)));
 
@@ -339,6 +365,17 @@ export function RevvAvatar({
       style={{ width: outerSize, height: outerSize }}
       className={cn("relative inline-flex shrink-0 items-center justify-center", className)}
     >
+      {/* Grand breathing ambient bloom for paid/prestige frames */}
+      {hasFrame && grandPaid && !reducedMotion && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -inset-1 rounded-[24%] opacity-75 blur-[6px] animate-revv-frame-pulse"
+          style={{
+            background: `radial-gradient(circle, ${frameStyle.accentHex}66 0%, ${frameStyle.secondaryHex}33 55%, transparent 75%)`,
+          }}
+        />
+      )}
+
       {/* Animated prestige squircle halo (behind photo, never obscuring image) */}
       {hasFrame && (
         <div
@@ -356,8 +393,49 @@ export function RevvAvatar({
             )}
             style={{ background: frameStyle.gradient }}
           />
+          {grandPaid && !reducedMotion && (
+            <div
+              className="absolute -inset-1/2 opacity-80 mix-blend-screen animate-revv-frame-counter-spin"
+              style={{
+                background: `conic-gradient(from 180deg, transparent 0deg, ${frameStyle.secondaryHex}cc 45deg, #ffffff 68deg, transparent 120deg, transparent 210deg, ${frameStyle.accentHex}aa 260deg, transparent 320deg)`,
+              }}
+            />
+          )}
           <div className="absolute inset-[3px] rounded-[19%] bg-card" />
         </div>
+      )}
+
+      {/* Corner starlight glints on grand paid frames */}
+      {hasFrame && grandPaid && !reducedMotion && size >= 36 && (
+        <>
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-1 -left-1 z-25 size-2.5 animate-revv-sparkle"
+            style={{ color: frameStyle.secondaryHex }}
+          >
+            <svg viewBox="0 0 16 16" fill="currentColor" className="size-full">
+              <path d="M8 0L9.8 6.2L16 8L9.8 9.8L8 16L6.2 9.8L0 8L6.2 6.2Z" />
+            </svg>
+          </span>
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute -bottom-1 -right-1 z-25 size-2 animate-revv-sparkle"
+            style={{ color: "#ffffff", animationDelay: "0.7s" }}
+          >
+            <svg viewBox="0 0 16 16" fill="currentColor" className="size-full">
+              <path d="M8 0L9.8 6.2L16 8L9.8 9.8L8 16L6.2 9.8L0 8L6.2 6.2Z" />
+            </svg>
+          </span>
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-0 -left-1 z-25 size-2 animate-revv-sparkle"
+            style={{ color: frameStyle.accentHex, animationDelay: "1.3s" }}
+          >
+            <svg viewBox="0 0 16 16" fill="currentColor" className="size-full">
+              <path d="M8 0L9.8 6.2L16 8L9.8 9.8L8 16L6.2 9.8L0 8L6.2 6.2Z" />
+            </svg>
+          </span>
+        </>
       )}
 
       {/* Squircle Photo / Initials */}

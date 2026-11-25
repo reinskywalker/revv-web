@@ -21,6 +21,7 @@ import { Route as PlansRouteImport } from './routes/plans'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as RidesRouteImport } from './routes/rides'
+import { Route as TripPlannerRouteImport } from './routes/trip-planner'
 import { Route as TripRecordsRouteImport } from './routes/trip-records'
 import { Route as ClubsIndexRouteImport } from './routes/clubs/index'
 import { Route as ClubsIdRouteImport } from './routes/clubs/$id'
@@ -88,6 +89,11 @@ const RidesRoute = RidesRouteImport.update({
   path: '/rides',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TripPlannerRoute = TripPlannerRouteImport.update({
+  id: '/trip-planner',
+  path: '/trip-planner',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TripRecordsRoute = TripRecordsRouteImport.update({
   id: '/trip-records',
   path: '/trip-records',
@@ -132,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/rides': typeof RidesRoute
+  '/trip-planner': typeof TripPlannerRoute
   '/trip-records': typeof TripRecordsRoute
   '/clubs/$id': typeof ClubsIdRoute
   '/community/$id': typeof CommunityIdRoute
@@ -152,6 +159,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/rides': typeof RidesRoute
+  '/trip-planner': typeof TripPlannerRoute
   '/trip-records': typeof TripRecordsRoute
   '/clubs/$id': typeof ClubsIdRoute
   '/community/$id': typeof CommunityIdRoute
@@ -173,6 +181,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
   '/rides': typeof RidesRoute
+  '/trip-planner': typeof TripPlannerRoute
   '/trip-records': typeof TripRecordsRoute
   '/clubs/$id': typeof ClubsIdRoute
   '/community/$id': typeof CommunityIdRoute
@@ -195,6 +204,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/register'
     | '/rides'
+    | '/trip-planner'
     | '/trip-records'
     | '/clubs/$id'
     | '/community/$id'
@@ -215,6 +225,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/register'
     | '/rides'
+    | '/trip-planner'
     | '/trip-records'
     | '/clubs/$id'
     | '/community/$id'
@@ -235,6 +246,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/register'
     | '/rides'
+    | '/trip-planner'
     | '/trip-records'
     | '/clubs/$id'
     | '/community/$id'
@@ -256,6 +268,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   RegisterRoute: typeof RegisterRoute
   RidesRoute: typeof RidesRoute
+  TripPlannerRoute: typeof TripPlannerRoute
   TripRecordsRoute: typeof TripRecordsRoute
   ClubsIdRoute: typeof ClubsIdRoute
   CommunityIdRoute: typeof CommunityIdRoute
@@ -350,6 +363,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RidesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/trip-planner': {
+      id: '/trip-planner'
+      path: '/trip-planner'
+      fullPath: '/trip-planner'
+      preLoaderRoute: typeof TripPlannerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/trip-records': {
       id: '/trip-records'
       path: '/trip-records'
@@ -408,6 +428,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   RegisterRoute: RegisterRoute,
   RidesRoute: RidesRoute,
+  TripPlannerRoute: TripPlannerRoute,
   TripRecordsRoute: TripRecordsRoute,
   ClubsIdRoute: ClubsIdRoute,
   CommunityIdRoute: CommunityIdRoute,

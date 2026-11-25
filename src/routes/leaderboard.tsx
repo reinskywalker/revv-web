@@ -57,6 +57,7 @@ function LeaderboardPage() {
   const [togglingOptIn, setTogglingOptIn] = useState(false);
   const [optInCooldown, setOptInCooldown] = useState(false);
   const [optInMessage, setOptInMessage] = useState<string | null>(null);
+  const [confirmHideOpen, setConfirmHideOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -79,9 +80,8 @@ function LeaderboardPage() {
     };
   }, [isAuthenticated]);
 
-  const handleToggleOptIn = async () => {
+  const executeToggleOptIn = async (nextValue: boolean) => {
     if (!isAuthenticated || togglingOptIn || optInCooldown || changesRemaining <= 0) return;
-    const nextValue = !optIn;
     setTogglingOptIn(true);
     setOptInMessage(null);
     setError(null);
@@ -98,11 +98,15 @@ function LeaderboardPage() {
       setTimeout(() => setOptInCooldown(false), 5000);
       if (!nextValue) {
         if (user?.id) {
-          setData((prev) =>
-            prev ? { ...prev, entries: prev.entries.filter((e) => e.user_id !== user.id) } : prev,
-          );
+          setData((prev) => {
+            if (!prev) return prev;
+            const filtered = prev.entries
+              .filter((e) => e.user_id !== user.id)
+              .map((e, idx) => ({ ...e, rank: idx + 1 }));
+            return { ...prev, entries: filtered };
+          });
         }
-        setOptInMessage("You are now hidden from the public rider rankings.");
+        setOptInMessage("You are now hidden from the public rider rankings across Web & Mobile.");
       } else {
         setOptInMessage(
           "You're back on the leaderboard! Your rank will appear after the midnight WIB daily update.",
@@ -113,6 +117,15 @@ function LeaderboardPage() {
     } finally {
       setTogglingOptIn(false);
     }
+  };
+
+  const handleToggleOptIn = () => {
+    if (!isAuthenticated || togglingOptIn || optInCooldown || changesRemaining <= 0) return;
+    if (optIn) {
+      setConfirmHideOpen(true);
+      return;
+    }
+    void executeToggleOptIn(true);
   };
 
   const loadLeaderboard = useCallback(async () => {
@@ -212,7 +225,7 @@ function LeaderboardPage() {
                 <button
                   type="button"
                   disabled={togglingOptIn || optInCooldown || changesRemaining <= 0}
-                  onClick={() => void handleToggleOptIn()}
+                  onClick={handleToggleOptIn}
                   title={
                     changesRemaining <= 0
                       ? "Daily visibility change limit reached. Try again after midnight WIB."
@@ -442,6 +455,49 @@ function LeaderboardPage() {
           </>
         )}
       </main>
+
+      {confirmHideOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="hide-rank-dialog-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <h2
+              id="hide-rank-dialog-title"
+              className="font-display text-lg font-black uppercase tracking-tight text-foreground"
+            >
+              Hide Your Rank from Leaderboard?
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              Turning this off immediately removes your profile from the public leaderboard across
+              Web &amp; Mobile. Turning it back on only updates after{" "}
+              <strong className="text-foreground">00:00 WIB</strong> and uses 1 of your daily
+              visibility changes ({changesRemaining} left today).
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmHideOpen(false)}
+                className="rounded-xl border border-border bg-secondary px-4 py-2 text-xs font-bold text-foreground hover:bg-secondary/80 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmHideOpen(false);
+                  void executeToggleOptIn(false);
+                }}
+                className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-amber-400 transition"
+              >
+                Yes, Hide My Rank
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!isAuthenticated && <SiteFooter />}
     </div>

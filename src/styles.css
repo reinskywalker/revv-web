@@ -183,6 +183,24 @@
   }
 }
 
+@keyframes revv-frame-counter-spin {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes revv-sparkle {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.75) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.25) rotate(45deg);
+  }
+}
+
 @keyframes revv-frame-pulse {
   0%,
   100% {
@@ -219,6 +237,14 @@
 
 @utility animate-revv-frame-spin {
   animation: revv-frame-spin 4s linear infinite;
+}
+
+@utility animate-revv-frame-counter-spin {
+  animation: revv-frame-counter-spin 5.5s linear infinite;
+}
+
+@utility animate-revv-sparkle {
+  animation: revv-sparkle 2.1s ease-in-out infinite;
 }
 
 @utility animate-revv-frame-pulse {
