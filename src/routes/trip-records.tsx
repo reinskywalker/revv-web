@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   ChevronDown,
   ChevronRight,
@@ -11,7 +11,6 @@ import {
   Navigation,
   RefreshCw,
   Search,
-  ShieldAlert,
   Users,
   X,
   Zap,
@@ -68,6 +67,7 @@ function formatDateTime(iso?: string | null): string {
 
 function AdminTripRecordsPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const isAdmin = user?.role?.toLowerCase() === "administrator";
 
   const [activeTab, setActiveTab] = useState<"recent" | "riders">("recent");
@@ -96,55 +96,49 @@ function AdminTripRecordsPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadRecent = useCallback(
-    async (pageNum: number, append: boolean, queryText: string) => {
-      if (append) setLoadingMoreRecent(true);
-      else setLoadingRecent(true);
-      setError(null);
-      try {
-        const res = await fetchAdminTrips({
-          page: pageNum,
-          limit: 10,
-          search: queryText,
-        });
-        setRecentTrips((prev) => (append ? [...prev, ...res.items] : res.items));
-        setRecentPage(res.page);
-        setRecentTotal(res.total);
-        setRecentHasMore(res.has_more);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load trip records.");
-      } finally {
-        setLoadingRecent(false);
-        setLoadingMoreRecent(false);
-      }
-    },
-    [],
-  );
+  const loadRecent = useCallback(async (pageNum: number, append: boolean, queryText: string) => {
+    if (append) setLoadingMoreRecent(true);
+    else setLoadingRecent(true);
+    setError(null);
+    try {
+      const res = await fetchAdminTrips({
+        page: pageNum,
+        limit: 10,
+        search: queryText,
+      });
+      setRecentTrips((prev) => (append ? [...prev, ...res.items] : res.items));
+      setRecentPage(res.page);
+      setRecentTotal(res.total);
+      setRecentHasMore(res.has_more);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load trip records.");
+    } finally {
+      setLoadingRecent(false);
+      setLoadingMoreRecent(false);
+    }
+  }, []);
 
-  const loadRiders = useCallback(
-    async (pageNum: number, append: boolean, queryText: string) => {
-      if (append) setLoadingMoreRiders(true);
-      else setLoadingRiders(true);
-      setError(null);
-      try {
-        const res = await fetchAdminTripsByRider({
-          page: pageNum,
-          limit: 10,
-          search: queryText,
-        });
-        setRiderGroups((prev) => (append ? [...prev, ...res.items] : res.items));
-        setRiderPage(res.page);
-        setRiderTotal(res.total);
-        setRiderHasMore(res.has_more);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load rider trips.");
-      } finally {
-        setLoadingRiders(false);
-        setLoadingMoreRiders(false);
-      }
-    },
-    [],
-  );
+  const loadRiders = useCallback(async (pageNum: number, append: boolean, queryText: string) => {
+    if (append) setLoadingMoreRiders(true);
+    else setLoadingRiders(true);
+    setError(null);
+    try {
+      const res = await fetchAdminTripsByRider({
+        page: pageNum,
+        limit: 10,
+        search: queryText,
+      });
+      setRiderGroups((prev) => (append ? [...prev, ...res.items] : res.items));
+      setRiderPage(res.page);
+      setRiderTotal(res.total);
+      setRiderHasMore(res.has_more);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load rider trips.");
+    } finally {
+      setLoadingRiders(false);
+      setLoadingMoreRiders(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) return;
@@ -174,6 +168,12 @@ function AdminTripRecordsPage() {
     setExpandedRiderIds((prev) => ({ ...prev, [userId]: !prev[userId] }));
   };
 
+  useEffect(() => {
+    if (!authLoading && (!isAuthenticated || !isAdmin)) {
+      void navigate({ to: "/" });
+    }
+  }, [authLoading, isAuthenticated, isAdmin, navigate]);
+
   if (authLoading) {
     return (
       <div className="p-8">
@@ -183,21 +183,7 @@ function AdminTripRecordsPage() {
   }
 
   if (!isAuthenticated || !isAdmin) {
-    return (
-      <div className="mx-auto max-w-xl p-8 pt-20 text-center space-y-4">
-        <ShieldAlert className="size-12 mx-auto text-destructive" />
-        <h1 className="font-display text-2xl font-black uppercase">Administrator Only</h1>
-        <p className="text-sm text-muted-foreground">
-          You must be signed in with an Administrator account to inspect Rider Trip Records.
-        </p>
-        <Link
-          to="/"
-          className="inline-flex rounded-xl bg-primary px-5 py-2.5 font-mono text-xs font-bold uppercase text-primary-foreground"
-        >
-          Return Home
-        </Link>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -213,8 +199,8 @@ function AdminTripRecordsPage() {
             Rider Trip Records
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            Inspect recent rides across all riders or browse per rider (sorted A–Z) with
-            expandable trip cards and interactive GPS map telemetry.
+            Inspect recent rides across all riders or browse per rider (sorted A–Z) with expandable
+            trip cards and interactive GPS map telemetry.
           </p>
         </div>
 
@@ -287,10 +273,7 @@ function AdminTripRecordsPage() {
           {loadingRecent ? (
             <div className="p-8 space-y-3">
               {[1, 2, 3, 4].map((n) => (
-                <div
-                  key={n}
-                  className="h-14 rounded-xl bg-secondary/40 animate-pulse"
-                />
+                <div key={n} className="h-14 rounded-xl bg-secondary/40 animate-pulse" />
               ))}
             </div>
           ) : recentTrips.length === 0 ? (
@@ -336,9 +319,7 @@ function AdminTripRecordsPage() {
                                 </div>
                               )}
                               <div>
-                                <div className="font-bold text-foreground">
-                                  {trip.display_name}
-                                </div>
+                                <div className="font-bold text-foreground">{trip.display_name}</div>
                                 <div className="font-mono text-[10px] text-muted-foreground">
                                   @{trip.username}
                                 </div>
@@ -368,9 +349,7 @@ function AdminTripRecordsPage() {
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-right font-mono">
-                            {trip.max_lean_deg > 0
-                                ? `${trip.max_lean_deg.toFixed(0)}°`
-                                : "—"}
+                            {trip.max_lean_deg > 0 ? `${trip.max_lean_deg.toFixed(0)}°` : "—"}
                           </td>
                           <td className="py-3.5 px-4 font-mono text-[11px] text-muted-foreground">
                             {formatDateTime(trip.start_time)}
@@ -474,41 +453,30 @@ function AdminTripRecordsPage() {
                             {group.display_name}
                           </div>
                           <div className="font-mono text-xs text-muted-foreground">
-                            @{group.username} • Last ride:{" "}
-                            {formatDateTime(group.last_trip_at)}
+                            @{group.username} • Last ride: {formatDateTime(group.last_trip_at)}
                           </div>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-4 gap-3 sm:gap-6 font-mono text-xs bg-secondary/40 rounded-xl px-4 py-2.5">
                         <div>
-                          <span className="text-[10px] text-muted-foreground block">
-                            TRIPS
-                          </span>
-                          <span className="font-black text-foreground">
-                            {group.total_trips}
-                          </span>
+                          <span className="text-[10px] text-muted-foreground block">TRIPS</span>
+                          <span className="font-black text-foreground">{group.total_trips}</span>
                         </div>
                         <div>
-                          <span className="text-[10px] text-muted-foreground block">
-                            DISTANCE
-                          </span>
+                          <span className="text-[10px] text-muted-foreground block">DISTANCE</span>
                           <span className="font-black text-primary">
                             {group.total_distance_km.toFixed(1)} km
                           </span>
                         </div>
                         <div>
-                          <span className="text-[10px] text-muted-foreground block">
-                            AVG SPD
-                          </span>
+                          <span className="text-[10px] text-muted-foreground block">AVG SPD</span>
                           <span className="font-bold text-foreground">
                             {group.avg_speed_kmh.toFixed(1)} km/h
                           </span>
                         </div>
                         <div>
-                          <span className="text-[10px] text-muted-foreground block">
-                            PEAK SPD
-                          </span>
+                          <span className="text-[10px] text-muted-foreground block">PEAK SPD</span>
                           <span className="font-bold text-emerald-400">
                             {group.max_speed_kmh.toFixed(0)} km/h
                           </span>
@@ -520,8 +488,8 @@ function AdminTripRecordsPage() {
                       <div className="border-t border-border bg-secondary/15 p-4 sm:p-5">
                         <div className="mb-3 flex items-center justify-between font-mono text-xs text-muted-foreground">
                           <span>
-                            SHOWING {group.trips.length} RECORDED TRIPS — CLICK A CARD TO
-                            INSPECT MAP &amp; TELEMETRY
+                            SHOWING {group.trips.length} RECORDED TRIPS — CLICK A CARD TO INSPECT
+                            MAP &amp; TELEMETRY
                           </span>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -683,10 +651,7 @@ function TripDetailModal({
     const latSpan = Math.max(0.002, (maxLat - minLat) * 1.25);
     const lngSpan = Math.max(0.002, (maxLng - minLng) * 1.25);
     const span = Math.max(latSpan, lngSpan);
-    const zoom = Math.max(
-      5,
-      Math.min(16, Math.floor(Math.log2(360 / span)) + 1),
-    );
+    const zoom = Math.max(5, Math.min(16, Math.floor(Math.log2(360 / span)) + 1));
 
     const w = 720;
     const h = 380;
@@ -733,9 +698,7 @@ function TripDetailModal({
     telemetry["destination_name"] || telemetry["end_address"] || detail?.title || "Destination",
   );
   const leanObj = telemetry["lean_angle"] as Record<string, unknown> | undefined;
-  const maxLean = Number(
-    telemetry["max_lean_deg"] ?? leanObj?.["max_lean_deg"] ?? 0,
-  );
+  const maxLean = Number(telemetry["max_lean_deg"] ?? leanObj?.["max_lean_deg"] ?? 0);
   const maxLeanLeft = Number(leanObj?.["max_lean_left_deg"] ?? 0);
   const maxLeanRight = Number(leanObj?.["max_lean_right_deg"] ?? 0);
 
@@ -748,202 +711,194 @@ function TripDetailModal({
       ariaLabel={detail?.title || "Trip telemetry inspector"}
     >
       {/* Modal Header */}
-        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-card/95 px-6 py-4 backdrop-blur-md">
-          <div>
-            <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-primary">
-              TRIP TELEMETRY &amp; GPS ROUTE INSPECTOR
-            </span>
-            <h3 className="font-display text-lg font-black text-foreground">
-              {detail?.title || "Loading Trip…"}
-            </h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-border bg-secondary/50 p-2 text-muted-foreground hover:text-foreground"
-          >
-            <X className="size-4" />
-          </button>
+      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-card/95 px-6 py-4 backdrop-blur-md">
+        <div>
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-primary">
+            TRIP TELEMETRY &amp; GPS ROUTE INSPECTOR
+          </span>
+          <h3 className="font-display text-lg font-black text-foreground">
+            {detail?.title || "Loading Trip…"}
+          </h3>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg border border-border bg-secondary/50 p-2 text-muted-foreground hover:text-foreground"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
 
-        {loading || !detail ? (
-          <div className="p-8 space-y-4">
-            <div className="h-72 rounded-2xl bg-secondary/40 animate-pulse" />
-            <div className="grid grid-cols-4 gap-3">
-              {[1, 2, 3, 4].map((n) => (
-                <div key={n} className="h-20 rounded-xl bg-secondary/40 animate-pulse" />
-              ))}
-            </div>
+      {loading || !detail ? (
+        <div className="p-8 space-y-4">
+          <div className="h-72 rounded-2xl bg-secondary/40 animate-pulse" />
+          <div className="grid grid-cols-4 gap-3">
+            {[1, 2, 3, 4].map((n) => (
+              <div key={n} className="h-20 rounded-xl bg-secondary/40 animate-pulse" />
+            ))}
           </div>
-        ) : (
-          <div className="p-6 space-y-6">
-            {/* Interactive Map View */}
-            <div className="relative overflow-hidden rounded-2xl border border-border bg-[#0c1017]">
-              {mapProjection ? (
-                <div className="relative">
-                  {/* Subtle Dark OSM Tile Grid Background */}
-                  <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-2 opacity-30 invert hue-rotate-180 contrast-125">
-                    {[-1, 0, 1].map((dy) =>
-                      [-1, 0, 1].map((dx) => (
-                        <img
-                          key={`${dx}_${dy}`}
-                          src={`https://tile.openstreetmap.org/${mapProjection.zoom}/${mapProjection.centerTileX + dx}/${mapProjection.centerTileY + dy}.png`}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                      )),
-                    )}
-                  </div>
-
-                  <svg
-                    viewBox={`0 0 ${mapProjection.w} ${mapProjection.h}`}
-                    className="relative z-10 w-full h-72 sm:h-80"
-                  >
-                    {/* Route outer glow */}
-                    <path
-                      d={mapProjection.pathD}
-                      fill="none"
-                      stroke="rgba(225, 29, 72, 0.32)"
-                      strokeWidth="10"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    {/* Route core line */}
-                    <path
-                      d={mapProjection.pathD}
-                      fill="none"
-                      stroke="#E11D48"
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    {/* Start marker (Green) */}
-                    <circle
-                      cx={mapProjection.startSvg.x}
-                      cy={mapProjection.startSvg.y}
-                      r="7"
-                      fill="#22C55E"
-                      stroke="#FFFFFF"
-                      strokeWidth="2.5"
-                    />
-                    {/* End marker (Red) */}
-                    <circle
-                      cx={mapProjection.endSvg.x}
-                      cy={mapProjection.endSvg.y}
-                      r="8"
-                      fill="#E11D48"
-                      stroke="#FFFFFF"
-                      strokeWidth="2.5"
-                    />
-                    {/* Interactive scrubbed point */}
-                    {hoverIdx !== null && mapProjection.svgPoints[hoverIdx] && (
-                      <circle
-                        cx={mapProjection.svgPoints[hoverIdx].x}
-                        cy={mapProjection.svgPoints[hoverIdx].y}
-                        r="7"
-                        fill="#38BDF8"
-                        stroke="#FFFFFF"
-                        strokeWidth="2.5"
+        </div>
+      ) : (
+        <div className="p-6 space-y-6">
+          {/* Interactive Map View */}
+          <div className="relative overflow-hidden rounded-2xl border border-border bg-card">
+            {mapProjection ? (
+              <div className="relative">
+                {/* Subtle Dark OSM Tile Grid Background */}
+                <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-2 opacity-30 invert hue-rotate-180 contrast-125">
+                  {[-1, 0, 1].map((dy) =>
+                    [-1, 0, 1].map((dx) => (
+                      <img
+                        key={`${dx}_${dy}`}
+                        src={`https://tile.openstreetmap.org/${mapProjection.zoom}/${mapProjection.centerTileX + dx}/${mapProjection.centerTileY + dy}.png`}
+                        alt=""
+                        className="w-full h-full object-cover"
                       />
-                    )}
-                  </svg>
+                    )),
+                  )}
+                </div>
 
-                  {/* Route Scrubber Bar */}
-                  <div className="relative z-20 flex items-center gap-3 border-t border-border/60 bg-background/90 px-4 py-2.5 font-mono text-xs">
-                    <span className="text-emerald-400 font-bold">START</span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={Math.max(0, points.length - 1)}
-                      value={hoverIdx ?? points.length - 1}
-                      onChange={(e) => setHoverIdx(Number(e.target.value))}
-                      className="flex-1 accent-primary"
+                <svg
+                  viewBox={`0 0 ${mapProjection.w} ${mapProjection.h}`}
+                  className="relative z-10 w-full h-72 sm:h-80"
+                >
+                  {/* Route outer glow */}
+                  <path
+                    d={mapProjection.pathD}
+                    fill="none"
+                    stroke="rgba(225, 29, 72, 0.32)"
+                    strokeWidth="10"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  {/* Route core line */}
+                  <path
+                    d={mapProjection.pathD}
+                    fill="none"
+                    stroke="#E11D48"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  {/* Start marker (Green) */}
+                  <circle
+                    cx={mapProjection.startSvg.x}
+                    cy={mapProjection.startSvg.y}
+                    r="7"
+                    fill="#22C55E"
+                    stroke="#FFFFFF"
+                    strokeWidth="2.5"
+                  />
+                  {/* End marker (Red) */}
+                  <circle
+                    cx={mapProjection.endSvg.x}
+                    cy={mapProjection.endSvg.y}
+                    r="8"
+                    fill="#E11D48"
+                    stroke="#FFFFFF"
+                    strokeWidth="2.5"
+                  />
+                  {/* Interactive scrubbed point */}
+                  {hoverIdx !== null && mapProjection.svgPoints[hoverIdx] && (
+                    <circle
+                      cx={mapProjection.svgPoints[hoverIdx].x}
+                      cy={mapProjection.svgPoints[hoverIdx].y}
+                      r="7"
+                      fill="#38BDF8"
+                      stroke="#FFFFFF"
+                      strokeWidth="2.5"
                     />
-                    <span className="text-primary font-bold">FINISH</span>
-                    <span className="text-muted-foreground">
-                      ({points.length} GPS pts)
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex h-56 flex-col items-center justify-center gap-2 text-muted-foreground">
-                  <Navigation className="size-8 opacity-40" />
-                  <p className="font-mono text-xs">
-                    No polyline coordinates stored for this trip.
-                  </p>
-                </div>
-              )}
-            </div>
+                  )}
+                </svg>
 
-            {/* Rider & Route Banner */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-xl border border-border bg-secondary/30 p-4 font-mono text-xs">
-              <div className="space-y-1">
-                <span className="text-[10px] text-muted-foreground block">RIDER</span>
-                <div className="font-display text-sm font-black text-foreground">
-                  {detail.display_name} (@{detail.username})
-                </div>
-                <div className="text-muted-foreground">
-                  Started: {formatDateTime(detail.start_time)}
+                {/* Route Scrubber Bar */}
+                <div className="relative z-20 flex items-center gap-3 border-t border-border/60 bg-background/90 px-4 py-2.5 font-mono text-xs">
+                  <span className="text-emerald-400 font-bold">START</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(0, points.length - 1)}
+                    value={hoverIdx ?? points.length - 1}
+                    onChange={(e) => setHoverIdx(Number(e.target.value))}
+                    className="flex-1 accent-primary"
+                  />
+                  <span className="text-primary font-bold">FINISH</span>
+                  <span className="text-muted-foreground">({points.length} GPS pts)</span>
                 </div>
               </div>
-              <div className="space-y-1">
-                <span className="text-[10px] text-muted-foreground block">
-                  ORIGIN &rarr; DESTINATION
-                </span>
-                <div className="text-foreground font-semibold truncate">
-                  {originName}
-                </div>
-                <div className="text-primary font-bold truncate">
-                  &rarr; {destName}
-                </div>
+            ) : (
+              <div className="flex h-56 flex-col items-center justify-center gap-2 text-muted-foreground">
+                <Navigation className="size-8 opacity-40" />
+                <p className="font-mono text-xs">No polyline coordinates stored for this trip.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Rider & Route Banner */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-xl border border-border bg-secondary/30 p-4 font-mono text-xs">
+            <div className="space-y-1">
+              <span className="text-[10px] text-muted-foreground block">RIDER</span>
+              <div className="font-display text-sm font-black text-foreground">
+                {detail.display_name} (@{detail.username})
+              </div>
+              <div className="text-muted-foreground">
+                Started: {formatDateTime(detail.start_time)}
               </div>
             </div>
-
-            {/* Telemetry Metrics Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 font-mono">
-              <MetricBox
-                icon={Compass}
-                label="DISTANCE"
-                value={`${detail.total_distance_km.toFixed(2)} km`}
-                accent="text-primary"
-              />
-              <MetricBox
-                icon={Clock}
-                label="DURATION"
-                value={formatDuration(detail.total_duration_seconds)}
-                accent="text-sky-400"
-              />
-              <MetricBox
-                icon={Gauge}
-                label="AVG SPEED"
-                value={`${detail.avg_speed_kmh.toFixed(1)} km/h`}
-                accent="text-amber-400"
-              />
-              <MetricBox
-                icon={Zap}
-                label="MAX SPEED"
-                value={`${detail.max_speed_kmh.toFixed(0)} km/h`}
-                accent="text-emerald-400"
-              />
-              <MetricBox
-                icon={Navigation}
-                label="MAX LEAN"
-                value={
-                  maxLean > 0
-                    ? `${maxLean.toFixed(0)}° (L${maxLeanLeft.toFixed(0)}°/R${maxLeanRight.toFixed(0)}°)`
-                    : "0°"
-                }
-                accent="text-purple-400"
-              />
-              <MetricBox
-                icon={MapPin}
-                label="VISIBILITY"
-                value={detail.visibility.toUpperCase()}
-                accent="text-rose-400"
-              />
+            <div className="space-y-1">
+              <span className="text-[10px] text-muted-foreground block">
+                ORIGIN &rarr; DESTINATION
+              </span>
+              <div className="text-foreground font-semibold truncate">{originName}</div>
+              <div className="text-primary font-bold truncate">&rarr; {destName}</div>
             </div>
           </div>
-        )}
+
+          {/* Telemetry Metrics Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 font-mono">
+            <MetricBox
+              icon={Compass}
+              label="DISTANCE"
+              value={`${detail.total_distance_km.toFixed(2)} km`}
+              accent="text-primary"
+            />
+            <MetricBox
+              icon={Clock}
+              label="DURATION"
+              value={formatDuration(detail.total_duration_seconds)}
+              accent="text-sky-400"
+            />
+            <MetricBox
+              icon={Gauge}
+              label="AVG SPEED"
+              value={`${detail.avg_speed_kmh.toFixed(1)} km/h`}
+              accent="text-amber-400"
+            />
+            <MetricBox
+              icon={Zap}
+              label="MAX SPEED"
+              value={`${detail.max_speed_kmh.toFixed(0)} km/h`}
+              accent="text-emerald-400"
+            />
+            <MetricBox
+              icon={Navigation}
+              label="MAX LEAN"
+              value={
+                maxLean > 0
+                  ? `${maxLean.toFixed(0)}° (L${maxLeanLeft.toFixed(0)}°/R${maxLeanRight.toFixed(0)}°)`
+                  : "0°"
+              }
+              accent="text-purple-400"
+            />
+            <MetricBox
+              icon={MapPin}
+              label="VISIBILITY"
+              value={detail.visibility.toUpperCase()}
+              accent="text-rose-400"
+            />
+          </div>
+        </div>
+      )}
     </ModalShell>
   );
 }

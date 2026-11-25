@@ -100,7 +100,7 @@ export function SupportDeskPanel() {
         </div>
 
         {notice && (
-          <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+          <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
             {notice}
           </div>
         )}

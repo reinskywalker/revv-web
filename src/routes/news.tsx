@@ -386,8 +386,8 @@ export function NewsPage() {
         open={Boolean(activeArticle)}
         onClose={() => setActiveArticle(null)}
         maxWidthClass="max-w-3xl"
-        backdropClassName="bg-black/85 backdrop-blur-md"
-        panelClassName="relative max-h-[90vh] overflow-y-auto bg-[#141A20] p-6 text-foreground md:p-10"
+        backdropClassName="bg-black/75 backdrop-blur-md"
+        panelClassName="relative max-h-[90vh] overflow-y-auto bg-card p-6 text-foreground md:p-10"
         ariaLabel={activeArticle?.title ?? "Article dispatch"}
       >
         {activeArticle && (

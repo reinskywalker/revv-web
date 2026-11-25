@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Flame, Shield, Users, X } from "lucide-react";
-import { RevvAvatar } from "@/components/revv/RevvAvatar";
+import { RevvAvatar, VerifiedCheckBadge } from "@/components/revv/RevvAvatar";
 import type { CommunityMemberItem, CommunitySummary } from "@/lib/api-rider";
 import { useI18n } from "@/lib/i18n";
 
@@ -117,11 +117,13 @@ export function ClubMembersPopupModal({
                     src={m.avatar_url}
                     name={m.display_name || m.username}
                     frameCode={m.equipped_frame_code}
+                    showVerifiedBadge={m.is_verified_profile}
                     size={38}
                   />
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-bold text-foreground">
-                      {m.display_name}
+                    <div className="flex items-center gap-1.5 truncate text-sm font-bold text-foreground">
+                      <span className="truncate">{m.display_name}</span>
+                      {m.is_verified_profile && <VerifiedCheckBadge size={14} />}
                     </div>
                     <div className="truncate font-mono text-xs text-muted-foreground">
                       @{m.username}

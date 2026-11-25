@@ -314,11 +314,11 @@ function PublicSharedEventPage() {
                       className={cn(
                         "rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide",
                         ev.status === "cancelled" || ev.lifecycle_state === "cancelled"
-                          ? "border-rose-500/40 bg-rose-500/15 text-rose-300"
+                          ? "border-rose-500/40 bg-rose-500/15 text-rose-700 dark:text-rose-300"
                           : ev.lifecycle_state === "ongoing"
-                            ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+                            ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                             : ev.lifecycle_state === "past"
-                              ? "border-zinc-500/40 bg-zinc-500/15 text-zinc-300"
+                              ? "border-zinc-500/40 bg-zinc-500/15 text-zinc-700 dark:text-zinc-300"
                               : "border-primary/40 bg-primary/15 text-primary",
                       )}
                     >
@@ -387,7 +387,9 @@ function PublicSharedEventPage() {
                       <Sparkles className="h-4 w-4 text-primary" />
                       Hosted By
                     </div>
-                    <p className="mt-1.5 text-sm font-semibold text-foreground">{ev.creator_name}</p>
+                    <p className="mt-1.5 text-sm font-semibold text-foreground">
+                      {ev.creator_name}
+                    </p>
                   </div>
                 </div>
 
@@ -416,7 +418,7 @@ function PublicSharedEventPage() {
                         type="button"
                         disabled={rsvpSubmitting !== null || ev.status === "cancelled"}
                         onClick={() => void handleRsvp("tentative")}
-                        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 px-4 py-2 text-sm font-semibold text-amber-300 transition hover:bg-amber-500/25 disabled:opacity-60"
+                        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 px-4 py-2 text-sm font-semibold text-amber-700 dark:text-amber-300 transition hover:bg-amber-500/25 disabled:opacity-60"
                       >
                         <HelpCircle className="h-4 w-4" />
                         Maybe
@@ -442,7 +444,9 @@ function PublicSharedEventPage() {
                 </div>
 
                 {rsvpNotice && (
-                  <p className="mt-3 text-sm font-medium text-emerald-400">{rsvpNotice}</p>
+                  <p className="mt-3 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                    {rsvpNotice}
+                  </p>
                 )}
               </div>
             </section>
@@ -474,7 +478,7 @@ function PublicSharedEventPage() {
                             className={cn(
                               "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold",
                               isFirst
-                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                                ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40"
                                 : isLast
                                   ? "bg-primary/20 text-primary border border-primary/40"
                                   : "bg-secondary text-foreground border border-border",
@@ -532,7 +536,11 @@ function PublicSharedEventPage() {
                 <div>
                   <h2 className="text-lg font-bold text-foreground">Participants</h2>
                   <p className="text-sm text-muted-foreground">
-                    Live RSVP roster ({participants.going_count + participants.tentative_count + participants.not_going_count} responses)
+                    Live RSVP roster (
+                    {participants.going_count +
+                      participants.tentative_count +
+                      participants.not_going_count}{" "}
+                    responses)
                   </p>
                 </div>
 

@@ -1,15 +1,6 @@
 import { useMemo, useState } from "react";
-import {
-  Bell,
-  Eye,
-  Mail,
-  Pencil,
-  Plus,
-  Settings,
-  Sliders,
-  Trash2,
-  Wrench,
-} from "lucide-react";
+import { Bell, Eye, Mail, Pencil, Plus, Settings, Sliders, Trash2, Wrench } from "lucide-react";
+import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
 import { ModalShell } from "@/components/revv/ModalShell";
 import {
   createAdminBrand,
@@ -38,7 +29,15 @@ import { cn } from "@/lib/utils";
 export type MasterSubTab = "brands" | "components" | "notifications" | "emails" | "settings";
 
 const TRANSMISSIONS = ["matic", "manual", "semi_auto", "dct"] as const;
-const CATEGORIES = ["scooter", "naked", "sport", "adventure", "touring", "cruiser", "classic"] as const;
+const CATEGORIES = [
+  "scooter",
+  "naked",
+  "sport",
+  "adventure",
+  "touring",
+  "cruiser",
+  "classic",
+] as const;
 
 export function AdminMasterDataPanel({
   activeMasterSub,
@@ -70,7 +69,9 @@ export function AdminMasterDataPanel({
   const [editBrandName, setEditBrandName] = useState("");
 
   // Motorcycle create/edit
-  const [newMotoBrandId, setNewMotoBrandId] = useState<string>(brands[0] ? String(brands[0].id) : "");
+  const [newMotoBrandId, setNewMotoBrandId] = useState<string>(
+    brands[0] ? String(brands[0].id) : "",
+  );
   const [newMotoSeries, setNewMotoSeries] = useState("");
   const [newMotoTransmission, setNewMotoTransmission] = useState("manual");
   const [newMotoCategory, setNewMotoCategory] = useState("naked");
@@ -88,7 +89,12 @@ export function AdminMasterDataPanel({
   const [newCompNameId, setNewCompNameId] = useState("");
   const [newCompKm, setNewCompKm] = useState("4000");
   const [newCompMonths, setNewCompMonths] = useState("6");
-  const [newCompTrans, setNewCompTrans] = useState<string[]>(["matic", "manual", "semi_auto", "dct"]);
+  const [newCompTrans, setNewCompTrans] = useState<string[]>([
+    "matic",
+    "manual",
+    "semi_auto",
+    "dct",
+  ]);
   const [editingComp, setEditingComp] = useState<MasterComponentItem | null>(null);
   const [editCompCode, setEditCompCode] = useState("");
   const [editCompNameEn, setEditCompNameEn] = useState("");
@@ -117,8 +123,37 @@ export function AdminMasterDataPanel({
   const [emailHtmlDraft, setEmailHtmlDraft] = useState<string | null>(null);
   const [showEmailPreviewModal, setShowEmailPreviewModal] = useState(false);
 
-  // General settings drafts
+  // General settings drafts & Delete Confirm state
   const [settingDrafts, setSettingDrafts] = useState<Record<number, string>>({});
+  const [confirmDelete, setConfirmDelete] = useState<{
+    kind: "brand" | "motorcycle" | "component" | "notification";
+    id: number;
+    label: string;
+  } | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  const handleConfirmMasterDelete = async () => {
+    if (!confirmDelete) return;
+    setDeleteBusy(true);
+    try {
+      if (confirmDelete.kind === "brand") {
+        await deleteAdminBrand(confirmDelete.id);
+      } else if (confirmDelete.kind === "motorcycle") {
+        await deleteAdminMotorcycle(confirmDelete.id);
+      } else if (confirmDelete.kind === "component") {
+        await deleteAdminComponent(confirmDelete.id);
+      } else {
+        await deleteAdminNotificationTemplate(confirmDelete.id);
+      }
+      await onReload();
+      onNotice(`Removed ${confirmDelete.label}.`);
+      setConfirmDelete(null);
+    } catch (err) {
+      onNotice(err instanceof Error ? err.message : `Failed to delete ${confirmDelete.label}.`);
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
 
   const filteredMotorcycles = useMemo(() => {
     if (selectedBrandFilter === "all") return motorcycles;
@@ -166,9 +201,7 @@ export function AdminMasterDataPanel({
         <h3 className="text-lg font-bold text-foreground">
           {masterSubLabel[activeMasterSub].title}
         </h3>
-        <p className="text-sm text-muted-foreground">
-          {masterSubLabel[activeMasterSub].subtitle}
-        </p>
+        <p className="text-sm text-muted-foreground">{masterSubLabel[activeMasterSub].subtitle}</p>
       </div>
 
       {/* 1. BRAND & MOTORCYCLE COMBINED */}
@@ -249,11 +282,9 @@ export function AdminMasterDataPanel({
                     </button>
                     <button
                       type="button"
-                      onClick={async () => {
-                        await deleteAdminBrand(b.id);
-                        await onReload();
-                        onNotice(`Removed brand ${b.name}.`);
-                      }}
+                      onClick={() =>
+                        setConfirmDelete({ kind: "brand", id: b.id, label: `brand ${b.name}` })
+                      }
                       className="p-1 text-muted-foreground hover:text-destructive"
                       title="Delete brand"
                     >
@@ -386,12 +417,15 @@ export function AdminMasterDataPanel({
                           </button>
                           <button
                             type="button"
-                            onClick={async () => {
-                              await deleteAdminMotorcycle(m.id);
-                              await onReload();
-                              onNotice(`Removed ${m.brand_name} ${m.series_name}.`);
-                            }}
+                            onClick={() =>
+                              setConfirmDelete({
+                                kind: "motorcycle",
+                                id: m.id,
+                                label: `${m.brand_name} ${m.series_name}`,
+                              })
+                            }
                             className="rounded border border-destructive/40 bg-destructive/10 p-1 text-destructive"
+                            title="Delete motorcycle model"
                           >
                             <Trash2 className="size-3.5" />
                           </button>
@@ -521,7 +555,9 @@ export function AdminMasterDataPanel({
                     <td className="py-2.5 px-3 font-semibold">{c.name_en || c.name}</td>
                     <td className="py-2.5 px-3 text-muted-foreground">{c.name_id || c.name}</td>
                     <td className="py-2.5 px-3 font-mono text-right">
-                      {c.default_interval_km ? `${c.default_interval_km.toLocaleString("id-ID")} km` : "—"}
+                      {c.default_interval_km
+                        ? `${c.default_interval_km.toLocaleString("id-ID")} km`
+                        : "—"}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-right">
                       {c.default_interval_months ? `${c.default_interval_months} mo` : "—"}
@@ -538,7 +574,9 @@ export function AdminMasterDataPanel({
                             setEditCompCode(c.code);
                             setEditCompNameEn(c.name_en || c.name);
                             setEditCompNameId(c.name_id || c.name);
-                            setEditCompKm(c.default_interval_km ? String(c.default_interval_km) : "");
+                            setEditCompKm(
+                              c.default_interval_km ? String(c.default_interval_km) : "",
+                            );
                             setEditCompMonths(
                               c.default_interval_months ? String(c.default_interval_months) : "",
                             );
@@ -550,12 +588,15 @@ export function AdminMasterDataPanel({
                         </button>
                         <button
                           type="button"
-                          onClick={async () => {
-                            await deleteAdminComponent(c.id);
-                            await onReload();
-                            onNotice(`Removed component ${c.code}.`);
-                          }}
+                          onClick={() =>
+                            setConfirmDelete({
+                              kind: "component",
+                              id: c.id,
+                              label: `component ${c.code}`,
+                            })
+                          }
                           className="rounded border border-destructive/40 bg-destructive/10 p-1 text-destructive"
+                          title="Delete component"
                         >
                           <Trash2 className="size-3.5" />
                         </button>
@@ -656,12 +697,15 @@ export function AdminMasterDataPanel({
                         </button>
                         <button
                           type="button"
-                          onClick={async () => {
-                            await deleteAdminNotificationTemplate(t.id);
-                            await onReload();
-                            onNotice(`Deleted template ${t.code}.`);
-                          }}
+                          onClick={() =>
+                            setConfirmDelete({
+                              kind: "notification",
+                              id: t.id,
+                              label: `template ${t.code}`,
+                            })
+                          }
                           className="rounded border border-destructive/40 bg-destructive/10 p-1 text-destructive"
+                          title="Delete notification template"
                         >
                           <Trash2 className="size-3.5" />
                         </button>
@@ -736,7 +780,7 @@ export function AdminMasterDataPanel({
                   rows={16}
                   value={currentHtml}
                   onChange={(e) => setEmailHtmlDraft(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-[#090b10] p-3.5 font-mono text-xs text-emerald-300 focus:border-primary focus:outline-none"
+                  className="w-full rounded-lg border border-input bg-secondary/60 p-3.5 font-mono text-xs text-emerald-700 dark:text-emerald-300 focus:border-primary focus:outline-none"
                 />
               </div>
               <div className="flex justify-end gap-3">
@@ -840,33 +884,33 @@ export function AdminMasterDataPanel({
           maxWidthClass="max-w-md"
           panelClassName="p-6 space-y-4"
         >
-            <input
-              type="text"
-              value={editBrandName}
-              onChange={(e) => setEditBrandName(e.target.value)}
-              className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm"
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditingBrand(null)}
-                className="rounded-lg border border-border px-3 py-1.5 font-mono text-xs"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  await updateAdminBrand(editingBrand.id, { name: editBrandName.trim() });
-                  setEditingBrand(null);
-                  await onReload();
-                  onNotice("Brand updated.");
-                }}
-                className="btn-primary px-4 py-1.5 text-xs"
-              >
-                Save
-              </button>
-            </div>
+          <input
+            type="text"
+            value={editBrandName}
+            onChange={(e) => setEditBrandName(e.target.value)}
+            className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm"
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setEditingBrand(null)}
+              className="rounded-lg border border-border px-3 py-1.5 font-mono text-xs"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await updateAdminBrand(editingBrand.id, { name: editBrandName.trim() });
+                setEditingBrand(null);
+                await onReload();
+                onNotice("Brand updated.");
+              }}
+              className="btn-primary px-4 py-1.5 text-xs"
+            >
+              Save
+            </button>
+          </div>
         </ModalShell>
       )}
 
@@ -879,82 +923,82 @@ export function AdminMasterDataPanel({
           maxWidthClass="max-w-lg"
           panelClassName="p-6 space-y-4"
         >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <select
-                value={editMotoBrandId}
-                onChange={(e) => setEditMotoBrandId(e.target.value)}
-                className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs"
-              >
-                {brands.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                value={editMotoSeries}
-                onChange={(e) => setEditMotoSeries(e.target.value)}
-                placeholder="Series Name"
-                className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs"
-              />
-              <select
-                value={editMotoTrans}
-                onChange={(e) => setEditMotoTrans(e.target.value)}
-                className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs"
-              >
-                {TRANSMISSIONS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={editMotoCat}
-                onChange={(e) => setEditMotoCat(e.target.value)}
-                className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                value={editMotoCc}
-                onChange={(e) => setEditMotoCc(e.target.value)}
-                placeholder="Engine CC"
-                className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs"
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditingMoto(null)}
-                className="rounded-lg border border-border px-3 py-1.5 font-mono text-xs"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  await updateAdminMotorcycle(editingMoto.id, {
-                    brand_id: Number(editMotoBrandId),
-                    series_name: editMotoSeries.trim(),
-                    transmission: editMotoTrans,
-                    category: editMotoCat,
-                    engine_cc: Number(editMotoCc) || null,
-                  });
-                  setEditingMoto(null);
-                  await onReload();
-                  onNotice("Motorcycle model updated.");
-                }}
-                className="btn-primary px-4 py-1.5 text-xs"
-              >
-                Save Changes
-              </button>
-            </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <select
+              value={editMotoBrandId}
+              onChange={(e) => setEditMotoBrandId(e.target.value)}
+              className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs"
+            >
+              {brands.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={editMotoSeries}
+              onChange={(e) => setEditMotoSeries(e.target.value)}
+              placeholder="Series Name"
+              className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs"
+            />
+            <select
+              value={editMotoTrans}
+              onChange={(e) => setEditMotoTrans(e.target.value)}
+              className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs"
+            >
+              {TRANSMISSIONS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <select
+              value={editMotoCat}
+              onChange={(e) => setEditMotoCat(e.target.value)}
+              className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs"
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              value={editMotoCc}
+              onChange={(e) => setEditMotoCc(e.target.value)}
+              placeholder="Engine CC"
+              className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setEditingMoto(null)}
+              className="rounded-lg border border-border px-3 py-1.5 font-mono text-xs"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await updateAdminMotorcycle(editingMoto.id, {
+                  brand_id: Number(editMotoBrandId),
+                  series_name: editMotoSeries.trim(),
+                  transmission: editMotoTrans,
+                  category: editMotoCat,
+                  engine_cc: Number(editMotoCc) || null,
+                });
+                setEditingMoto(null);
+                await onReload();
+                onNotice("Motorcycle model updated.");
+              }}
+              className="btn-primary px-4 py-1.5 text-xs"
+            >
+              Save Changes
+            </button>
+          </div>
         </ModalShell>
       )}
 
@@ -967,90 +1011,90 @@ export function AdminMasterDataPanel({
           maxWidthClass="max-w-lg"
           panelClassName="p-6 space-y-4"
         >
-            <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input
+              type="text"
+              value={editCompCode}
+              onChange={(e) => setEditCompCode(e.target.value)}
+              placeholder="Code"
+              className="rounded-lg border border-input bg-secondary/40 px-3 py-2 font-mono text-xs"
+            />
+            <input
+              type="text"
+              value={editCompNameEn}
+              onChange={(e) => setEditCompNameEn(e.target.value)}
+              placeholder="Name (EN)"
+              className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs"
+            />
+            <input
+              type="text"
+              value={editCompNameId}
+              onChange={(e) => setEditCompNameId(e.target.value)}
+              placeholder="Nama (ID)"
+              className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs"
+            />
+            <div className="flex gap-2">
               <input
-                type="text"
-                value={editCompCode}
-                onChange={(e) => setEditCompCode(e.target.value)}
-                placeholder="Code"
-                className="rounded-lg border border-input bg-secondary/40 px-3 py-2 font-mono text-xs"
+                type="number"
+                value={editCompKm}
+                onChange={(e) => setEditCompKm(e.target.value)}
+                placeholder="Every KM"
+                className="w-1/2 rounded-lg border border-input bg-secondary/40 px-3 py-2 font-mono text-xs"
               />
               <input
-                type="text"
-                value={editCompNameEn}
-                onChange={(e) => setEditCompNameEn(e.target.value)}
-                placeholder="Name (EN)"
-                className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs"
+                type="number"
+                value={editCompMonths}
+                onChange={(e) => setEditCompMonths(e.target.value)}
+                placeholder="Months"
+                className="w-1/2 rounded-lg border border-input bg-secondary/40 px-3 py-2 font-mono text-xs"
               />
-              <input
-                type="text"
-                value={editCompNameId}
-                onChange={(e) => setEditCompNameId(e.target.value)}
-                placeholder="Nama (ID)"
-                className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs"
-              />
-              <div className="flex gap-2">
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-3 font-mono text-xs">
+            {TRANSMISSIONS.map((tr) => (
+              <label key={tr} className="inline-flex items-center gap-1.5">
                 <input
-                  type="number"
-                  value={editCompKm}
-                  onChange={(e) => setEditCompKm(e.target.value)}
-                  placeholder="Every KM"
-                  className="w-1/2 rounded-lg border border-input bg-secondary/40 px-3 py-2 font-mono text-xs"
+                  type="checkbox"
+                  checked={editCompTrans.includes(tr)}
+                  onChange={(e) =>
+                    setEditCompTrans((prev) =>
+                      e.target.checked ? [...prev, tr] : prev.filter((x) => x !== tr),
+                    )
+                  }
                 />
-                <input
-                  type="number"
-                  value={editCompMonths}
-                  onChange={(e) => setEditCompMonths(e.target.value)}
-                  placeholder="Months"
-                  className="w-1/2 rounded-lg border border-input bg-secondary/40 px-3 py-2 font-mono text-xs"
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-3 font-mono text-xs">
-              {TRANSMISSIONS.map((tr) => (
-                <label key={tr} className="inline-flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={editCompTrans.includes(tr)}
-                    onChange={(e) =>
-                      setEditCompTrans((prev) =>
-                        e.target.checked ? [...prev, tr] : prev.filter((x) => x !== tr),
-                      )
-                    }
-                  />
-                  <span className="uppercase">{tr}</span>
-                </label>
-              ))}
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditingComp(null)}
-                className="rounded-lg border border-border px-3 py-1.5 font-mono text-xs"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  await updateAdminComponent(editingComp.id, {
-                    code: editCompCode.trim().toUpperCase(),
-                    name: (editCompNameEn || editCompNameId).trim(),
-                    name_en: editCompNameEn.trim(),
-                    name_id: editCompNameId.trim(),
-                    default_interval_km: Number(editCompKm) || null,
-                    default_interval_months: Number(editCompMonths) || null,
-                    applicable_transmission: editCompTrans,
-                  });
-                  setEditingComp(null);
-                  await onReload();
-                  onNotice("Component updated.");
-                }}
-                className="btn-primary px-4 py-1.5 text-xs"
-              >
-                Save Changes
-              </button>
-            </div>
+                <span className="uppercase">{tr}</span>
+              </label>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setEditingComp(null)}
+              className="rounded-lg border border-border px-3 py-1.5 font-mono text-xs"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await updateAdminComponent(editingComp.id, {
+                  code: editCompCode.trim().toUpperCase(),
+                  name: (editCompNameEn || editCompNameId).trim(),
+                  name_en: editCompNameEn.trim(),
+                  name_id: editCompNameId.trim(),
+                  default_interval_km: Number(editCompKm) || null,
+                  default_interval_months: Number(editCompMonths) || null,
+                  applicable_transmission: editCompTrans,
+                });
+                setEditingComp(null);
+                await onReload();
+                onNotice("Component updated.");
+              }}
+              className="btn-primary px-4 py-1.5 text-xs"
+            >
+              Save Changes
+            </button>
+          </div>
         </ModalShell>
       )}
 
@@ -1067,75 +1111,75 @@ export function AdminMasterDataPanel({
           maxWidthClass="max-w-lg"
           panelClassName="p-6 space-y-4"
         >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <input
-                type="text"
-                value={notifForm.code}
-                onChange={(e) => setNotifForm({ ...notifForm, code: e.target.value })}
-                placeholder="Code"
-                className="rounded-lg border border-input bg-secondary/40 px-3 py-2 font-mono text-xs"
-              />
-              <input
-                type="text"
-                value={notifForm.category}
-                onChange={(e) => setNotifForm({ ...notifForm, category: e.target.value })}
-                placeholder="Category"
-                className="rounded-lg border border-input bg-secondary/40 px-3 py-2 font-mono text-xs"
-              />
-              <input
-                type="text"
-                value={notifForm.name}
-                onChange={(e) => setNotifForm({ ...notifForm, name: e.target.value })}
-                placeholder="Display Name"
-                className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs sm:col-span-2"
-              />
-              <input
-                type="text"
-                value={notifForm.title_template}
-                onChange={(e) => setNotifForm({ ...notifForm, title_template: e.target.value })}
-                placeholder="Title Template"
-                className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs sm:col-span-2"
-              />
-              <textarea
-                rows={3}
-                value={notifForm.body_template}
-                onChange={(e) => setNotifForm({ ...notifForm, body_template: e.target.value })}
-                placeholder="Body Template"
-                className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs sm:col-span-2"
-              />
-              <input
-                type="text"
-                value={notifForm.variables_hint}
-                onChange={(e) => setNotifForm({ ...notifForm, variables_hint: e.target.value })}
-                placeholder="Variables hint (e.g. {{actor_name}})"
-                className="rounded-lg border border-input bg-secondary/40 px-3 py-2 font-mono text-xs sm:col-span-2"
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditingNotif(null)}
-                className="rounded-lg border border-border px-3 py-1.5 font-mono text-xs"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (editingNotif.id) {
-                    await updateAdminNotificationTemplate(editingNotif.id, notifForm);
-                  } else {
-                    await createAdminNotificationTemplate(notifForm);
-                  }
-                  setEditingNotif(null);
-                  await onReload();
-                  onNotice("Notification template saved.");
-                }}
-                className="btn-primary px-4 py-1.5 text-xs"
-              >
-                Save Template
-              </button>
-            </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input
+              type="text"
+              value={notifForm.code}
+              onChange={(e) => setNotifForm({ ...notifForm, code: e.target.value })}
+              placeholder="Code"
+              className="rounded-lg border border-input bg-secondary/40 px-3 py-2 font-mono text-xs"
+            />
+            <input
+              type="text"
+              value={notifForm.category}
+              onChange={(e) => setNotifForm({ ...notifForm, category: e.target.value })}
+              placeholder="Category"
+              className="rounded-lg border border-input bg-secondary/40 px-3 py-2 font-mono text-xs"
+            />
+            <input
+              type="text"
+              value={notifForm.name}
+              onChange={(e) => setNotifForm({ ...notifForm, name: e.target.value })}
+              placeholder="Display Name"
+              className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs sm:col-span-2"
+            />
+            <input
+              type="text"
+              value={notifForm.title_template}
+              onChange={(e) => setNotifForm({ ...notifForm, title_template: e.target.value })}
+              placeholder="Title Template"
+              className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs sm:col-span-2"
+            />
+            <textarea
+              rows={3}
+              value={notifForm.body_template}
+              onChange={(e) => setNotifForm({ ...notifForm, body_template: e.target.value })}
+              placeholder="Body Template"
+              className="rounded-lg border border-input bg-secondary/40 px-3 py-2 text-xs sm:col-span-2"
+            />
+            <input
+              type="text"
+              value={notifForm.variables_hint}
+              onChange={(e) => setNotifForm({ ...notifForm, variables_hint: e.target.value })}
+              placeholder="Variables hint (e.g. {{actor_name}})"
+              className="rounded-lg border border-input bg-secondary/40 px-3 py-2 font-mono text-xs sm:col-span-2"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setEditingNotif(null)}
+              className="rounded-lg border border-border px-3 py-1.5 font-mono text-xs"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                if (editingNotif.id) {
+                  await updateAdminNotificationTemplate(editingNotif.id, notifForm);
+                } else {
+                  await createAdminNotificationTemplate(notifForm);
+                }
+                setEditingNotif(null);
+                await onReload();
+                onNotice("Notification template saved.");
+              }}
+              className="btn-primary px-4 py-1.5 text-xs"
+            >
+              Save Template
+            </button>
+          </div>
         </ModalShell>
       )}
 
@@ -1156,15 +1200,26 @@ export function AdminMasterDataPanel({
         backdropClassName="bg-black/80"
         panelClassName="p-0 overflow-hidden [&>div:first-child]:px-5 [&>div:first-child]:pt-3.5 [&>div:first-child]:mb-0 [&>div:first-child]:border-b [&>div:first-child]:border-border/70 [&>div:first-child]:pb-3.5"
       >
-            <div className="p-4 bg-[#07080a]">
-              <iframe
-                title="REVV Email Preview"
-                sandbox=""
-                srcDoc={compiledEmailPreviewHtml}
-                className="w-full h-[420px] rounded-xl border border-border/60 bg-[#0a0b0e]"
-              />
-            </div>
+        <div className="p-4 bg-secondary/50">
+          <iframe
+            title="REVV Email Preview"
+            sandbox=""
+            srcDoc={compiledEmailPreviewHtml}
+            className="w-full h-[420px] rounded-xl border border-border bg-white"
+          />
+        </div>
       </ModalShell>
+
+      <ConfirmDialog
+        open={Boolean(confirmDelete)}
+        title="Confirm Master Data Deletion"
+        message={`Permanently delete ${confirmDelete?.label ?? "this item"}? This cannot be undone.`}
+        confirmLabel="Delete"
+        destructive
+        busy={deleteBusy}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={() => void handleConfirmMasterDelete()}
+      />
     </div>
   );
 }

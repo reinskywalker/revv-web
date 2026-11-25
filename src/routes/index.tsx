@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
+import { RevvAvatar, VerifiedCheckBadge } from "@/components/revv/RevvAvatar";
 import { SiteFooter, SiteHeader } from "@/components/revv/chrome";
 import { FeedPhone, NavPhone, ProfilePhone } from "@/components/revv/phone-mockups";
 import { Wordmark } from "@/components/revv/wordmark";
@@ -554,7 +555,6 @@ function AuthenticatedHome({ user }: { user: RiderProfile | null }) {
           ) : (
             <div className="space-y-4">
               {posts.map((post) => {
-                const avatarSrc = resolveMediaUrl(post.author_avatar_url || post.author_avatar);
                 const bikeBadge = post.motorcycle_label || post.bike_label;
                 const postImageSrc = resolveMediaUrl(post.image_url);
                 const canDeletePost =
@@ -574,21 +574,19 @@ function AuthenticatedHome({ user }: { user: RiderProfile | null }) {
                         params={{ username: post.author_username }}
                         className="group flex items-center gap-3 min-w-0"
                       >
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary font-display text-sm font-bold text-primary overflow-hidden border border-border">
-                          {avatarSrc ? (
-                            <img
-                              src={avatarSrc}
-                              alt={post.author_display_name}
-                              loading="lazy"
-                              className="size-full object-cover"
-                            />
-                          ) : (
-                            post.author_username.charAt(0).toUpperCase()
-                          )}
-                        </div>
+                        <RevvAvatar
+                          src={post.author_avatar_url || post.author_avatar}
+                          name={post.author_display_name || post.author_username}
+                          frameCode={post.author_frame_code}
+                          showVerifiedBadge={post.author_is_verified}
+                          size={40}
+                        />
                         <div className="min-w-0">
-                          <h4 className="font-display text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate">
-                            {post.author_display_name || post.author_username}
+                          <h4 className="flex items-center gap-1.5 font-display text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate">
+                            <span className="truncate">
+                              {post.author_display_name || post.author_username}
+                            </span>
+                            {post.author_is_verified && <VerifiedCheckBadge size={14} />}
                           </h4>
                           <span className="font-mono text-xs text-muted-foreground">
                             @{post.author_username} · {formatRelativeTime(post.created_at)}

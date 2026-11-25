@@ -30,6 +30,7 @@ import {
   type DirectConversationItem,
   type DirectMessageItem,
 } from "@/lib/api-rider";
+import { RevvAvatar } from "@/components/revv/RevvAvatar";
 import { useAuth } from "@/lib/auth-context";
 import { formatRelativeTime } from "@/lib/date";
 
@@ -381,17 +382,7 @@ function MessagesPage() {
                         : "border-border/70 bg-secondary/20 hover:bg-secondary/40"
                     }`}
                   >
-                    <div className="size-10 rounded-full bg-secondary flex items-center justify-center font-display font-bold text-primary overflow-hidden shrink-0">
-                      {resolveMediaUrl(c.avatar_url) ? (
-                        <img
-                          src={resolveMediaUrl(c.avatar_url) || undefined}
-                          alt={c.username}
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        c.username.charAt(0).toUpperCase()
-                      )}
-                    </div>
+                    <RevvAvatar src={c.avatar_url} name={c.display_name || c.username} size={40} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-semibold text-foreground truncate">

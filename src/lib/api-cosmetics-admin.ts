@@ -115,14 +115,91 @@ export async function updateAdminPlanPrice(
   planKey: string,
   payload: {
     base_price_usd_cents: number;
-    idr_override_amount?: number | null;
-    label?: string;
-    tagline?: string;
-    is_active?: boolean;
+    idr_override_amount?: number | null | undefined;
+    label?: string | undefined;
+    tagline?: string | undefined;
+    is_active?: boolean | undefined;
   },
 ): Promise<void> {
   await authRequest(`/admin/pricing/plans/${encodeURIComponent(planKey)}`, {
     method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface AdminUserActivitySummary {
+  user_id: string;
+  username: string;
+  noreg?: string | null;
+  email?: string | null;
+  last_login_at?: string | null;
+  last_active_at?: string | null;
+  login_count: number;
+  session_count: number;
+  last_platform?: string | null;
+  last_app_version?: string | null;
+  last_device_model?: string | null;
+  created_at: string;
+}
+
+export interface AdminUserCosmeticsResponse {
+  user_id: string;
+  is_early_user: boolean;
+  has_founding_achievement: boolean;
+  equipped_frame_code?: string | null;
+  owned_frames: Array<{
+    frame_code: string;
+    granted_reason: string;
+    acquired_at: string;
+    expires_at: string;
+  }>;
+  owned_badges: Array<{
+    badge_code: string;
+    granted_reason: string;
+    acquired_at: string;
+    expires_at: string;
+    is_equipped: boolean;
+  }>;
+  activity: AdminUserActivitySummary;
+}
+
+export async function fetchAdminUserCosmetics(userId: string): Promise<AdminUserCosmeticsResponse> {
+  return authRequest<AdminUserCosmeticsResponse>(
+    `/admin/users/${encodeURIComponent(userId)}/cosmetics`,
+  );
+}
+
+export async function grantAdminUserCosmetic(
+  userId: string,
+  payload: {
+    item_type: "early_user" | "frame" | "badge";
+    code?: string | undefined;
+    reason?: string | undefined;
+    auto_equip?: boolean | undefined;
+  },
+): Promise<{
+  user_id: string;
+  item_type: string;
+  code?: string;
+  frame_code?: string;
+  achievement_code?: string;
+  bundled_badge_code?: string | null;
+}> {
+  return authRequest(`/admin/users/${encodeURIComponent(userId)}/cosmetics/grant`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function revokeAdminUserCosmetic(
+  userId: string,
+  payload: {
+    item_type: "early_user" | "frame" | "badge";
+    code?: string | undefined;
+  },
+): Promise<{ user_id: string; item_type: string; code?: string }> {
+  return authRequest(`/admin/users/${encodeURIComponent(userId)}/cosmetics/revoke`, {
+    method: "POST",
     body: JSON.stringify(payload),
   });
 }

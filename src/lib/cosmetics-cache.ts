@@ -146,6 +146,22 @@ export function clearCosmeticsMemoryCache(): void {
   notifyCatalogSubscribers(null);
 }
 
+/**
+ * Full invalidation for country/currency changes, account switches, and admin grants:
+ * clears both in-memory cache and persisted ETag/catalog in localStorage.
+ */
+export function invalidateCosmeticsCatalogCache(): void {
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.removeItem(STORAGE_CATALOG_KEY);
+      window.localStorage.removeItem(STORAGE_ETAG_KEY);
+    } catch {
+      // ignore storage errors
+    }
+  }
+  clearCosmeticsMemoryCache();
+}
+
 function prewarmWebLotties(catalog: CosmeticsCatalogResponse): void {
   if (typeof window === "undefined" || !("caches" in window)) return;
   for (const uiAsset of Object.values(catalog.ui_assets ?? {})) {
@@ -181,8 +197,8 @@ export async function fetchCosmeticsCatalogCached(
     const baseUrl = getApiBaseUrl();
     const session = getSavedSession();
     const headers: Record<string, string> = { Accept: "application/json" };
-    if (session?.access_token) {
-      headers["Authorization"] = `Bearer ${session.access_token}`;
+    if (session?.token) {
+      headers["Authorization"] = `Bearer ${session.token}`;
     }
     if (!forceRefresh && stored.etag && stored.catalog) {
       headers["If-None-Match"] = stored.etag;
@@ -248,7 +264,7 @@ export async function fetchLottieByHashCached(
         const cachedResp = await cache.match(targetUrl);
         if (cachedResp) {
           const parsed = (await cachedResp.json()) as Record<string, unknown>;
-          if (parsed && typeof parsed === "object" && Array.isArray(parsed.layers)) {
+          if (parsed && typeof parsed === "object" && Array.isArray(parsed["layers"])) {
             memoryLottieMap.set(hash, parsed);
             return parsed;
           }
@@ -264,7 +280,7 @@ export async function fetchLottieByHashCached(
       if (!resp.ok) return null;
       const cloned = resp.clone();
       const parsed = (await resp.json()) as Record<string, unknown>;
-      if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.layers)) {
+      if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed["layers"])) {
         return null;
       }
       memoryLottieMap.set(hash, parsed);

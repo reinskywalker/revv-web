@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AlertTriangle, Check, Loader2, ShieldCheck } from "lucide-react";
+import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
 import { SiteFooter, SiteHeader } from "@/components/revv/chrome";
 import { AccountDeletionCard } from "@/components/billing/AccountDeletionCard";
 import { ClubBoostSection } from "@/components/billing/ClubBoostSection";
@@ -23,7 +24,7 @@ import {
 } from "@/lib/api-billing";
 import { useAuth } from "@/lib/auth-context";
 import {
-  clearCosmeticsMemoryCache,
+  invalidateCosmeticsCatalogCache,
   type CosmeticsCatalogResponse,
   fetchCosmeticsCatalogCached,
 } from "@/lib/cosmetics-cache";
@@ -58,6 +59,9 @@ function PlansPage() {
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [activeOrder, setActiveOrder] = useState<PaymentOrderDto | null>(null);
+  const activeOrderRef = useRef<PaymentOrderDto | null>(null);
+  activeOrderRef.current = activeOrder;
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,7 +77,7 @@ function PlansPage() {
         const nonPlayPending = plansRes.pending_orders.filter(
           (o) => o.provider !== "google_play" && o.status === "PENDING",
         );
-        if (nonPlayPending.length > 0 && !activeOrder) {
+        if (nonPlayPending.length > 0 && !activeOrderRef.current) {
           setActiveOrder(nonPlayPending[0]!);
         }
       } else {
@@ -84,9 +88,10 @@ function PlansPage() {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, activeOrder]);
+  }, [isAuthenticated, user?.country]);
 
   useEffect(() => {
+    invalidateCosmeticsCatalogCache();
     void loadData();
   }, [loadData]);
 
@@ -161,7 +166,7 @@ function PlansPage() {
         }),
       );
       if (res.order.status === "SETTLED") {
-        clearCosmeticsMemoryCache();
+        invalidateCosmeticsCatalogCache();
         await loadData();
       }
     } catch (err) {
@@ -200,7 +205,7 @@ function PlansPage() {
     setBusyAction(`equip_badge_${badgeCode}`);
     try {
       await equipMyCosmeticBadges(next);
-      clearCosmeticsMemoryCache();
+      invalidateCosmeticsCatalogCache();
       setNotice(t("billing.badgesUpdated"));
       await loadData();
     } catch (err) {
@@ -214,7 +219,7 @@ function PlansPage() {
     setBusyAction(`equip_frame_${frameCode ?? "none"}`);
     try {
       await equipMyAvatarFrame(frameCode);
-      clearCosmeticsMemoryCache();
+      invalidateCosmeticsCatalogCache();
       setNotice(t("billing.frameUpdated"));
       await loadData();
     } catch (err) {
@@ -315,7 +320,7 @@ function PlansPage() {
                     <button
                       type="button"
                       disabled={Boolean(busyAction)}
-                      onClick={() => void handleCancelRenewal()}
+                      onClick={() => setConfirmCancelOpen(true)}
                       className="rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10 disabled:opacity-50"
                     >
                       {t("billing.cancelAutoRenew")}
@@ -328,7 +333,7 @@ function PlansPage() {
         </header>
 
         {notice && (
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-sm text-emerald-300">
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-sm text-emerald-700 dark:text-emerald-300">
             <Check className="size-4 shrink-0" />
             <span>{notice}</span>
           </div>
@@ -419,7 +424,7 @@ function PlansPage() {
             <CosmeticsShopSection
               cosmetics={cosmetics}
               userAvatarUrl={user?.avatar_url}
-              userDisplayName={user?.display_name || user?.username || "Rider"}
+              userDisplayName={user?.name || user?.first_name || user?.username || "Rider"}
               busyAction={busyAction}
               onEquipFrame={(code) => void handleEquipFrame(code)}
               onBuyFrame={(code) =>
@@ -449,6 +454,19 @@ function PlansPage() {
         )}
       </main>
       <SiteFooter />
+      <ConfirmDialog
+        open={confirmCancelOpen}
+        title={t("billing.cancelAutoRenew")}
+        message="Auto-renewal will pause immediately. Your current paid benefits remain active until the end of the billing cycle."
+        confirmLabel={t("billing.cancelAutoRenew")}
+        destructive
+        busy={busyAction === "cancel_sub"}
+        onCancel={() => setConfirmCancelOpen(false)}
+        onConfirm={() => {
+          setConfirmCancelOpen(false);
+          void handleCancelRenewal();
+        }}
+      />
     </div>
   );
 }

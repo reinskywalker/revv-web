@@ -13,6 +13,7 @@ import { type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { AuthProvider } from "../lib/auth-context";
 import { I18nProvider } from "../lib/i18n";
+import { ThemeProvider } from "../lib/theme-context";
 import { AppShellLayout } from "../components/revv/app-shell-layout";
 
 function NotFoundComponent() {
@@ -157,7 +158,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap",
       },
       {
         rel: "stylesheet",
@@ -167,6 +168,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "alternate", type: "text/plain", href: "/llms.txt", title: "LLM Context" },
     ],
     scripts: [
+      {
+        type: "text/javascript",
+        children:
+          "(function(){try{var m=localStorage.getItem('revv_web_theme')||'dark';var r=m==='system'?(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):m;if(r==='light'){document.documentElement.classList.add('light');document.documentElement.classList.remove('dark');}else{document.documentElement.classList.add('dark');document.documentElement.classList.remove('light');}}catch(e){}})();",
+      },
       {
         type: "application/ld+json",
         children: JSON.stringify(jsonLdWebsite),
@@ -198,13 +204,15 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <I18nProvider>
-        <AuthProvider>
-          <AppShellLayout>
-            <Outlet />
-          </AppShellLayout>
-        </AuthProvider>
-      </I18nProvider>
+      <ThemeProvider>
+        <I18nProvider>
+          <AuthProvider>
+            <AppShellLayout>
+              <Outlet />
+            </AppShellLayout>
+          </AuthProvider>
+        </I18nProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

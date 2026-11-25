@@ -7,7 +7,7 @@ import { useI18n } from "@/lib/i18n";
 
 interface CosmeticsShopSectionProps {
   cosmetics: CosmeticsCatalogResponse | null;
-  userAvatarUrl?: string | null;
+  userAvatarUrl?: string | null | undefined;
   userDisplayName: string;
   busyAction: string | null;
   onEquipFrame: (frameCode: string | null) => void;

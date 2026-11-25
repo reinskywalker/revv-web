@@ -148,10 +148,10 @@ export async function createPaymentCheckout(payload: {
   provider: "midtrans" | "doku" | "google_play";
   item_type: "subscription" | "club_boost" | "cosmetic_frame" | "cosmetic_badge";
   item_code: string;
-  billing_period?: string;
-  target_community_id?: string;
-  quantity?: number;
-  payment_channel?: string;
+  billing_period?: string | undefined;
+  target_community_id?: string | undefined;
+  quantity?: number | undefined;
+  payment_channel?: string | undefined;
   idempotency_key: string;
 }): Promise<{ order: PaymentOrderDto; reused: boolean }> {
   return authRequest<{ order: PaymentOrderDto; reused: boolean }>("/payments/checkout", {

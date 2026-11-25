@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { AppOpenBanner } from "@/components/revv/AppOpenBanner";
 import { ClubMembersPopupModal } from "@/components/revv/ClubMembersPopupModal";
-import { RevvAvatar } from "@/components/revv/RevvAvatar";
+import { RevvAvatar, VerifiedCheckBadge } from "@/components/revv/RevvAvatar";
 import { resolveMediaUrl, type FeedPostItem } from "@/lib/api";
 import {
   AuthApiError,
@@ -428,67 +428,75 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
         <div className="space-y-6">
           {/* Hero Header */}
           <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
-            <div className="relative h-44 w-full bg-gradient-to-br from-primary/25 via-secondary to-background sm:h-56">
+            <div className="relative h-44 w-full overflow-hidden bg-gradient-to-br from-primary/25 via-secondary to-card sm:h-56">
               {community.banner_url && (
                 <img
                   src={resolveMediaUrl(community.banner_url) || ""}
                   alt={community.name}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
                   className="h-full w-full object-cover"
                 />
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/25 to-transparent" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card/85 via-card/15 to-transparent" />
             </div>
 
-            <div className="relative px-6 pb-6">
-              <div className="-mt-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div className="flex items-end gap-4">
-                  <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-4 border-card bg-secondary shadow-md">
-                    {community.avatar_url ? (
-                      <img
-                        src={resolveMediaUrl(community.avatar_url) || ""}
-                        alt={community.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-primary">
-                        {community.name.slice(0, 2).toUpperCase()}
-                      </div>
+            <div className="relative z-10 px-5 pb-6 sm:px-6">
+              {/* Pull ONLY the avatar slightly onto the banner; identity & buttons sit cleanly on card body */}
+              <div className="-mt-12 mb-4 flex items-end justify-between gap-4">
+                <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-4 border-card bg-secondary shadow-md">
+                  {community.avatar_url ? (
+                    <img
+                      src={resolveMediaUrl(community.avatar_url) || ""}
+                      alt={community.name}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-primary">
+                      {community.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide",
+                        isPrivate
+                          ? "border-amber-500/40 bg-amber-500/15 text-amber-600 dark:text-amber-300"
+                          : "border-emerald-500/40 bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
+                      )}
+                    >
+                      {isPrivate && <Lock className="h-3 w-3" />}
+                      {isPrivate ? "Private Club" : "Public Club"}
+                    </span>
+                    {community.is_official && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/40 bg-sky-500/15 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-sky-600 dark:text-sky-300">
+                        <BadgeCheck className="h-3.5 w-3.5" />
+                        Official REVV
+                        {community.country_code ? ` · ${community.country_code}` : ""}
+                      </span>
+                    )}
+                    {community.my_role && isApproved && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-primary/35 bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                        <Shield className="h-3 w-3" />
+                        {community.my_role}
+                      </span>
                     )}
                   </div>
-                  <div className="pb-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide",
-                          isPrivate
-                            ? "border-amber-500/40 bg-amber-500/15 text-amber-300"
-                            : "border-emerald-500/40 bg-emerald-500/15 text-emerald-300",
-                        )}
-                      >
-                        {isPrivate && <Lock className="h-3 w-3" />}
-                        {isPrivate ? "Private Club" : "Public Club"}
-                      </span>
-                      {community.is_official && (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-sky-400/40 bg-sky-500/15 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-sky-300">
-                          <BadgeCheck className="h-3.5 w-3.5" />
-                          Official REVV
-                          {community.country_code ? ` · ${community.country_code}` : ""}
-                        </span>
-                      )}
-                      {community.my_role && isApproved && (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-primary/35 bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                          <Shield className="h-3 w-3" />
-                          {community.my_role}
-                        </span>
-                      )}
-                    </div>
-                    <h1 className="mt-1.5 text-2xl font-bold text-foreground sm:text-3xl">
-                      {community.name}
-                    </h1>
-                  </div>
+                  <h1 className="mt-2 truncate text-2xl font-bold text-foreground sm:text-3xl">
+                    {community.name}
+                  </h1>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2.5">
+                <div className="flex shrink-0 flex-wrap items-center gap-2.5">
                   <button
                     type="button"
                     onClick={() => void handleCopyClubLink()}
@@ -511,9 +519,9 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                         className={cn(
                           "inline-flex min-h-[44px] items-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold transition",
                           isApproved
-                            ? "border border-border bg-secondary text-foreground hover:border-rose-500/50 hover:text-rose-300"
+                            ? "border border-border bg-secondary text-foreground hover:border-rose-500/50 hover:text-rose-600 dark:hover:text-rose-300"
                             : isPending
-                              ? "border border-amber-500/40 bg-amber-500/15 text-amber-300"
+                              ? "border border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300"
                               : "bg-primary text-primary-foreground hover:bg-primary/90",
                         )}
                       >
@@ -868,7 +876,7 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                     <div className="mt-3 space-y-4">
                       {canManage && adminChannels.length > 0 && (
                         <div>
-                          <p className="mb-1.5 flex items-center gap-1.5 px-2 text-xs font-bold uppercase tracking-wider text-amber-300">
+                          <p className="mb-1.5 flex items-center gap-1.5 px-2 text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
                             <Lock className="h-3 w-3" />
                             Administration
                           </p>
@@ -1050,9 +1058,9 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                                 className={cn(
                                   "rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase",
                                   ev.status === "cancelled"
-                                    ? "border-rose-500/40 bg-rose-500/15 text-rose-300"
+                                    ? "border-rose-500/40 bg-rose-500/15 text-rose-700 dark:text-rose-300"
                                     : ev.lifecycle_state === "past"
-                                      ? "border-zinc-500/40 bg-zinc-500/15 text-zinc-300"
+                                      ? "border-zinc-500/40 bg-zinc-500/15 text-zinc-700 dark:text-zinc-300"
                                       : "border-primary/40 bg-primary/15 text-primary",
                                 )}
                               >
@@ -1135,7 +1143,7 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                               className={cn(
                                 "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition",
                                 ev.my_rsvp === "tentative" || ev.my_rsvp === "interested"
-                                  ? "border-amber-500 bg-amber-500/20 text-amber-300"
+                                  ? "border-amber-500 bg-amber-500/20 text-amber-700 dark:text-amber-300"
                                   : "border-border bg-background text-foreground hover:border-amber-500/50",
                               )}
                             >
@@ -1148,7 +1156,7 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                               className={cn(
                                 "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition",
                                 ev.my_rsvp === "not_going"
-                                  ? "border-rose-500 bg-rose-500/20 text-rose-300"
+                                  ? "border-rose-500 bg-rose-500/20 text-rose-700 dark:text-rose-300"
                                   : "border-border bg-background text-muted-foreground hover:text-foreground",
                               )}
                             >
@@ -1262,11 +1270,13 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                           src={m.avatar_url}
                           name={m.display_name || m.username}
                           frameCode={m.equipped_frame_code}
+                          showVerifiedBadge={m.is_verified_profile}
                           size={44}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-foreground">
-                            {m.display_name}
+                          <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-foreground">
+                            <span className="truncate">{m.display_name}</span>
+                            {m.is_verified_profile && <VerifiedCheckBadge size={14} />}
                           </p>
                           <p className="truncate text-xs text-muted-foreground">@{m.username}</p>
                         </div>

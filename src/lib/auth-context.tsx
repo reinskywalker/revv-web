@@ -9,6 +9,7 @@ import {
   type AuthTokens,
   type RiderProfile,
 } from "./api";
+import { invalidateCosmeticsCatalogCache } from "./cosmetics-cache";
 
 interface AuthContextValue {
   user: RiderProfile | null;
@@ -72,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     void logoutSession();
+    invalidateCosmeticsCatalogCache();
     setUser(null);
   }, []);
 

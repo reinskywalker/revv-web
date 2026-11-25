@@ -7,6 +7,72 @@ import { fetchCommunities, type CommunitySummary } from "@/lib/api-rider";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 
+function ClubMediaBanner({
+  name,
+  bannerUrl,
+  isPrivate,
+}: {
+  name: string;
+  bannerUrl?: string | null | undefined;
+  isPrivate: boolean;
+}) {
+  const [imgErr, setImgErr] = useState(false);
+  const resolved = bannerUrl ? resolveMediaUrl(bannerUrl) : null;
+  return (
+    <div className="relative h-32 w-full overflow-hidden bg-gradient-to-br from-primary/25 via-secondary to-card">
+      {resolved && !imgErr ? (
+        <img
+          src={resolved}
+          alt={name}
+          onError={() => setImgErr(true)}
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+        />
+      ) : null}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card/85 via-transparent to-transparent" />
+      <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold backdrop-blur-sm",
+            isPrivate
+              ? "border-amber-500/45 bg-card/90 text-amber-600 dark:text-amber-300"
+              : "border-emerald-500/45 bg-card/90 text-emerald-600 dark:text-emerald-300",
+          )}
+        >
+          {isPrivate ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
+          {isPrivate ? "Private" : "Public"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ClubMediaAvatar({
+  name,
+  avatarUrl,
+}: {
+  name: string;
+  avatarUrl?: string | null | undefined;
+}) {
+  const [imgErr, setImgErr] = useState(false);
+  const resolved = avatarUrl ? resolveMediaUrl(avatarUrl) : null;
+  return (
+    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border-4 border-card bg-secondary shadow-md">
+      {resolved && !imgErr ? (
+        <img
+          src={resolved}
+          alt={name}
+          onError={() => setImgErr(true)}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-lg font-bold text-primary">
+          {name.slice(0, 2).toUpperCase()}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/clubs/")({
   head: () => ({
     meta: [
@@ -69,7 +135,12 @@ function ClubsDirectoryPage() {
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <SiteHeader />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+      <main
+        className={cn(
+          "mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6",
+          !isAuthenticated && "pt-24",
+        )}
+      >
         <div className="flex flex-col gap-4 border-b border-border pb-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wider text-primary">
@@ -136,7 +207,7 @@ function ClubsDirectoryPage() {
                 className={cn(
                   "inline-flex min-h-[42px] items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition",
                   joinedOnly
-                    ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"
+                    ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                     : "border-border bg-card text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -191,48 +262,16 @@ function ClubsDirectoryPage() {
                   params={{ id: club.id }}
                   className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:border-primary/45 hover:shadow-md"
                 >
-                  {/* Banner */}
-                  <div className="relative h-32 w-full bg-gradient-to-br from-primary/25 via-secondary to-background">
-                    {club.banner_url ? (
-                      <img
-                        src={resolveMediaUrl(club.banner_url) || ""}
-                        alt={club.name}
-                        className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                      />
-                    ) : null}
-                    <div className="absolute inset-0 bg-gradient-to-t from-card/85 via-transparent to-transparent" />
+                  <ClubMediaBanner
+                    name={club.name}
+                    bannerUrl={club.banner_url}
+                    isPrivate={isPrivate}
+                  />
 
-                    <div className="absolute right-3 top-3 flex items-center gap-1.5">
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold backdrop-blur-sm",
-                          isPrivate
-                            ? "border-amber-500/45 bg-background/80 text-amber-300"
-                            : "border-emerald-500/45 bg-background/80 text-emerald-300",
-                        )}
-                      >
-                        {isPrivate ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
-                        {isPrivate ? "Private" : "Public"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Card Body */}
-                  <div className="flex flex-1 flex-col px-5 pb-5">
+                  {/* Card Body (relative z-10 keeps avatar cleanly above banner) */}
+                  <div className="relative z-10 flex flex-1 flex-col px-5 pb-5">
                     <div className="-mt-8 flex items-end justify-between gap-2">
-                      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border-4 border-card bg-secondary shadow-sm">
-                        {club.avatar_url ? (
-                          <img
-                            src={resolveMediaUrl(club.avatar_url) || ""}
-                            alt={club.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-lg font-bold text-primary">
-                            {club.name.slice(0, 2).toUpperCase()}
-                          </div>
-                        )}
-                      </div>
+                      <ClubMediaAvatar name={club.name} avatarUrl={club.avatar_url} />
 
                       {(isMember || isPending) && (
                         <span
@@ -240,7 +279,7 @@ function ClubsDirectoryPage() {
                             "mb-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold",
                             isMember
                               ? "border-primary/40 bg-primary/15 text-primary"
-                              : "border-amber-500/40 bg-amber-500/15 text-amber-300",
+                              : "border-amber-500/40 bg-amber-500/15 text-amber-600 dark:text-amber-300",
                           )}
                         >
                           {isMember ? "Member" : "Pending"}

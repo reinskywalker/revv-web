@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import * as Popover from "@radix-ui/react-popover";
 import {
   Activity,
   BarChart3,
@@ -15,12 +16,14 @@ import {
   Home,
   LayoutDashboard,
   LifeBuoy,
+  LogIn,
   LogOut,
   Mail,
   MapPin,
   Megaphone,
   Menu,
   MessageSquare,
+  Moon,
   Newspaper,
   PanelLeftClose,
   PanelLeftOpen,
@@ -29,26 +32,26 @@ import {
   ShieldCheck,
   Sliders,
   Sparkles,
+  Sun,
   Trash2,
   Trophy,
   User,
   Users,
   Wrench,
   X,
-  LogIn,
   type LucideIcon,
 } from "lucide-react";
 import { Wordmark } from "./wordmark";
 import { RevvAvatar } from "./RevvAvatar";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
 import {
   clearAllMyNotifications,
   deleteNotificationById,
   fetchMyNotifications,
   markAllNotificationsAsRead,
   markNotificationAsRead,
-  resolveMediaUrl,
   type WebNotificationItem,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -57,13 +60,166 @@ interface AppShellLayoutProps {
   children: ReactNode;
 }
 
+interface NotificationsPopoverProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  notifications: WebNotificationItem[];
+  unreadCount: number;
+  onMarkAllRead: () => void;
+  onClearAll: () => void;
+  onOpenNotification: (n: WebNotificationItem) => void;
+  onDismissNotification: (e: React.MouseEvent, id: string) => void;
+  side?: "bottom" | "right" | "top" | "left";
+  align?: "start" | "center" | "end";
+  trigger: ReactNode;
+}
+
+function NotificationsPopover({
+  open,
+  onOpenChange,
+  notifications,
+  unreadCount,
+  onMarkAllRead,
+  onClearAll,
+  onOpenNotification,
+  onDismissNotification,
+  side = "bottom",
+  align = "end",
+  trigger,
+}: NotificationsPopoverProps) {
+  return (
+    <Popover.Root open={open} onOpenChange={onOpenChange}>
+      <Popover.Trigger asChild>{trigger}</Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          side={side}
+          align={align}
+          sideOffset={8}
+          collisionPadding={12}
+          className="z-50 flex max-h-[min(75vh,520px)] w-[min(calc(100vw-1.5rem),380px)] flex-col overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-2xl outline-none"
+        >
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Bell className="size-4 text-primary" />
+              <h2 className="font-display text-sm font-bold text-foreground">Notifications</h2>
+              {unreadCount > 0 && (
+                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-bold text-primary">
+                  {unreadCount} new
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              aria-label="Close notifications"
+              className="rounded-lg p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+
+          {notifications.length > 0 && (
+            <div className="flex items-center justify-between border-b border-border/70 bg-secondary/40 px-4 py-2">
+              <button
+                type="button"
+                onClick={onMarkAllRead}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+              >
+                <CheckCheck className="size-3.5" />
+                Mark all read
+              </button>
+              <button
+                type="button"
+                onClick={onClearAll}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="size-3.5" />
+                Clear all
+              </button>
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto divide-y divide-border/60">
+            {notifications.length === 0 ? (
+              <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                <Bell className="mb-2.5 size-8 text-muted-foreground/45" />
+                <p className="text-sm font-bold text-foreground">You're all caught up</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Messages, club mentions, and alerts will show up here.
+                </p>
+              </div>
+            ) : (
+              notifications.map((n) => (
+                <div
+                  key={n.id}
+                  onClick={() => onOpenNotification(n)}
+                  className={cn(
+                    "group relative flex cursor-pointer items-start gap-3 px-4 py-3 transition hover:bg-secondary/50",
+                    !n.is_read ? "bg-primary/[0.06]" : "opacity-80",
+                  )}
+                >
+                  <div className="mt-1.5 shrink-0">
+                    {!n.is_read ? (
+                      <span title="Unread" className="block size-2 rounded-full bg-primary" />
+                    ) : (
+                      <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={cn(
+                          "truncate text-xs",
+                          !n.is_read
+                            ? "font-bold text-foreground"
+                            : "font-medium text-foreground/80",
+                        )}
+                      >
+                        {n.title}
+                      </span>
+                      {!n.is_read && (
+                        <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                          New
+                        </span>
+                      )}
+                    </div>
+                    <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                      {n.body}
+                    </p>
+                    <div className="flex items-center justify-between pt-0.5 text-[11px] text-muted-foreground/80">
+                      <span>{new Date(n.created_at).toLocaleString()}</span>
+                      {n.actor_username && n.notif_type !== "admin_broadcast" && (
+                        <span>@{n.actor_username}</span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    title="Dismiss"
+                    onClick={(e) => onDismissNotification(e, n.id)}
+                    className="shrink-0 rounded-md p-1 text-muted-foreground opacity-65 transition hover:bg-destructive/15 hover:text-destructive group-hover:opacity-100"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
 export function AppShellLayout({ children }: AppShellLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
+  const [desktopNotifOpen, setDesktopNotifOpen] = useState(false);
+  const [mobileNotifOpen, setMobileNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<WebNotificationItem[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    social: true,
     riding: true,
-    garage: true,
+    you: true,
     admin: true,
     "admin-master": false,
   });
@@ -71,6 +227,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuth();
+  const { resolvedTheme, toggleTheme } = useTheme();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -142,15 +299,28 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     )
       .trim()
       .replace(/^\/+/, "");
-    setNotifOpen(false);
+    setDesktopNotifOpen(false);
+    setMobileNotifOpen(false);
     if (notif.notif_type === "direct_message" || rawRoute.startsWith("chat/")) {
       navigate({ to: "/messages" });
       return;
     }
     if (rawRoute.startsWith("news/")) {
       navigate({ to: "/news" });
-    } else if (rawRoute.startsWith("communities") || rawRoute.startsWith("events")) {
-      navigate({ to: "/rides" });
+    } else if (rawRoute.startsWith("communities/") || rawRoute.startsWith("clubs/")) {
+      const clubId = rawRoute
+        .replace(/^(communities|clubs)\//, "")
+        .split("/")[0]
+        ?.trim();
+      if (clubId) {
+        navigate({ to: "/clubs/$id", params: { id: clubId } });
+      } else {
+        navigate({ to: "/clubs" });
+      }
+    } else if (rawRoute.startsWith("communities") || rawRoute.startsWith("clubs")) {
+      navigate({ to: "/clubs" });
+    } else if (rawRoute.startsWith("events")) {
+      navigate({ to: "/clubs" });
     } else if (rawRoute.startsWith("profile/")) {
       const targetUser = rawRoute.replace(/^profile\//, "").trim();
       if (targetUser) {
@@ -181,8 +351,6 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     clearAllMyNotifications().catch(() => {});
   };
 
-  // The left navigation sidebar is ONLY visible when the user is logged in.
-  // When logged out, render in standard full-screen public layout.
   if (!isAuthenticated) {
     return <div className="min-h-screen bg-background text-foreground antialiased">{children}</div>;
   }
@@ -193,7 +361,6 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
   const canAccessAdminSection = isAdministrator || isModerator;
 
   const myProfilePath = user?.username ? `/id/${encodeURIComponent(user.username)}` : "/id/me";
-  const userAvatarSrc = resolveMediaUrl(user?.avatar_url);
 
   interface NavLeafItem {
     id: string;
@@ -230,7 +397,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
         },
         {
           id: "admin-subscriptions",
-          label: "Paid Users & Tiers",
+          label: "Subscriptions & Tiers",
           to: "/admin",
           search: { tab: "subscriptions" },
           icon: Crown,
@@ -247,6 +414,12 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
           label: "Trip Records",
           to: "/trip-records",
           icon: MapPin,
+        },
+        {
+          id: "admin-analytics",
+          label: "Telemetry Analytics",
+          to: "/analytics",
+          icon: Activity,
         },
         {
           id: "admin-master",
@@ -292,7 +465,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
         },
         {
           id: "admin-news",
-          label: "News Management",
+          label: "News Desk",
           to: "/admin",
           search: { tab: "news" },
           icon: Newspaper,
@@ -330,7 +503,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
       ? [
           {
             id: "admin-news",
-            label: "News Management",
+            label: "Moderator News Desk",
             to: "/admin",
             search: { tab: "news" },
             icon: Newspaper,
@@ -340,33 +513,40 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
 
   const navGroups: NavGroupItem[] = [
     {
-      id: "riding",
-      label: "Riding & Social",
-      icon: Compass,
+      id: "social",
+      label: "Social",
+      icon: Home,
       items: [
-        { id: "home", label: "Home Feed", to: "/", icon: Home, exact: true },
-        { id: "rides", label: "Rides & Clubs", to: "/rides", icon: Compass },
-        { id: "messages", label: "Crew & Chat", to: "/messages", icon: MessageSquare },
-      ],
-    },
-    {
-      id: "garage",
-      label: "Garage & Community",
-      icon: Wrench,
-      items: [
-        { id: "garage", label: "Digital Garage", to: "/garage", icon: Wrench },
+        { id: "home", label: "Feed", to: "/", icon: Home, exact: true },
         { id: "clubs", label: "Clubs", to: "/clubs", icon: Users },
         { id: "leaderboard", label: "Leaderboard", to: "/leaderboard", icon: Trophy },
         { id: "news", label: "News", to: "/news", icon: FileText },
-        { id: "plans", label: "Plans & Cosmetics", to: "/plans", icon: Crown },
-        { id: "profile", label: "My Profile", to: myProfilePath, icon: User },
+      ],
+    },
+    {
+      id: "riding",
+      label: "Riding",
+      icon: Compass,
+      items: [
+        { id: "garage", label: "Garage", to: "/garage", icon: Wrench },
+        { id: "rides", label: "Routes & Radar", to: "/rides", icon: Compass },
+        { id: "plans", label: "Plans & Shop", to: "/plans", icon: Crown },
+      ],
+    },
+    {
+      id: "you",
+      label: "You",
+      icon: User,
+      items: [
+        { id: "messages", label: "Messages", to: "/messages", icon: MessageSquare },
+        { id: "profile", label: "Profile", to: myProfilePath, icon: User },
       ],
     },
     ...(canAccessAdminSection
       ? [
           {
             id: "admin",
-            label: "Admin Console",
+            label: isAdministrator ? "Operations" : "Moderation",
             icon: LayoutDashboard,
             items: adminMenuItems,
           },
@@ -383,8 +563,10 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     if (!item.to) return false;
     if (item.to === "/admin") {
       if (currentPath !== "/admin") return false;
-      const targetTab = item.search?.["tab"] ?? "overview";
-      if ((currentTab ?? "overview") !== targetTab) return false;
+      const targetTab =
+        item.search?.["tab"] ?? (isModerator && !isAdministrator ? "news" : "overview");
+      const effectiveTab = currentTab ?? (isModerator && !isAdministrator ? "news" : "overview");
+      if (effectiveTab !== targetTab) return false;
       if (item.search?.["sub"]) {
         return (currentSub ?? "brands") === item.search["sub"];
       }
@@ -435,8 +617,8 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
                 className={cn(
                   "mx-auto flex h-11 w-11 items-center justify-center rounded-xl transition-all",
                   active
-                    ? "bg-primary/20 text-primary border border-primary/40 shadow-sm"
-                    : "text-foreground/75 hover:bg-secondary/50 hover:text-foreground",
+                    ? "bg-primary/15 text-primary border border-primary/35 shadow-xs"
+                    : "text-foreground/75 hover:bg-secondary hover:text-foreground",
                 )}
               >
                 <Icon className="size-5 shrink-0" />
@@ -448,7 +630,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     }
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-3.5">
         {navGroups.map((group) => {
           const GroupIcon = group.icon;
           const isGroupOpen = expandedGroups[group.id] ?? true;
@@ -457,21 +639,21 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
               <button
                 type="button"
                 onClick={() => toggleGroup(group.id)}
-                className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-xs font-semibold uppercase tracking-wider text-foreground/75 hover:bg-secondary/40 hover:text-foreground transition"
+                className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition hover:bg-secondary/60 hover:text-foreground"
               >
                 <span className="flex items-center gap-2">
-                  <GroupIcon className="size-4 text-primary" />
+                  <GroupIcon className="size-3.5 text-primary" />
                   <span>{group.label}</span>
                 </span>
                 {isGroupOpen ? (
-                  <ChevronDown className="size-4" />
+                  <ChevronDown className="size-3.5" />
                 ) : (
-                  <ChevronRight className="size-4" />
+                  <ChevronRight className="size-3.5" />
                 )}
               </button>
 
               {isGroupOpen && (
-                <div className="space-y-1 pl-2 border-l border-border/60 ml-3">
+                <div className="ml-2.5 space-y-0.5 border-l border-border/70 pl-2">
                   {group.items.map((item) => {
                     const Icon = item.icon;
                     if (item.children && item.children.length > 0) {
@@ -482,10 +664,10 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
                             type="button"
                             onClick={() => toggleGroup(item.id)}
                             className={cn(
-                              "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-all",
+                              "flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-medium transition-all",
                               currentPath === "/admin" && currentTab === "master"
-                                ? "bg-primary/15 text-primary border border-primary/30"
-                                : "text-foreground/85 hover:bg-secondary/40 hover:text-foreground",
+                                ? "bg-primary/15 text-primary font-semibold"
+                                : "text-foreground/85 hover:bg-secondary hover:text-foreground",
                             )}
                           >
                             <span className="flex items-center gap-2.5">
@@ -499,7 +681,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
                             )}
                           </button>
                           {isSubOpen && (
-                            <div className="space-y-1 pl-2.5 ml-3 border-l border-border/60">
+                            <div className="ml-3 space-y-0.5 border-l border-border/70 pl-2.5">
                               {item.children.map((sub) => {
                                 const SubIcon = sub.icon;
                                 const subActive = isLeafActive(sub);
@@ -510,10 +692,10 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
                                     search={sub.search as never}
                                     onClick={onNavigate}
                                     className={cn(
-                                      "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                                      "flex items-center gap-2.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all",
                                       subActive
-                                        ? "bg-primary/20 text-primary border border-primary/40 font-semibold"
-                                        : "text-foreground/80 hover:bg-secondary/40 hover:text-foreground",
+                                        ? "bg-primary/15 text-primary font-semibold"
+                                        : "text-foreground/80 hover:bg-secondary hover:text-foreground",
                                     )}
                                   >
                                     <SubIcon className="size-3.5 shrink-0" />
@@ -535,10 +717,10 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
                         search={item.search as never}
                         onClick={onNavigate}
                         className={cn(
-                          "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                          "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-all",
                           active
-                            ? "bg-primary/20 text-primary border border-primary/40 font-semibold shadow-sm"
-                            : "text-foreground/85 hover:bg-secondary/40 hover:text-foreground",
+                            ? "bg-primary/15 text-primary font-semibold shadow-2xs"
+                            : "text-foreground/85 hover:bg-secondary hover:text-foreground",
                         )}
                       >
                         <Icon
@@ -570,18 +752,26 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     currentPath === "/trip-records" ||
     currentPath === "/admin";
 
+  const mobileBottomItems = [
+    { id: "feed", label: "Feed", to: "/", icon: Home, exact: true },
+    { id: "clubs", label: "Clubs", to: "/clubs", icon: Users },
+    { id: "garage", label: "Garage", to: "/garage", icon: Wrench },
+    { id: "messages", label: "Chat", to: "/messages", icon: MessageSquare },
+    { id: "profile", label: "Profile", to: myProfilePath, icon: User },
+  ];
+
   return (
-    <div className="min-h-screen bg-background text-foreground antialiased flex flex-col md:flex-row">
+    <div className="flex min-h-screen flex-col bg-background text-foreground antialiased md:flex-row">
       {/* Mobile Top App Bar */}
-      <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-border/80 bg-background/95 px-4 backdrop-blur-md md:hidden">
-        <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-border bg-background/95 px-3.5 backdrop-blur-md md:hidden">
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Open Navigation Menu"
-            className="rounded-lg border border-border bg-secondary/50 p-2 text-foreground transition hover:bg-secondary"
+            className="rounded-xl border border-border bg-secondary/60 p-2 text-foreground transition hover:bg-secondary"
           >
-            <Menu className="size-5" />
+            <Menu className="size-4" />
           </button>
           <Link to="/" className="flex items-center">
             <Wordmark className="text-xl" />
@@ -589,96 +779,105 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          {isAuthenticated && (
-            <button
-              type="button"
-              onClick={() => setNotifOpen(true)}
-              aria-label="Open Notifications"
-              className="relative rounded-lg border border-border bg-secondary/40 p-2 text-foreground transition hover:bg-secondary"
-            >
-              <Bell className="size-4" />
-              {unreadCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex min-w-[16px] h-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[10px] font-black text-primary-foreground">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              )}
-            </button>
-          )}
-          {isAuthenticated && user ? (
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            className="inline-flex size-9 items-center justify-center rounded-xl border border-border bg-secondary/60 text-foreground"
+          >
+            {resolvedTheme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+          </button>
+
+          <NotificationsPopover
+            open={mobileNotifOpen}
+            onOpenChange={setMobileNotifOpen}
+            notifications={notifications}
+            unreadCount={unreadCount}
+            onMarkAllRead={handleMarkAllRead}
+            onClearAll={handleClearAll}
+            onOpenNotification={handleOpenNotification}
+            onDismissNotification={handleDismissNotification}
+            side="bottom"
+            align="end"
+            trigger={
+              <button
+                type="button"
+                aria-label="Open Notifications"
+                className="relative inline-flex size-9 items-center justify-center rounded-xl border border-border bg-secondary/60 text-foreground transition hover:bg-secondary"
+              >
+                <Bell className="size-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </button>
+            }
+          />
+
+          {user && (
             <Link
               to={myProfilePath}
-              className="flex items-center gap-2 rounded-full border border-border/80 bg-secondary/40 px-2.5 py-1 text-xs font-mono"
+              className="flex items-center gap-1.5 rounded-full border border-border bg-secondary/50 py-0.5 pl-0.5 pr-2.5 text-xs font-medium"
             >
               <RevvAvatar
                 src={user.avatar_url}
                 name={user.username ?? "Rider"}
                 frameCode={user.equipped_frame_code}
+                showVerifiedBadge={user.is_verified_profile}
                 size={26}
               />
-              <span className="max-w-[90px] truncate font-medium">@{user.username}</span>
-            </Link>
-          ) : (
-            <Link
-              to="/login"
-              className="rounded-lg bg-primary px-3 py-1.5 font-display text-xs font-bold uppercase tracking-wide text-primary-foreground transition hover:bg-primary/90"
-            >
-              Sign In
+              <span className="max-w-[76px] truncate">@{user.username}</span>
             </Link>
           )}
         </div>
       </header>
 
-      {/* Mobile Backdrop & Off-Canvas Drawer */}
+      {/* Mobile Drawer */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
+        <div className="fixed inset-0 z-50 flex md:hidden">
           <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="relative z-10 flex w-72 max-w-[80vw] flex-col border-r border-border bg-card p-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border/60 pb-4">
+          <div className="relative z-10 flex w-72 max-w-[82vw] flex-col border-r border-border bg-card p-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border pb-4">
               <Link to="/" onClick={() => setMobileOpen(false)}>
                 <Wordmark className="text-2xl" />
               </Link>
-              <button
-                type="button"
-                onClick={() => setMobileOpen(false)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
-              >
-                <X className="size-5" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <LanguageSwitcher compact />
+                <button
+                  type="button"
+                  onClick={() => setMobileOpen(false)}
+                  aria-label="Close navigation menu"
+                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
             </div>
 
             <nav className="mt-4 flex-1 overflow-y-auto pr-1">
               {renderNavTree(() => setMobileOpen(false))}
             </nav>
 
-            {/* Mobile Footer Session Status */}
-            <div className="border-t border-border/60 pt-4">
-              {isAuthenticated && user ? (
+            <div className="border-t border-border pt-4">
+              {user && (
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex size-9 items-center justify-center rounded-lg bg-primary/20 font-bold text-primary font-display text-sm overflow-hidden">
-                      {userAvatarSrc ? (
-                        <img
-                          src={userAvatarSrc}
-                          alt={user.username ?? "Rider"}
-                          className="size-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                          }}
-                        />
-                      ) : (
-                        user.username?.charAt(0).toUpperCase() || "R"
-                      )}
-                    </div>
+                    <RevvAvatar
+                      src={user.avatar_url}
+                      name={user.first_name || user.username || "Rider"}
+                      frameCode={user.equipped_frame_code}
+                      showVerifiedBadge={user.is_verified_profile}
+                      size={36}
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-display text-sm font-bold">
                         {user.first_name || user.username}
                       </div>
-                      <div className="truncate font-mono text-xs text-muted-foreground">
-                        @{user.username}
-                      </div>
+                      <div className="truncate text-xs text-muted-foreground">@{user.username}</div>
                     </div>
                   </div>
                   <button
@@ -687,22 +886,11 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
                       logout();
                       setMobileOpen(false);
                     }}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary/50 py-2 font-mono text-xs font-semibold uppercase text-muted-foreground transition hover:bg-destructive/20 hover:text-destructive"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary py-2 text-xs font-semibold text-foreground/85 transition hover:bg-destructive/15 hover:text-destructive"
                   >
                     <LogOut className="size-3.5" />
                     Sign Out
                   </button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Link
-                    to="/login"
-                    onClick={() => setMobileOpen(false)}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 font-display text-xs font-bold uppercase tracking-wide text-primary-foreground"
-                  >
-                    <LogIn className="size-3.5" />
-                    Sign In
-                  </Link>
                 </div>
               )}
             </div>
@@ -710,18 +898,17 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
         </div>
       )}
 
-      {/* Desktop Persistent Left Navigation Sidebar */}
+      {/* Desktop Left Sidebar */}
       <aside
         className={cn(
-          "hidden md:flex shrink-0 flex-col border-r border-border/80 bg-card/60 backdrop-blur-xl h-screen sticky top-0 z-30 transition-[width] duration-200",
-          sidebarCollapsed ? "w-[72px]" : "w-64",
+          "sticky top-0 z-30 hidden h-screen shrink-0 flex-col border-r border-border bg-card/90 backdrop-blur-xl transition-[width] duration-200 md:flex",
+          sidebarCollapsed ? "w-[74px]" : "w-64",
         )}
       >
-        {/* Brand Header & Collapse Toggle */}
         <div
           className={cn(
-            "flex border-b border-border/60",
-            sidebarCollapsed ? "flex-col items-center gap-3 p-3" : "flex-col gap-2 p-5",
+            "flex border-b border-border",
+            sidebarCollapsed ? "flex-col items-center gap-3 p-3" : "flex-col gap-2.5 p-4",
           )}
         >
           <div className="flex w-full items-center justify-between gap-2">
@@ -733,310 +920,241 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
               <Link
                 to="/"
                 title="REVV Home"
-                className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 font-display text-sm font-black text-primary"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 font-display text-sm font-black text-primary"
               >
                 R
               </Link>
             )}
-            <button
-              type="button"
-              onClick={toggleSidebarCollapsed}
-              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-background/60 text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
-            >
-              {sidebarCollapsed ? (
-                <PanelLeftOpen className="size-4" />
-              ) : (
-                <PanelLeftClose className="size-4" />
+            <div className="flex items-center gap-1.5">
+              {!sidebarCollapsed && (
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  title={resolvedTheme === "dark" ? "Light mode" : "Dark mode"}
+                  aria-label="Toggle theme"
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-background/80 text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+                >
+                  {resolvedTheme === "dark" ? (
+                    <Sun className="size-4" />
+                  ) : (
+                    <Moon className="size-4" />
+                  )}
+                </button>
               )}
-            </button>
+              <button
+                type="button"
+                onClick={toggleSidebarCollapsed}
+                title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-background/80 text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+              >
+                {sidebarCollapsed ? (
+                  <PanelLeftOpen className="size-4" />
+                ) : (
+                  <PanelLeftClose className="size-4" />
+                )}
+              </button>
+            </div>
           </div>
+
           {!sidebarCollapsed && (
             <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-400">
-                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Rider Cockpit
-              </span>
               <LanguageSwitcher compact />
+              <NotificationsPopover
+                open={desktopNotifOpen}
+                onOpenChange={setDesktopNotifOpen}
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkAllRead={handleMarkAllRead}
+                onClearAll={handleClearAll}
+                onOpenNotification={handleOpenNotification}
+                onDismissNotification={handleDismissNotification}
+                side="right"
+                align="start"
+                trigger={
+                  <button
+                    type="button"
+                    aria-label="Open Notifications"
+                    className="relative inline-flex items-center gap-1.5 rounded-xl border border-border bg-secondary/70 px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-secondary"
+                  >
+                    <Bell className="size-3.5 text-primary" />
+                    <span>Alerts</span>
+                    {unreadCount > 0 && (
+                      <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
+                  </button>
+                }
+              />
             </div>
           )}
         </div>
 
-        {/* Navigation Links */}
-        <nav className="flex-1 space-y-2 px-2.5 py-4 overflow-y-auto">
+        <nav className="flex-1 space-y-2 overflow-y-auto px-2.5 py-4">
           {renderNavTree(undefined, sidebarCollapsed)}
-          {sidebarCollapsed ? (
-            <button
-              type="button"
-              onClick={() => setNotifOpen(true)}
-              title="Notifications"
-              aria-label="Notifications"
-              className="relative mx-auto flex h-11 w-11 items-center justify-center rounded-xl text-foreground/75 transition-all hover:bg-secondary/50 hover:text-foreground"
-            >
-              <Bell className="size-5 shrink-0" />
-              {unreadCount > 0 && (
-                <span className="absolute right-1.5 top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setNotifOpen(true)}
-              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-foreground/85 transition-all hover:bg-secondary/40 hover:text-foreground"
-            >
-              <span className="flex items-center gap-2.5">
-                <Bell className="size-4 shrink-0 text-muted-foreground" />
-                <span>Notifications</span>
-              </span>
-              {unreadCount > 0 && (
-                <span className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs font-bold text-primary-foreground">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
+          {sidebarCollapsed && (
+            <div className="flex flex-col items-center gap-1.5 pt-2">
+              <NotificationsPopover
+                open={desktopNotifOpen}
+                onOpenChange={setDesktopNotifOpen}
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkAllRead={handleMarkAllRead}
+                onClearAll={handleClearAll}
+                onOpenNotification={handleOpenNotification}
+                onDismissNotification={handleDismissNotification}
+                side="right"
+                align="end"
+                trigger={
+                  <button
+                    type="button"
+                    title="Notifications"
+                    aria-label="Notifications"
+                    className="relative flex h-11 w-11 items-center justify-center rounded-xl text-foreground/75 transition hover:bg-secondary hover:text-foreground"
+                  >
+                    <Bell className="size-5 shrink-0" />
+                    {unreadCount > 0 && (
+                      <span className="absolute right-1.5 top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+                }
+              />
+              <button
+                type="button"
+                onClick={toggleTheme}
+                title={resolvedTheme === "dark" ? "Light mode" : "Dark mode"}
+                aria-label="Toggle theme"
+                className="flex h-11 w-11 items-center justify-center rounded-xl text-foreground/75 transition hover:bg-secondary hover:text-foreground"
+              >
+                {resolvedTheme === "dark" ? (
+                  <Sun className="size-5" />
+                ) : (
+                  <Moon className="size-5" />
+                )}
+              </button>
+            </div>
           )}
         </nav>
 
-        {/* Bottom Profile / Session Card */}
-        <div className="border-t border-border/60 p-3 bg-secondary/10">
-          {isAuthenticated && user ? (
+        <div className="border-t border-border bg-secondary/25 p-3">
+          {user ? (
             sidebarCollapsed ? (
               <div className="flex flex-col items-center gap-2">
-                <Link
-                  to={myProfilePath}
-                  title={`@${user.username}`}
-                  className="flex size-10 items-center justify-center rounded-lg bg-primary/20 font-bold text-primary font-display text-sm overflow-hidden hover:ring-2 hover:ring-primary/50"
-                >
-                  {userAvatarSrc ? (
-                    <img
-                      src={userAvatarSrc}
-                      alt={user.username ?? "Rider"}
-                      className="size-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  ) : (
-                    user.username?.charAt(0).toUpperCase() || "R"
-                  )}
+                <Link to={myProfilePath} title={`@${user.username}`}>
+                  <RevvAvatar
+                    src={user.avatar_url}
+                    name={user.username ?? "Rider"}
+                    frameCode={user.equipped_frame_code}
+                    showVerifiedBadge={user.is_verified_profile}
+                    size={38}
+                  />
                 </Link>
                 <button
                   type="button"
                   onClick={logout}
                   title="Sign Out"
                   aria-label="Sign Out"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-secondary/30 text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-secondary/60 text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
                 >
                   <LogOut className="size-4" />
                 </button>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <Link
                   to={myProfilePath}
-                  className="group flex items-center gap-3 rounded-lg p-2 transition hover:bg-secondary/40"
+                  className="group flex items-center gap-3 rounded-xl p-1.5 transition hover:bg-secondary/70"
                 >
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/20 font-bold text-primary font-display text-sm overflow-hidden">
-                    {userAvatarSrc ? (
-                      <img
-                        src={userAvatarSrc}
-                        alt={user.username ?? "Rider"}
-                        className="size-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                    ) : (
-                      user.username?.charAt(0).toUpperCase() || "R"
-                    )}
-                  </div>
+                  <RevvAvatar
+                    src={user.avatar_url}
+                    name={user.first_name || user.username || "Rider"}
+                    frameCode={user.equipped_frame_code}
+                    showVerifiedBadge={user.is_verified_profile}
+                    size={38}
+                  />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-bold group-hover:text-primary transition-colors">
+                    <div className="truncate text-sm font-bold text-foreground transition-colors group-hover:text-primary">
                       {user.first_name || user.username}
                     </div>
                     <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
                       <span>@{user.username}</span>
-                      {isAdministrator && <ShieldCheck className="size-3.5 text-primary inline" />}
+                      {isAdministrator && <ShieldCheck className="inline size-3.5 text-primary" />}
                     </div>
                   </div>
                 </Link>
 
-                <button
-                  type="button"
-                  onClick={logout}
-                  className="flex w-full min-h-[42px] items-center justify-center gap-2 rounded-lg border border-border bg-secondary/30 py-2 text-sm font-medium text-foreground/85 transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <LogOut className="size-4" />
-                  Sign Out
-                </button>
-                <Link
-                  to="/privacy"
-                  className="block text-center text-xs font-medium text-muted-foreground hover:text-primary"
-                >
-                  Privacy &amp; Legal
-                </Link>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={logout}
+                    className="flex flex-1 min-h-[38px] items-center justify-center gap-1.5 rounded-xl border border-border bg-background/70 px-3 py-1.5 text-xs font-semibold text-foreground/85 transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <LogOut className="size-3.5" />
+                    Sign Out
+                  </button>
+                  <Link
+                    to="/privacy"
+                    className="rounded-xl border border-border bg-background/70 px-2.5 py-2 text-xs font-medium text-muted-foreground hover:text-primary"
+                  >
+                    Legal
+                  </Link>
+                </div>
               </div>
             )
           ) : (
-            <div className="space-y-2">
-              <Link
-                to="/login"
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow transition hover:bg-primary/90"
-              >
-                <LogIn className="size-4" />
-                {!sidebarCollapsed && <span>Sign In</span>}
-              </Link>
-            </div>
+            <Link
+              to="/login"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-xs"
+            >
+              <LogIn className="size-4" />
+              {!sidebarCollapsed && <span>Sign In</span>}
+            </Link>
           )}
         </div>
       </aside>
 
-      {/* Main Content Area with Smooth Route Fade-in */}
-      <main className="flex-1 min-w-0 overflow-y-auto">
+      {/* Main Content */}
+      <main className="min-w-0 flex-1 overflow-y-auto pb-20 md:pb-6">
         <div
           className={cn(
             "animate-fade-in",
-            isDashboardPage && "p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto",
+            isDashboardPage && "mx-auto max-w-7xl p-4 sm:p-6 lg:p-8",
           )}
         >
           {children}
         </div>
       </main>
 
-      {/* Notifications Drawer */}
-      {notifOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm"
-            onClick={() => setNotifOpen(false)}
-          />
-          <div className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-border bg-card shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border/80 px-5 py-4">
-              <div className="flex items-center gap-2.5">
-                <Bell className="size-4 text-primary" />
-                <h2 className="font-display text-base font-black uppercase tracking-wider">
-                  Notifications
-                </h2>
-                {unreadCount > 0 && (
-                  <span className="rounded-full bg-primary/20 border border-primary/40 px-2 py-0.5 font-mono text-[10px] font-bold text-primary">
-                    {unreadCount} UNREAD
-                  </span>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setNotifOpen(false)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            {notifications.length > 0 && (
-              <div className="flex items-center justify-between border-b border-border/50 bg-secondary/20 px-5 py-2.5">
-                <button
-                  type="button"
-                  onClick={handleMarkAllRead}
-                  className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase text-primary hover:underline"
-                >
-                  <CheckCheck className="size-3.5" />
-                  Mark All Read
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearAll}
-                  className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase text-muted-foreground hover:text-destructive"
-                >
-                  <Trash2 className="size-3.5" />
-                  Clear All
-                </button>
-              </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto divide-y divide-border/50">
-              {notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-                  <Bell className="size-10 text-muted-foreground/40 mb-3" />
-                  <p className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
-                    All Caught Up
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    New broadcasts, direct messages, and community alerts will appear here.
-                  </p>
-                </div>
-              ) : (
-                notifications.map((n) => (
-                  <div
-                    key={n.id}
-                    onClick={() => handleOpenNotification(n)}
-                    className={cn(
-                      "group relative flex cursor-pointer items-start gap-3 px-5 py-4 transition hover:bg-secondary/40",
-                      !n.is_read ? "bg-primary/[0.06]" : "bg-transparent opacity-80",
-                    )}
-                  >
-                    <div className="mt-1 shrink-0">
-                      {!n.is_read ? (
-                        <span
-                          title="Unread"
-                          className="block size-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(238,75,62,0.8)]"
-                        />
-                      ) : (
-                        <span title="Read">
-                          <Check className="size-3.5 text-emerald-400" />
-                        </span>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span
-                          className={cn(
-                            "text-xs truncate",
-                            !n.is_read
-                              ? "font-black text-foreground"
-                              : "font-semibold text-muted-foreground",
-                          )}
-                        >
-                          {n.title}
-                        </span>
-                        <span
-                          className={cn(
-                            "shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase",
-                            !n.is_read
-                              ? "bg-primary/20 text-primary border border-primary/30"
-                              : "bg-secondary text-muted-foreground",
-                          )}
-                        >
-                          {!n.is_read ? "UNREAD" : "READ"}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                        {n.body}
-                      </p>
-                      <div className="flex items-center justify-between pt-1 font-mono text-[10px] text-muted-foreground/70">
-                        <span>{new Date(n.created_at).toLocaleString()}</span>
-                        {n.actor_username && n.notif_type !== "admin_broadcast" && (
-                          <span>@{n.actor_username}</span>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      title="Clear notification"
-                      onClick={(e) => handleDismissNotification(e, n.id)}
-                      className="shrink-0 rounded-md p-1.5 text-muted-foreground opacity-60 transition hover:bg-destructive/20 hover:text-destructive group-hover:opacity-100"
-                    >
-                      <X className="size-3.5" />
-                    </button>
-                  </div>
-                ))
+      {/* Mobile Bottom Navigation */}
+      <nav
+        aria-label="Mobile Navigation"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-card/95 backdrop-blur-md md:hidden"
+      >
+        {mobileBottomItems.map((item) => {
+          const Icon = item.icon;
+          const active = item.exact
+            ? currentPath === item.to
+            : item.id === "profile"
+              ? currentPath.startsWith("/id")
+              : currentPath.startsWith(item.to);
+          return (
+            <Link
+              key={item.id}
+              to={item.to}
+              className={cn(
+                "flex flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-semibold transition",
+                active ? "text-primary" : "text-muted-foreground hover:text-foreground",
               )}
-            </div>
-          </div>
-        </div>
-      )}
+            >
+              <Icon className="size-4" />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }

@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import {
   Activity,
   BarChart3,
+  ChevronDown,
+  ChevronUp,
   Clock,
   Compass,
   Gauge,
@@ -10,10 +12,7 @@ import {
   Users,
   Zap,
 } from "lucide-react";
-import {
-  type AdminAnalyticsResponse,
-  type AdminDashboardStats,
-} from "@/lib/api";
+import { type AdminAnalyticsResponse, type AdminDashboardStats } from "@/lib/api";
 
 type UserSortKey = "last_active" | "last_login" | "logins" | "distance" | "trips";
 
@@ -45,10 +44,14 @@ function KpiCard({
   return (
     <div className="hud-card p-5 space-y-2">
       <div className="flex items-center justify-between text-muted-foreground">
-        <span className="text-xs font-semibold uppercase tracking-wider text-foreground/80">{label}</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-foreground/80">
+          {label}
+        </span>
         {icon}
       </div>
-      <div className={`font-display text-2xl sm:text-3xl font-black ${accent || "text-foreground"}`}>
+      <div
+        className={`font-display text-2xl sm:text-3xl font-black ${accent || "text-foreground"}`}
+      >
         {value}
       </div>
       <div className="text-sm text-foreground/75 truncate">{sub}</div>
@@ -65,6 +68,7 @@ export function AdminOverviewAnalyticsPanel({
 }) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<UserSortKey>("last_active");
+  const [showTelemetry, setShowTelemetry] = useState(false);
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -98,11 +102,7 @@ export function AdminOverviewAnalyticsPanel({
     [analytics?.hourly_distribution],
   );
   const totalBucketTrips = useMemo(
-    () =>
-      Math.max(
-        1,
-        analytics?.distance_buckets.reduce((acc, item) => acc + item.count, 0) ?? 1,
-      ),
+    () => Math.max(1, analytics?.distance_buckets.reduce((acc, item) => acc + item.count, 0) ?? 1),
     [analytics?.distance_buckets],
   );
 
@@ -116,8 +116,14 @@ export function AdminOverviewAnalyticsPanel({
             ["Suspended / Del", `${adminStats.suspended_users} / ${adminStats.deleted_users}`],
             ["Digital Garages", adminStats.total_garages],
             ["Feed Posts", adminStats.total_feed_posts],
-            ["Master Models", adminStats.total_master_motorcycles ?? adminStats.master_motorcycles_count ?? 0],
-            ["Components", adminStats.total_master_components ?? adminStats.master_components_count ?? 0],
+            [
+              "Master Models",
+              adminStats.total_master_motorcycles ?? adminStats.master_motorcycles_count ?? 0,
+            ],
+            [
+              "Components",
+              adminStats.total_master_components ?? adminStats.master_components_count ?? 0,
+            ],
           ].map(([title, value]) => (
             <div key={String(title)} className="hud-card p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-foreground/80">
@@ -203,9 +209,7 @@ export function AdminOverviewAnalyticsPanel({
                           title={`${d.day}: ${d.distance_km} km · ${d.trips_count} trips`}
                         />
                       </div>
-                      <span className="text-xs text-foreground/75">
-                        {d.day.slice(8)}
-                      </span>
+                      <span className="text-xs text-foreground/75">{d.day.slice(8)}</span>
                     </div>
                   );
                 })}
@@ -313,98 +317,118 @@ export function AdminOverviewAnalyticsPanel({
             </div>
           </div>
 
-          {/* User Login & Activity Telemetry Table */}
-          <div className="hud-card p-6 space-y-4">
+          {/* User Login & Activity Telemetry (Collapsed by default to keep dashboard clean) */}
+          <div className="hud-card p-5 space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className="font-display text-base font-black uppercase tracking-wider">
-                  User Login &amp; Activity Telemetry
+                <h3 className="font-display text-base font-bold tracking-tight">
+                  Recent Rider Activity ({filteredUsers.length})
                 </h3>
-                <p className="text-sm text-foreground/75">
-                  15-min throttled backend activity &amp; 6-hour mobile telemetry ping
+                <p className="text-xs text-muted-foreground">
+                  Inspect login timestamps, sessions, and mobile versions on demand.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <div className="relative">
-                  <Search className="size-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Filter rider, email, device…"
-                    className="rounded-lg border border-border bg-secondary/40 pl-8 pr-3 py-1.5 font-mono text-xs focus:border-primary focus:outline-none"
-                  />
-                </div>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as UserSortKey)}
-                  className="rounded-lg border border-border bg-secondary/40 px-2.5 py-1.5 font-mono text-xs"
-                >
-                  <option value="last_active">Sort: Last Active</option>
-                  <option value="last_login">Sort: Last Login</option>
-                  <option value="logins">Sort: Login Count</option>
-                  <option value="distance">Sort: Distance</option>
-                  <option value="trips">Sort: Trips</option>
-                </select>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowTelemetry((v) => !v)}
+                className="inline-flex items-center gap-1.5 self-start rounded-xl border border-border bg-secondary/60 px-3.5 py-2 text-xs font-semibold text-foreground transition hover:bg-secondary sm:self-auto"
+              >
+                {showTelemetry ? (
+                  <>
+                    <ChevronUp className="size-3.5" />
+                    Hide Activity Log
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="size-3.5" />
+                    Show Activity Log ({filteredUsers.length})
+                  </>
+                )}
+              </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-border/70 text-xs font-semibold uppercase tracking-wide text-foreground/80">
-                  <tr>
-                    <th className="py-2.5 pr-3">Rider</th>
-                    <th className="py-2.5 px-3">Last Active</th>
-                    <th className="py-2.5 px-3">Last Login</th>
-                    <th className="py-2.5 px-3 text-right">Logins</th>
-                    <th className="py-2.5 px-3 text-right">Sessions</th>
-                    <th className="py-2.5 px-3">Platform / Device</th>
-                    <th className="py-2.5 pl-3 text-right">Trips / Dist</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/40">
-                  {filteredUsers.slice(0, 100).map((u) => (
-                    <tr key={u.id} className="hover:bg-secondary/20">
-                      <td className="py-2.5 pr-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="size-7 rounded-full bg-primary/15 text-primary text-xs font-bold flex items-center justify-center shrink-0">
-                            {u.username.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-bold text-foreground truncate max-w-[160px]">
-                              {u.display_name}
+            {showTelemetry && (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  <div className="relative">
+                    <Search className="size-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Filter rider, email, device…"
+                      className="rounded-xl border border-border bg-secondary/40 pl-8 pr-3 py-1.5 text-xs focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as UserSortKey)}
+                    className="rounded-xl border border-border bg-secondary/40 px-2.5 py-1.5 text-xs"
+                  >
+                    <option value="last_active">Sort: Last Active</option>
+                    <option value="last_login">Sort: Last Login</option>
+                    <option value="logins">Sort: Login Count</option>
+                    <option value="distance">Sort: Distance</option>
+                    <option value="trips">Sort: Trips</option>
+                  </select>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-border/70 text-xs font-semibold uppercase tracking-wide text-foreground/80">
+                      <tr>
+                        <th className="py-2.5 pr-3">Rider</th>
+                        <th className="py-2.5 px-3">Last Active</th>
+                        <th className="py-2.5 px-3">Last Login</th>
+                        <th className="py-2.5 px-3 text-right">Logins</th>
+                        <th className="py-2.5 px-3 text-right">Sessions</th>
+                        <th className="py-2.5 px-3">Platform / Device</th>
+                        <th className="py-2.5 pl-3 text-right">Trips / Dist</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/40">
+                      {filteredUsers.slice(0, 100).map((u) => (
+                        <tr key={u.id} className="hover:bg-secondary/20">
+                          <td className="py-2.5 pr-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="size-7 rounded-full bg-primary/15 text-primary text-xs font-bold flex items-center justify-center shrink-0">
+                                {u.username.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-bold text-foreground truncate max-w-[160px]">
+                                  {u.display_name}
+                                </div>
+                                <div className="text-xs text-muted-foreground">@{u.username}</div>
+                              </div>
                             </div>
-                            <div className="text-xs text-foreground/75">
-                              @{u.username}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 text-sm">
-                        {formatShortDate(u.last_active_at)}
-                      </td>
-                      <td className="py-2.5 px-3 text-sm text-foreground/75">
-                        {formatShortDate(u.last_login_at)}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-right font-semibold">
-                        {u.login_count}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-right text-muted-foreground">
-                        {u.session_count}
-                      </td>
-                      <td className="py-2.5 px-3 text-sm">
-                        <span className="uppercase">{u.last_platform || "—"}</span>
-                        {u.last_app_version ? ` v${u.last_app_version}` : ""}
-                        {u.last_device_model ? ` · ${u.last_device_model}` : ""}
-                      </td>
-                      <td className="py-2.5 pl-3 font-mono text-right">
-                        {u.total_trips} · {u.total_distance_km.toFixed(1)} km
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+                          <td className="py-2.5 px-3 text-sm">
+                            {formatShortDate(u.last_active_at)}
+                          </td>
+                          <td className="py-2.5 px-3 text-sm text-muted-foreground">
+                            {formatShortDate(u.last_login_at)}
+                          </td>
+                          <td className="py-2.5 px-3 font-mono text-right font-semibold">
+                            {u.login_count}
+                          </td>
+                          <td className="py-2.5 px-3 font-mono text-right text-muted-foreground">
+                            {u.session_count}
+                          </td>
+                          <td className="py-2.5 px-3 text-sm">
+                            <span className="uppercase">{u.last_platform || "—"}</span>
+                            {u.last_app_version ? ` v${u.last_app_version}` : ""}
+                            {u.last_device_model ? ` · ${u.last_device_model}` : ""}
+                          </td>
+                          <td className="py-2.5 pl-3 font-mono text-right">
+                            {u.total_trips} · {u.total_distance_km.toFixed(1)} km
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         </>
       )}

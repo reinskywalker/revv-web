@@ -38,6 +38,7 @@ describe("billing formatting & localized ClubMembersPopupModal", () => {
       thread_count: 5,
       channel_count: 3,
       is_official: false,
+      created_at: "2026-01-01T00:00:00Z",
     };
     const members: CommunityMemberItem[] = [
       {
@@ -47,6 +48,7 @@ describe("billing formatting & localized ClubMembersPopupModal", () => {
         role: "Founder",
         status: "Approved",
         equipped_frame_code: "beta_pioneer",
+        joined_at: "2026-01-01T00:00:00Z",
       },
     ];
 

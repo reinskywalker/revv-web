@@ -47,6 +47,13 @@ export interface RequestOtpResponseData {
   expires_at?: string;
 }
 
+export interface EquippedCosmeticBadgeItem {
+  code: string;
+  title: string;
+  asset_hash?: string | null;
+  lottie_url?: string | null;
+}
+
 export interface RiderProfile {
   id: string;
   name: string;
@@ -62,6 +69,9 @@ export interface RiderProfile {
   last_name?: string | null;
   avatar_url?: string | null;
   equipped_frame_code?: string | null;
+  equipped_badges?: EquippedCosmeticBadgeItem[];
+  is_verified_profile?: boolean;
+  subscription_tier?: string | null;
   banner_url?: string | null;
   date_of_birth?: string | null;
   bio?: string | null;
@@ -74,6 +84,8 @@ export interface RiderProfile {
   show_city?: boolean | null;
   show_country?: boolean | null;
   show_job?: boolean | null;
+  show_achievements?: boolean | null;
+  show_riding_stats?: boolean | null;
   privacy_country?: string | null;
   privacy_saved_routes?: string | null;
   leaderboard_opt_in?: boolean | null;
@@ -174,6 +186,7 @@ export interface FeedPostItem {
   author_display_name: string;
   author_avatar_url?: string | null;
   author_frame_code?: string | null;
+  author_is_verified?: boolean;
   author_avatar?: string | null;
   post_type: string;
   caption?: string | null;
@@ -961,6 +974,9 @@ export interface PublicProfileResponse {
   last_name: string | null;
   avatar_url: string | null;
   equipped_frame_code?: string | null;
+  equipped_badges?: EquippedCosmeticBadgeItem[];
+  is_verified_profile?: boolean;
+  subscription_tier?: string | null;
   banner_url: string | null;
   bio: string | null;
   city: string | null;
@@ -977,11 +993,79 @@ export interface PublicProfileResponse {
   show_job?: boolean | null;
   show_motorcycle_count?: boolean | null;
   show_garage_details?: boolean | null;
+  show_achievements?: boolean | null;
+  show_riding_stats?: boolean | null;
   privacy_country?: string | null;
   privacy_saved_routes?: string | null;
   motorcycle_count: number | null;
   garage: PublicProfileGarageItem[] | null;
   posts: FeedPostItem[] | null;
+}
+
+export interface AchievementTierProgress {
+  level: number;
+  name: string;
+  threshold: number;
+  xp: number;
+  unlocked: boolean;
+  unlocked_at?: string | null;
+}
+
+export interface UserAchievementItem {
+  code: string;
+  title: string;
+  description: string;
+  category: string;
+  kind: string;
+  has_badge: boolean;
+  icon_key?: string | null;
+  unit_label?: string | null;
+  highest_level: number;
+  max_level: number;
+  current_value: number;
+  next_threshold?: number | null;
+  achieved_at?: string | null;
+  pin_slot?: number | null;
+  tiers: AchievementTierProgress[];
+}
+
+export interface UserAchievementsPayload {
+  summary: {
+    total_achieved: number;
+    total_categories: number;
+    badges_unlocked: number;
+    total_badge_tiers: number;
+    milestones_achieved: number;
+    total_milestones: number;
+    total_xp: number;
+  };
+  pinned_codes: string[];
+  items: UserAchievementItem[];
+}
+
+export async function fetchPublicUserAchievements(
+  identifier: string,
+): Promise<UserAchievementsPayload> {
+  const clean = identifier.trim() || "me";
+  const session = getSavedSession();
+  const baseUrl = getApiBaseUrl();
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (session.token) {
+    headers["Authorization"] = `Bearer ${session.token}`;
+  }
+  const res = await fetch(`${baseUrl}/users/${encodeURIComponent(clean)}/achievements`, {
+    headers,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new AuthApiError(
+      body?.meta?.message || `Unable to load achievements (${res.status})`,
+      res.status,
+      body?.meta?.code,
+    );
+  }
+  const body = await res.json();
+  return body?.data ?? body;
 }
 
 export interface FriendUserItem {
@@ -990,6 +1074,7 @@ export interface FriendUserItem {
   display_name: string;
   avatar_url?: string | null;
   equipped_frame_code?: string | null;
+  is_verified_profile?: boolean;
   city?: string | null;
   job?: string | null;
   connected_since: string;
@@ -1012,6 +1097,7 @@ export interface SocialRiderSearchResult {
   display_name: string;
   avatar_url?: string | null;
   equipped_frame_code?: string | null;
+  is_verified_profile?: boolean;
   city?: string | null;
   friendship_status: "friends" | "outgoing_request" | "incoming_request" | "none";
 }
@@ -1083,6 +1169,10 @@ export async function fetchPublicProfile(identifier: string): Promise<PublicProf
           middle_name: myProf.middle_name || null,
           last_name: myProf.last_name || null,
           avatar_url: myProf.avatar_url || null,
+          equipped_frame_code: myProf.equipped_frame_code ?? null,
+          equipped_badges: myProf.equipped_badges ?? [],
+          is_verified_profile: myProf.is_verified_profile ?? false,
+          subscription_tier: myProf.subscription_tier ?? null,
           banner_url: myProf.banner_url || null,
           bio: myProf.bio || null,
           city: myProf.city || null,
@@ -2132,6 +2222,7 @@ export interface LeaderboardEntry {
   display_name: string;
   avatar_url?: string | null;
   equipped_frame_code?: string | null;
+  is_verified_profile?: boolean;
   city?: string | null;
   country?: string | null;
   primary_bike?: string | null;

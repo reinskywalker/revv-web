@@ -5,12 +5,12 @@ import { useCosmeticsCatalog, useLottieAsset } from "@/lib/cosmetics-cache";
 import { cn } from "@/lib/utils";
 
 export interface RevvBadgeProps {
-  badgeCode?: string | null;
-  assetHash?: string | null;
-  lottieUrl?: string | null;
-  title?: string;
-  size?: number;
-  className?: string;
+  badgeCode?: string | null | undefined;
+  assetHash?: string | null | undefined;
+  lottieUrl?: string | null | undefined;
+  title?: string | undefined;
+  size?: number | undefined;
+  className?: string | undefined;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   Activity,
   BarChart3,
@@ -8,7 +8,6 @@ import {
   Gauge,
   RefreshCw,
   Search,
-  ShieldAlert,
   Smartphone,
   TrendingUp,
   Users,
@@ -57,6 +56,7 @@ function formatShortDate(iso?: string | null): string {
 
 function AdminAnalyticsPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const isAdmin = user?.role?.toLowerCase() === "administrator";
 
   const [data, setData] = useState<AdminAnalyticsResponse | null>(null);
@@ -90,18 +90,12 @@ function AdminAnalyticsPage() {
     const list = [...(data?.user_metrics ?? [])];
     list.sort((a, b) => {
       if (sortBy === "last_login") {
-        return (
-          new Date(b.last_login_at || 0).getTime() -
-          new Date(a.last_login_at || 0).getTime()
-        );
+        return new Date(b.last_login_at || 0).getTime() - new Date(a.last_login_at || 0).getTime();
       }
       if (sortBy === "logins") return b.login_count - a.login_count;
       if (sortBy === "distance") return b.total_distance_km - a.total_distance_km;
       if (sortBy === "trips") return b.total_trips - a.total_trips;
-      return (
-        new Date(b.last_active_at || 0).getTime() -
-        new Date(a.last_active_at || 0).getTime()
-      );
+      return new Date(b.last_active_at || 0).getTime() - new Date(a.last_active_at || 0).getTime();
     });
     const q = search.trim().toLowerCase();
     if (!q) return list;
@@ -114,6 +108,12 @@ function AdminAnalyticsPage() {
     );
   }, [data?.user_metrics, search, sortBy]);
 
+  useEffect(() => {
+    if (!authLoading && (!isAuthenticated || !isAdmin)) {
+      void navigate({ to: "/" });
+    }
+  }, [authLoading, isAuthenticated, isAdmin, navigate]);
+
   if (authLoading) {
     return (
       <div className="p-8">
@@ -123,29 +123,11 @@ function AdminAnalyticsPage() {
   }
 
   if (!isAuthenticated || !isAdmin) {
-    return (
-      <div className="mx-auto max-w-xl p-8 pt-20 text-center space-y-4">
-        <ShieldAlert className="size-12 mx-auto text-destructive" />
-        <h1 className="font-display text-2xl font-black uppercase">Administrator Only</h1>
-        <p className="text-sm text-muted-foreground">
-          You must be signed in with an Administrator account to access Data Science &amp;
-          Telemetry Analytics.
-        </p>
-        <Link
-          to="/"
-          className="inline-flex rounded-xl bg-primary px-5 py-2.5 font-mono text-xs font-bold uppercase text-primary-foreground"
-        >
-          Return Home
-        </Link>
-      </div>
-    );
+    return null;
   }
 
   const s = data?.summary;
-  const maxDailyKm = Math.max(
-    1,
-    ...(data?.daily_series.map((d) => d.distance_km) ?? [1]),
-  );
+  const maxDailyKm = Math.max(1, ...(data?.daily_series.map((d) => d.distance_km) ?? [1]));
   const maxHourlyTrips = Math.max(
     1,
     ...(data?.hourly_distribution.map((h) => h.trips_count) ?? [1]),
@@ -192,10 +174,7 @@ function AdminAnalyticsPage() {
       {loading || !s ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-            <div
-              key={n}
-              className="h-28 rounded-2xl border border-border bg-card animate-pulse"
-            />
+            <div key={n} className="h-28 rounded-2xl border border-border bg-card animate-pulse" />
           ))}
         </div>
       ) : (
@@ -280,9 +259,7 @@ function AdminAnalyticsPage() {
                           className="w-full max-w-[26px] rounded-t-md bg-gradient-to-t from-primary/60 to-primary transition-all group-hover:brightness-125"
                         />
                       </div>
-                      <span className="font-mono text-[9px] text-muted-foreground">
-                        {shortDay}
-                      </span>
+                      <span className="font-mono text-[9px] text-muted-foreground">{shortDay}</span>
                     </div>
                   );
                 })}
@@ -343,10 +320,7 @@ function AdminAnalyticsPage() {
               </div>
               <div className="h-40 flex items-end gap-1.5 pt-4 pb-1 border-b border-border/60">
                 {data.hourly_distribution.map((h) => {
-                  const pct = Math.max(
-                    4,
-                    Math.round((h.trips_count / maxHourlyTrips) * 100),
-                  );
+                  const pct = Math.max(4, Math.round((h.trips_count / maxHourlyTrips) * 100));
                   return (
                     <div
                       key={h.hour_wib}
@@ -404,8 +378,8 @@ function AdminAnalyticsPage() {
                   User Login &amp; Activity Telemetry ({filteredUsers.length})
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Throttled 15-minute session tracking &amp; 6-hour device metadata sync for
-                  zero battery overhead
+                  Throttled 15-minute session tracking &amp; 6-hour device metadata sync for zero
+                  battery overhead
                 </p>
               </div>
 
@@ -491,9 +465,7 @@ function AdminAnalyticsPage() {
                           "—"
                         )}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold">
-                        {u.total_trips}
-                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-bold">{u.total_trips}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-primary">
                         {u.total_distance_km.toFixed(1)} km
                       </td>
@@ -528,16 +500,12 @@ function KpiCard({
   return (
     <div className="rounded-2xl border border-border bg-card p-4 flex flex-col justify-between gap-2">
       <div className="flex items-center justify-between text-muted-foreground">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-wider">
-          {label}
-        </span>
+        <span className="font-mono text-[10px] font-bold uppercase tracking-wider">{label}</span>
         <Icon className={cn("size-4", accent)} />
       </div>
       <div>
         <div className={cn("font-display text-xl font-black", accent)}>{value}</div>
-        <div className="font-mono text-[10px] text-muted-foreground mt-0.5 truncate">
-          {sub}
-        </div>
+        <div className="font-mono text-[10px] text-muted-foreground mt-0.5 truncate">{sub}</div>
       </div>
     </div>
   );

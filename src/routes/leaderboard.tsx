@@ -13,7 +13,7 @@ import {
   Zap,
 } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/revv/chrome";
-import { RevvAvatar } from "@/components/revv/RevvAvatar";
+import { RevvAvatar, VerifiedCheckBadge } from "@/components/revv/RevvAvatar";
 import {
   adminRefreshLeaderboard,
   fetchMyProfile,
@@ -104,9 +104,7 @@ function LeaderboardPage() {
       if (!nextValue) {
         if (user?.id) {
           setData((prev) =>
-            prev
-              ? { ...prev, entries: prev.entries.filter((e) => e.user_id !== user.id) }
-              : prev,
+            prev ? { ...prev, entries: prev.entries.filter((e) => e.user_id !== user.id) } : prev,
           );
         }
         setOptInMessage("You are now hidden from the public rider rankings.");
@@ -156,9 +154,12 @@ function LeaderboardPage() {
   const sortedEntries = useMemo(() => {
     const list = [...(data?.entries ?? [])];
     list.sort((a, b) => {
-      if (metric === "trips") return b.total_trips - a.total_trips || b.total_distance_km - a.total_distance_km;
-      if (metric === "max_speed") return b.max_speed_kmh - a.max_speed_kmh || b.total_distance_km - a.total_distance_km;
-      if (metric === "avg_speed") return b.avg_speed_kmh - a.avg_speed_kmh || b.total_distance_km - a.total_distance_km;
+      if (metric === "trips")
+        return b.total_trips - a.total_trips || b.total_distance_km - a.total_distance_km;
+      if (metric === "max_speed")
+        return b.max_speed_kmh - a.max_speed_kmh || b.total_distance_km - a.total_distance_km;
+      if (metric === "avg_speed")
+        return b.avg_speed_kmh - a.avg_speed_kmh || b.total_distance_km - a.total_distance_km;
       return b.total_distance_km - a.total_distance_km || b.total_trips - a.total_trips;
     });
     const q = search.trim().toLowerCase();
@@ -225,8 +226,8 @@ function LeaderboardPage() {
                   className={cn(
                     "mt-1 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 font-mono text-xs font-bold transition disabled:opacity-50",
                     optIn
-                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
-                      : "border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25",
+                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25"
+                      : "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25",
                   )}
                 >
                   {togglingOptIn && <RefreshCw className="size-3.5 animate-spin" />}
@@ -336,10 +337,10 @@ function LeaderboardPage() {
                   const rankNum = idx + 1;
                   const badgeColors =
                     rankNum === 1
-                      ? "border-amber-400/60 bg-amber-500/10 text-amber-300"
+                      ? "border-amber-500/60 bg-amber-500/10 text-amber-700 dark:text-amber-300"
                       : rankNum === 2
-                        ? "border-slate-300/50 bg-slate-400/10 text-slate-200"
-                        : "border-orange-500/50 bg-orange-500/10 text-orange-300";
+                        ? "border-slate-400/50 bg-slate-500/10 text-slate-700 dark:text-slate-200"
+                        : "border-orange-500/50 bg-orange-500/10 text-orange-700 dark:text-orange-300";
                   return (
                     <PodiumCard
                       key={rider.user_id}
@@ -371,20 +372,17 @@ function LeaderboardPage() {
                   <tbody className="divide-y divide-border/60 text-sm">
                     {sortedEntries.map((item, idx) => {
                       return (
-                        <tr
-                          key={item.user_id}
-                          className="transition-colors hover:bg-secondary/30"
-                        >
+                        <tr key={item.user_id} className="transition-colors hover:bg-secondary/30">
                           <td className="py-3.5 px-4 font-mono font-black text-xs">
                             <span
                               className={cn(
                                 "inline-flex size-7 items-center justify-center rounded-lg border",
                                 idx === 0
-                                  ? "border-amber-400/60 bg-amber-500/15 text-amber-300"
+                                  ? "border-amber-500/60 bg-amber-500/15 text-amber-700 dark:text-amber-300"
                                   : idx === 1
-                                    ? "border-slate-300/50 bg-slate-400/15 text-slate-200"
+                                    ? "border-slate-400/50 bg-slate-500/15 text-slate-700 dark:text-slate-200"
                                     : idx === 2
-                                      ? "border-orange-500/50 bg-orange-500/15 text-orange-300"
+                                      ? "border-orange-500/50 bg-orange-500/15 text-orange-700 dark:text-orange-300"
                                       : "border-border bg-secondary/40 text-muted-foreground",
                               )}
                             >
@@ -401,11 +399,13 @@ function LeaderboardPage() {
                                 src={item.avatar_url}
                                 name={item.display_name}
                                 frameCode={item.equipped_frame_code}
+                                showVerifiedBadge={item.is_verified_profile}
                                 size={36}
                               />
                               <div className="min-w-0">
-                                <div className="font-display font-bold text-foreground group-hover:text-primary transition-colors truncate">
-                                  {item.display_name}
+                                <div className="flex items-center gap-1.5 font-display font-bold text-foreground group-hover:text-primary transition-colors truncate">
+                                  <span className="truncate">{item.display_name}</span>
+                                  {item.is_verified_profile && <VerifiedCheckBadge size={15} />}
                                 </div>
                                 <div className="font-mono text-[11px] text-muted-foreground flex items-center gap-2">
                                   <span>@{item.username}</span>
@@ -474,15 +474,15 @@ function PodiumCard({
             src={rider.avatar_url}
             name={rider.display_name}
             frameCode={rider.equipped_frame_code}
+            showVerifiedBadge={rider.is_verified_profile}
             size={48}
           />
           <div className="min-w-0">
-            <h3 className="font-display text-base font-black text-foreground truncate">
-              {rider.display_name}
+            <h3 className="flex items-center gap-1.5 font-display text-base font-black text-foreground truncate">
+              <span className="truncate">{rider.display_name}</span>
+              {rider.is_verified_profile && <VerifiedCheckBadge size={16} />}
             </h3>
-            <p className="font-mono text-xs text-muted-foreground truncate">
-              @{rider.username}
-            </p>
+            <p className="font-mono text-xs text-muted-foreground truncate">@{rider.username}</p>
             {rider.primary_bike && (
               <p className="font-mono text-[11px] text-primary truncate mt-0.5">
                 {rider.primary_bike}

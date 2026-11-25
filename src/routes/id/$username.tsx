@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  Award,
   Camera,
   Check,
   Edit3,
@@ -17,13 +18,14 @@ import {
   Route as RouteIcon,
   ShieldAlert,
   Trash2,
+  Trophy,
   UserPlus,
   UserX,
   Wrench,
   X,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
-import { RevvAvatar } from "@/components/revv/RevvAvatar";
+import { RevvAvatar, RevvCosmeticBadge, VerifiedCheckBadge } from "@/components/revv/RevvAvatar";
 import {
   ProfileEditorForm,
   type AccountVisibility,
@@ -39,6 +41,7 @@ import {
   deleteProfileBanner,
   fetchMyProfile,
   fetchPublicProfile,
+  fetchPublicUserAchievements,
   resolveMediaUrl,
   sendFriendRequest,
   unfriendRider,
@@ -46,7 +49,12 @@ import {
   uploadProfileAvatar,
   uploadProfileBanner,
   type PublicProfileResponse,
+  type UserAchievementsPayload,
 } from "@/lib/api";
+import {
+  invalidateCosmeticsCatalogCache,
+  fetchCosmeticsCatalogCached,
+} from "@/lib/cosmetics-cache";
 import { compressImageToTarget } from "@/lib/image-compress";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -60,10 +68,14 @@ function ProfilePage() {
   const { user, refreshUser } = useAuth();
 
   const [profile, setProfile] = useState<PublicProfileResponse | null>(null);
+  const [achievements, setAchievements] = useState<UserAchievementsPayload | null>(null);
+  const [achievementsError, setAchievementsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"garage" | "posts" | "routes" | "trips">("garage");
+  const [activeTab, setActiveTab] = useState<
+    "garage" | "achievements" | "posts" | "routes" | "trips"
+  >("garage");
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
   const [confirmAction, setConfirmAction] = useState<
     "unfriend" | "delete_avatar" | "delete_banner" | null
@@ -142,11 +154,24 @@ function ProfilePage() {
   const loadData = async () => {
     setLoading(true);
     setError(null);
+    setAchievementsError(null);
     try {
       const data = await fetchPublicProfile(username);
       setProfile(data);
       if (isSelf) {
         syncEditFields(data);
+      }
+      if (!data.is_private && data.show_achievements !== false) {
+        fetchPublicUserAchievements(data.username || data.id)
+          .then((ach) => setAchievements(ach))
+          .catch((achErr: unknown) => {
+            setAchievements(null);
+            setAchievementsError(
+              achErr instanceof Error ? achErr.message : "Achievements unavailable",
+            );
+          });
+      } else {
+        setAchievements(null);
       }
     } catch (err: unknown) {
       if (isSelf) {
@@ -160,6 +185,10 @@ function ProfilePage() {
             middle_name: myProf.middle_name || null,
             last_name: myProf.last_name || null,
             avatar_url: myProf.avatar_url || null,
+            equipped_frame_code: myProf.equipped_frame_code ?? null,
+            equipped_badges: myProf.equipped_badges ?? [],
+            is_verified_profile: myProf.is_verified_profile ?? false,
+            subscription_tier: myProf.subscription_tier ?? null,
             banner_url: myProf.banner_url || null,
             bio: myProf.bio || null,
             city: myProf.city || null,
@@ -173,6 +202,8 @@ function ProfilePage() {
             show_city: myProf.show_city ?? null,
             show_country: myProf.show_country ?? null,
             show_job: myProf.show_job ?? null,
+            show_achievements: myProf.show_achievements ?? null,
+            show_riding_stats: myProf.show_riding_stats ?? null,
             privacy_saved_routes: myProf.privacy_saved_routes ?? null,
             is_friend: true,
             has_pending_request: false,
@@ -182,6 +213,9 @@ function ProfilePage() {
             posts: null,
           });
           syncEditFields(myProf);
+          fetchPublicUserAchievements(myProf.username || myProf.id)
+            .then((ach) => setAchievements(ach))
+            .catch(() => {});
           return;
         } catch {
           // ignore
@@ -278,7 +312,12 @@ function ProfilePage() {
       if (profile && editUsername.trim() !== (profile.username || "").trim()) {
         payload.username = editUsername.trim();
       }
+      const prevCountry = (profile?.country || "").trim();
       await updateMyProfile(payload);
+      if (editCountry.trim() !== prevCountry) {
+        invalidateCosmeticsCatalogCache();
+        void fetchCosmeticsCatalogCached(true);
+      }
       setIsEditing(false);
       setActionNotice("Profile updated successfully");
       await refreshUser();
@@ -538,101 +577,104 @@ function ProfilePage() {
         </div>
 
         {/* Profile Info Row */}
-        <div className="px-6 pb-6 pt-0 relative">
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 -mt-16 sm:-mt-20">
-            {/* Avatar & Identifiers */}
-            <div className="flex items-end gap-4">
-              <div
-                onClick={() => {
-                  if (resolvedAvatarUrl) {
-                    setPreviewImage({
-                      url: resolvedAvatarUrl,
-                      title: `${displayName} Profile Photo`,
-                    });
-                  } else if (isSelf) {
-                    avatarInputRef.current?.click();
-                  }
-                }}
-                className="group relative flex items-center justify-center cursor-pointer"
-              >
-                <RevvAvatar
-                  src={profile.avatar_url}
-                  name={displayName}
-                  frameCode={profile.equipped_frame_code}
-                  size={104}
-                />
-                {isSelf && (
-                  <div className="absolute bottom-1 right-1 flex items-center gap-1">
-                    {resolvedAvatarUrl && (
-                      <button
-                        type="button"
-                        title="Remove Profile Photo"
-                        aria-label="Remove profile photo"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmAction("delete_avatar");
-                        }}
-                        className="p-1.5 rounded-full bg-black/70 hover:bg-black text-destructive transition border border-white/20"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    )}
+        <div className="relative z-10 px-5 pb-6 pt-0 sm:px-6">
+          {/* Avatar overlapping banner bottom cleanly */}
+          <div className="-mt-14 mb-4 flex items-end justify-between gap-4 sm:-mt-16">
+            <div
+              onClick={() => {
+                if (resolvedAvatarUrl) {
+                  setPreviewImage({
+                    url: resolvedAvatarUrl,
+                    title: `${displayName} Profile Photo`,
+                  });
+                } else if (isSelf) {
+                  avatarInputRef.current?.click();
+                }
+              }}
+              className="group relative inline-flex shrink-0 cursor-pointer items-center justify-center"
+            >
+              <RevvAvatar
+                src={profile.avatar_url}
+                name={displayName}
+                frameCode={profile.equipped_frame_code}
+                showVerifiedBadge={profile.is_verified_profile}
+                size={104}
+              />
+              {isSelf && (
+                <div className="absolute -bottom-1 -right-1 z-30 flex items-center gap-1">
+                  {resolvedAvatarUrl && (
                     <button
                       type="button"
-                      title="Change Profile Photo"
-                      aria-label="Change profile photo"
+                      title="Remove Profile Photo"
+                      aria-label="Remove profile photo"
                       onClick={(e) => {
                         e.stopPropagation();
-                        avatarInputRef.current?.click();
+                        setConfirmAction("delete_avatar");
                       }}
-                      className="p-1.5 rounded-full bg-black/70 hover:bg-black text-white transition border border-white/20"
+                      className="rounded-full border border-white/25 bg-black/75 p-1.5 text-destructive transition hover:bg-black"
                     >
-                      {uploadingAvatar ? (
-                        <Loader2 className="size-3.5 animate-spin text-white" />
-                      ) : (
-                        <Camera className="size-3.5 text-white" />
-                      )}
+                      <Trash2 className="size-3.5" />
                     </button>
-                  </div>
-                )}
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h1 className="font-display text-2xl sm:text-3xl font-black text-foreground">
-                    {displayName}
-                  </h1>
-                  {/* Temporarily hidden noreg badge
-                  {profile.noreg && (
-                    <span className="rounded bg-secondary/80 px-2 py-0.5 font-mono text-[11px] font-bold text-muted-foreground border border-border">
-                      #{profile.noreg}
+                  )}
+                  <button
+                    type="button"
+                    title="Change Profile Photo"
+                    aria-label="Change profile photo"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      avatarInputRef.current?.click();
+                    }}
+                    className="rounded-full border border-white/25 bg-black/75 p-1.5 text-white transition hover:bg-black"
+                  >
+                    {uploadingAvatar ? (
+                      <Loader2 className="size-3.5 animate-spin text-white" />
+                    ) : (
+                      <Camera className="size-3.5 text-white" />
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Display Name + Tier Pill + Action Buttons safely aligned inside card body */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="font-display text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+                  {displayName}
+                </h1>
+                {profile.is_verified_profile && <VerifiedCheckBadge size={22} />}
+                {profile.subscription_tier &&
+                  !["", "rookie", "free"].includes(profile.subscription_tier.toLowerCase()) && (
+                    <span className="inline-flex items-center rounded-full border border-sky-500/35 bg-sky-500/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-300">
+                      {profile.subscription_tier.replace(/_/g, " ")}
                     </span>
                   )}
-                  */}
-                </div>
-                <p className="font-mono text-sm text-primary font-bold">@{profile.username}</p>
               </div>
+              <p className="text-sm font-semibold text-primary">@{profile.username}</p>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2 pt-2 sm:pt-0">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
               {isSelf ? (
                 <button
                   type="button"
                   onClick={() => setIsEditing(!isEditing)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/40 px-4 py-2 font-display text-xs font-bold uppercase tracking-wider text-foreground hover:bg-secondary transition"
+                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-secondary/50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-foreground transition hover:bg-secondary"
                 >
                   <Edit3 className="size-3.5" />
                   {isEditing ? "Close Editor" : "Edit Profile"}
                 </button>
               ) : profile.is_friend ? (
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 font-display text-xs font-bold uppercase tracking-wider text-emerald-400">
-                    <Check className="size-4" /> Connected Friend
+                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    <Check className="size-4" /> Connected
                   </span>
                   <button
                     type="button"
                     onClick={handleUnfriend}
-                    className="rounded-lg border border-border/80 bg-secondary/30 p-2 text-muted-foreground hover:bg-destructive/20 hover:text-destructive transition"
+                    className="rounded-xl border border-border/80 bg-secondary/40 p-2 text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
                     title="Unfriend"
                   >
                     <UserX className="size-4" />
@@ -642,7 +684,7 @@ function ProfilePage() {
                 <button
                   type="button"
                   onClick={handleCancelRequest}
-                  className="inline-flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 font-display text-xs font-bold uppercase tracking-wider text-amber-400 hover:bg-amber-500/20 transition"
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-300 transition hover:bg-amber-500/20"
                 >
                   <Hourglass className="size-3.5" /> Cancel Request
                 </button>
@@ -650,7 +692,7 @@ function ProfilePage() {
                 <button
                   type="button"
                   onClick={handleAddFriend}
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2 font-display text-xs font-bold uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition shadow-sm"
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2 text-xs font-bold uppercase tracking-wider text-primary-foreground shadow-sm transition hover:bg-primary/90"
                 >
                   <UserPlus className="size-4" /> Add Friend
                 </button>
@@ -659,7 +701,7 @@ function ProfilePage() {
           </div>
 
           {/* Bio & Details */}
-          <div className="mt-6 flex flex-wrap gap-4 text-xs font-mono text-muted-foreground">
+          <div className="mt-5 flex flex-wrap gap-4 text-xs font-medium text-muted-foreground">
             {(profile.account_visibility !== "CUSTOM" || profile.show_city !== false) &&
               profile.city && (
                 <span className="flex items-center gap-1.5">
@@ -684,9 +726,25 @@ function ProfilePage() {
           </div>
 
           {profile.bio && (
-            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-foreground/90 font-sans italic border-l-2 border-primary/60 pl-3">
+            <p className="mt-4 max-w-2xl border-l-2 border-primary/60 pl-3 font-sans text-sm italic leading-relaxed text-foreground/90">
               "{profile.bio}"
             </p>
+          )}
+
+          {/* Equipped Animated Cosmetic Badges (Mobile parity) */}
+          {profile.equipped_badges && profile.equipped_badges.length > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {profile.equipped_badges.map((b) => (
+                <RevvCosmeticBadge
+                  key={b.code}
+                  code={b.code}
+                  title={b.title}
+                  assetHash={b.asset_hash}
+                  lottieUrl={b.lottie_url}
+                  size={24}
+                />
+              ))}
+            </div>
           )}
         </div>
 
@@ -802,12 +860,12 @@ function ProfilePage() {
       ) : (
         /* Tabs: Garage & Activity Posts */
         <div className="space-y-6">
-          <div className="flex border-b border-border">
+          <div className="flex overflow-x-auto border-b border-border">
             <button
               type="button"
               onClick={() => setActiveTab("garage")}
               className={cn(
-                "inline-flex items-center gap-2 border-b-2 px-6 py-3 font-display text-sm font-bold uppercase tracking-wider transition-colors",
+                "inline-flex shrink-0 items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-colors",
                 activeTab === "garage"
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground",
@@ -820,22 +878,35 @@ function ProfilePage() {
             </button>
             <button
               type="button"
+              onClick={() => setActiveTab("achievements")}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-colors",
+                activeTab === "achievements"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Trophy className="size-4" />
+              Achievements{achievements ? ` (${achievements.summary.total_achieved})` : ""}
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveTab("posts")}
               className={cn(
-                "inline-flex items-center gap-2 border-b-2 px-6 py-3 font-display text-sm font-bold uppercase tracking-wider transition-colors",
+                "inline-flex shrink-0 items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-colors",
                 activeTab === "posts"
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground",
               )}
             >
               <MessageSquare className="size-4" />
-              Ride Posts ({profile.posts?.length || 0})
+              Posts ({profile.posts?.length || 0})
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("routes")}
               className={cn(
-                "inline-flex items-center gap-2 border-b-2 px-6 py-3 font-display text-sm font-bold uppercase tracking-wider transition-colors",
+                "inline-flex shrink-0 items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-colors",
                 activeTab === "routes"
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground",
@@ -849,7 +920,7 @@ function ProfilePage() {
                 type="button"
                 onClick={() => setActiveTab("trips")}
                 className={cn(
-                  "inline-flex items-center gap-2 border-b-2 px-6 py-3 font-display text-sm font-bold uppercase tracking-wider transition-colors",
+                  "inline-flex shrink-0 items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-colors",
                   activeTab === "trips"
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground",
@@ -860,6 +931,167 @@ function ProfilePage() {
               </button>
             )}
           </div>
+
+          {activeTab === "achievements" && (
+            <div className="space-y-6">
+              {profile.show_achievements === false || achievementsError ? (
+                <div className="rounded-xl border border-border/80 bg-card/60 p-10 text-center space-y-2">
+                  <Lock className="size-6 mx-auto text-muted-foreground" />
+                  <p className="font-display text-sm font-bold text-foreground">
+                    Achievements Hidden
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {achievementsError || "This rider prefers to keep their achievements private."}
+                  </p>
+                </div>
+              ) : !achievements ? (
+                <div className="rounded-xl border border-border p-10 text-center text-sm text-muted-foreground">
+                  <Loader2 className="size-5 animate-spin mx-auto mb-2 text-primary" />
+                  Loading rider achievements...
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="rounded-xl border border-border bg-card p-4">
+                      <div className="text-xs text-muted-foreground">Total XP</div>
+                      <div className="mt-1 text-xl font-extrabold text-primary">
+                        {achievements.summary.total_xp.toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-border bg-card p-4">
+                      <div className="text-xs text-muted-foreground">Badges Unlocked</div>
+                      <div className="mt-1 text-xl font-extrabold text-foreground">
+                        {achievements.summary.badges_unlocked} /{" "}
+                        {achievements.summary.total_badge_tiers}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-border bg-card p-4">
+                      <div className="text-xs text-muted-foreground">Milestones</div>
+                      <div className="mt-1 text-xl font-extrabold text-foreground">
+                        {achievements.summary.milestones_achieved} /{" "}
+                        {achievements.summary.total_milestones}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-border bg-card p-4">
+                      <div className="text-xs text-muted-foreground">Categories Completed</div>
+                      <div className="mt-1 text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                        {achievements.summary.total_achieved} /{" "}
+                        {achievements.summary.total_categories}
+                      </div>
+                    </div>
+                  </div>
+
+                  {achievements.pinned_codes.length > 0 && (
+                    <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        <Award className="size-4 text-primary" />
+                        Pinned Showcase Badges
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        {achievements.pinned_codes.map((code) => {
+                          const item = achievements.items.find((i) => i.code === code);
+                          if (!item) return null;
+                          return (
+                            <div
+                              key={code}
+                              className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-2.5"
+                            >
+                              {item.icon_key ? (
+                                <img
+                                  src={`/badges/${item.icon_key}.webp`}
+                                  alt={item.title}
+                                  className="size-10 shrink-0 rounded-lg object-contain"
+                                />
+                              ) : (
+                                <Trophy className="size-8 shrink-0 text-primary" />
+                              )}
+                              <div className="min-w-0">
+                                <div className="text-xs font-bold text-foreground truncate">
+                                  {item.title}
+                                </div>
+                                <div className="text-[11px] text-primary font-medium">
+                                  Level {item.highest_level} / {item.max_level}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {achievements.items
+                      .slice()
+                      .sort((a, b) => (b.highest_level > 0 ? 1 : 0) - (a.highest_level > 0 ? 1 : 0))
+                      .map((item) => {
+                        const unlocked = item.highest_level >= 1;
+                        const activeTier =
+                          item.tiers.find((tr) => tr.level === item.highest_level) ?? item.tiers[0];
+                        return (
+                          <div
+                            key={item.code}
+                            className={cn(
+                              "flex items-start gap-3.5 rounded-2xl border p-4 transition",
+                              unlocked
+                                ? "border-border bg-card shadow-xs"
+                                : "border-border/60 bg-card/40 opacity-65",
+                            )}
+                          >
+                            <div className="flex size-14 shrink-0 items-center justify-center rounded-xl border border-border bg-secondary/50 p-1.5">
+                              {item.has_badge && item.icon_key ? (
+                                <img
+                                  src={`/badges/${item.icon_key}.webp`}
+                                  alt={item.title}
+                                  className={cn(
+                                    "size-full object-contain",
+                                    !unlocked && "grayscale opacity-60",
+                                  )}
+                                />
+                              ) : (
+                                <Trophy
+                                  className={cn(
+                                    "size-6",
+                                    unlocked ? "text-primary" : "text-muted-foreground",
+                                  )}
+                                />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 className="text-sm font-bold text-foreground truncate">
+                                  {item.title}
+                                </h4>
+                                <span
+                                  className={cn(
+                                    "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
+                                    unlocked
+                                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                      : "bg-secondary text-muted-foreground",
+                                  )}
+                                >
+                                  {unlocked
+                                    ? activeTier?.name || `Lv.${item.highest_level}`
+                                    : "Locked"}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground line-clamp-2">
+                                {item.description}
+                              </p>
+                              <div className="text-[11px] font-medium text-muted-foreground">
+                                {item.current_value.toFixed(item.current_value % 1 === 0 ? 0 : 1)}
+                                {item.next_threshold ? ` / ${item.next_threshold}` : ""}{" "}
+                                {item.unit_label || ""}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {activeTab === "garage" && (
             <div className="space-y-4">

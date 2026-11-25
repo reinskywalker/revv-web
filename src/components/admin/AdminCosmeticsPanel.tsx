@@ -1,8 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { Lottie } from "lottie-react";
-import { CheckCircle2, Coins, Plus, RefreshCw, Save, Sparkles, Trash2, Upload } from "lucide-react";
+import {
+  CheckCircle2,
+  Coins,
+  Plus,
+  RefreshCw,
+  Save,
+  Search,
+  Sparkles,
+  Trash2,
+  Upload,
+  UserPlus,
+} from "lucide-react";
+import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
+import { ModalShell } from "@/components/revv/ModalShell";
 import { RevvAvatar } from "@/components/revv/RevvAvatar";
 import { RevvBadge } from "@/components/revv/RevvBadge";
+import { fetchAdminUsers, type AdminUserItem } from "@/lib/api";
 import { formatDbPrice } from "@/lib/api-billing";
 import {
   type AdminCosmeticsResponse,
@@ -12,11 +26,12 @@ import {
   archiveAdminFrame,
   fetchAdminCosmetics,
   fetchAdminPricing,
+  grantAdminUserCosmetic,
   saveAdminBadge,
   saveAdminFrame,
   updateAdminPlanPrice,
 } from "@/lib/api-cosmetics-admin";
-import { clearCosmeticsMemoryCache } from "@/lib/cosmetics-cache";
+import { invalidateCosmeticsCatalogCache } from "@/lib/cosmetics-cache";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +62,39 @@ export function AdminCosmeticsPanel() {
   const [lottieRaw, setLottieRaw] = useState("");
   const [lottiePreview, setLottiePreview] = useState<Record<string, unknown> | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Confirm Archive dialog + Grant to Rider modal
+  const [confirmArchive, setConfirmArchive] = useState<{
+    kind: "frame" | "badge";
+    code: string;
+    title: string;
+  } | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const [grantTarget, setGrantTarget] = useState<{
+    kind: "frame" | "badge";
+    code: string;
+    title: string;
+  } | null>(null);
+  const [riderList, setRiderList] = useState<AdminUserItem[]>([]);
+  const [riderQuery, setRiderQuery] = useState("");
+  const [grantAutoEquip, setGrantAutoEquip] = useState(true);
+  const [grantBusyUserId, setGrantBusyUserId] = useState<string | null>(null);
+
+  const openGrantModal = async (target: {
+    kind: "frame" | "badge";
+    code: string;
+    title: string;
+  }) => {
+    setGrantTarget(target);
+    setRiderQuery("");
+    if (riderList.length === 0) {
+      try {
+        setRiderList(await fetchAdminUsers());
+      } catch {
+        setError("Could not load rider directory.");
+      }
+    }
+  };
 
   // Inline DB plan price draft map
   const [planDrafts, setPlanDrafts] = useState<
@@ -154,7 +202,7 @@ export function AdminCosmeticsPanel() {
       } else {
         await saveAdminBadge(payload, editingExistingCode ?? undefined);
       }
-      clearCosmeticsMemoryCache();
+      invalidateCosmeticsCatalogCache();
       setNotice(
         `${editingKind === "frame" ? "Avatar frame" : "Animated badge"} saved to PostgreSQL (live immediately with zero app rebuild).`,
       );
@@ -206,8 +254,14 @@ export function AdminCosmeticsPanel() {
       <div className="flex flex-wrap gap-2 border-b border-border/70 pb-3">
         {(
           [
-            { id: "frames", label: `${t("adminCosmetics.tabFrames")} (${cosmetics?.frames.length ?? 0})` },
-            { id: "badges", label: `${t("adminCosmetics.tabBadges")} (${cosmetics?.badges.length ?? 0})` },
+            {
+              id: "frames",
+              label: `${t("adminCosmetics.tabFrames")} (${cosmetics?.frames.length ?? 0})`,
+            },
+            {
+              id: "badges",
+              label: `${t("adminCosmetics.tabBadges")} (${cosmetics?.badges.length ?? 0})`,
+            },
             { id: "pricing", label: `${t("adminCosmetics.tabPricing")} (${plans.length})` },
           ] as const
         ).map((tab) => (
@@ -232,7 +286,7 @@ export function AdminCosmeticsPanel() {
       </div>
 
       {notice && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
           <CheckCircle2 className="size-4 shrink-0" />
           <span>{notice}</span>
         </div>
@@ -246,105 +300,145 @@ export function AdminCosmeticsPanel() {
       {subView !== "pricing" ? (
         <div className="grid gap-6 lg:grid-cols-12">
           {/* Catalog list */}
-          <div className="space-y-3 lg:col-span-7">
+          <div className="min-w-0 space-y-3 lg:col-span-7">
             {(subView === "frames" ? (cosmetics?.frames ?? []) : (cosmetics?.badges ?? [])).map(
-              (item) => (
-                <div
-                  key={item.code}
-                  className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/80 bg-card p-4"
-                >
-                  <div className="flex items-center gap-3.5">
-                    {subView === "frames" ? (
-                      <RevvAvatar name={item.title} frameCode={item.code} size={44} />
-                    ) : (
-                      <RevvBadge
-                        badgeCode={item.code}
-                        assetHash={item.asset_hash}
-                        lottieUrl={item.lottie_url}
-                        title={item.title}
-                        size={44}
-                      />
-                    )}
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-display text-base font-bold">{item.title}</span>
-                        <code className="rounded bg-secondary px-1.5 py-0.5 text-xs text-muted-foreground">
-                          {item.code}
-                        </code>
-                        {!item.is_active && (
-                          <span className="rounded bg-destructive/20 px-1.5 py-0.5 text-xs text-destructive">
-                            Archived
+              (item) => {
+                const sourceLabel =
+                  item.source_type === "beta_reward"
+                    ? "Beta Reward"
+                    : item.source_type === "subscription"
+                      ? "Subscription"
+                      : item.source_type === "milestone"
+                        ? "Milestone"
+                        : item.source_type === "event"
+                          ? "Event"
+                          : "Shop";
+                const isVerifiedFrame =
+                  "is_verified_badge" in item && Boolean(item.is_verified_badge);
+
+                return (
+                  <div
+                    key={item.code}
+                    className="flex flex-col gap-3 rounded-2xl border border-border/80 bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-3.5">
+                      {subView === "frames" ? (
+                        <RevvAvatar name={item.title} frameCode={item.code} size={44} />
+                      ) : (
+                        <RevvBadge
+                          badgeCode={item.code}
+                          assetHash={item.asset_hash}
+                          lottieUrl={item.lottie_url}
+                          title={item.title}
+                          size={44}
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-display text-sm font-bold text-foreground sm:text-base">
+                            {item.title}
                           </span>
-                        )}
-                      </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{item.description}</p>
-                      <div className="mt-1.5 flex flex-wrap gap-2 text-xs font-mono text-muted-foreground">
-                        <span>source: {item.source_type}</span>
-                        <span>· condition: {item.condition_type}</span>
-                        {item.condition_target_code && <span>({item.condition_target_code})</span>}
-                        {item.price_idr != null && item.price_idr > 0 && (
-                          <span className="text-warning">
-                            · {formatDbPrice("IDR", item.price_idr)}
+                          <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-secondary-foreground">
+                            {sourceLabel}
                           </span>
-                        )}
-                        {item.price_usd_cents != null && item.price_usd_cents > 0 && (
-                          <span className="text-sky-400">
-                            / {formatDbPrice("USD", item.price_usd_cents)}
-                          </span>
-                        )}
+                          {isVerifiedFrame && (
+                            <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-600 dark:text-sky-300">
+                              Verified Checkmark
+                            </span>
+                          )}
+                          {!item.is_active && (
+                            <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
+                              Archived
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                          {item.description}
+                        </p>
+                        {(item.price_idr != null && item.price_idr > 0) ||
+                        (item.price_usd_cents != null && item.price_usd_cents > 0) ? (
+                          <div className="mt-1.5 flex flex-wrap gap-2 text-xs font-semibold">
+                            {item.price_idr != null && item.price_idr > 0 && (
+                              <span className="text-amber-600 dark:text-amber-400">
+                                {formatDbPrice("IDR", item.price_idr)}
+                              </span>
+                            )}
+                            {item.price_usd_cents != null && item.price_usd_cents > 0 && (
+                              <span className="text-sky-600 dark:text-sky-400">
+                                {formatDbPrice("USD", item.price_usd_cents)}
+                              </span>
+                            )}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingKind(subView === "frames" ? "frame" : "badge");
-                        setEditingExistingCode(item.code);
-                        setCode(item.code);
-                        setTitle(item.title);
-                        setDescription(item.description);
-                        setCategory(item.category);
-                        setSourceType(item.source_type);
-                        setConditionType(item.condition_type);
-                        setConditionTargetCode(item.condition_target_code ?? "");
-                        setPriceIdr(item.price_idr != null ? String(item.price_idr) : "");
-                        setPriceUsdCents(
-                          item.price_usd_cents != null ? String(item.price_usd_cents) : "",
-                        );
-                        setLottieRaw("");
-                        setLottiePreview(null);
-                      }}
-                      className="rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-semibold hover:bg-secondary"
-                    >
-                      Edit
-                    </button>
-                    {item.is_active && (
+                    <div className="flex shrink-0 items-center gap-1.5 self-end sm:self-center">
                       <button
                         type="button"
-                        onClick={async () => {
-                          if (subView === "frames") await archiveAdminFrame(item.code);
-                          else await archiveAdminBadge(item.code);
-                          clearCosmeticsMemoryCache();
-                          await loadAll();
-                        }}
-                        className="rounded-lg border border-destructive/40 bg-destructive/10 p-1.5 text-destructive hover:bg-destructive/20"
-                        title="Archive cosmetic"
+                        onClick={() =>
+                          void openGrantModal({
+                            kind: subView === "frames" ? "frame" : "badge",
+                            code: item.code,
+                            title: item.title,
+                          })
+                        }
+                        className="inline-flex items-center gap-1 rounded-xl border border-primary/35 bg-primary/10 px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20"
+                        title="Grant directly to a rider"
                       >
-                        <Trash2 className="size-4" />
+                        <UserPlus className="size-3.5" />
+                        Grant
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingKind(subView === "frames" ? "frame" : "badge");
+                          setEditingExistingCode(item.code);
+                          setCode(item.code);
+                          setTitle(item.title);
+                          setDescription(item.description);
+                          setCategory(item.category);
+                          setSourceType(item.source_type);
+                          setConditionType(item.condition_type);
+                          setConditionTargetCode(item.condition_target_code ?? "");
+                          setPriceIdr(item.price_idr != null ? String(item.price_idr) : "");
+                          setPriceUsdCents(
+                            item.price_usd_cents != null ? String(item.price_usd_cents) : "",
+                          );
+                          setLottieRaw("");
+                          setLottiePreview(null);
+                        }}
+                        className="rounded-xl border border-border bg-secondary/60 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary"
+                      >
+                        Edit
+                      </button>
+                      {item.is_active && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setConfirmArchive({
+                              kind: subView === "frames" ? "frame" : "badge",
+                              code: item.code,
+                              title: item.title,
+                            })
+                          }
+                          className="rounded-xl border border-destructive/40 bg-destructive/10 p-1.5 text-destructive hover:bg-destructive/20"
+                          title="Archive cosmetic"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ),
+                );
+              },
             )}
           </div>
 
           {/* Create / Edit Lottie form */}
           <form
             onSubmit={handleSaveCosmetic}
-            className="space-y-4 rounded-xl border border-border/80 bg-card p-5 lg:col-span-5"
+            className="min-w-0 space-y-4 rounded-2xl border border-border/80 bg-card p-5 lg:col-span-5"
           >
             <div className="flex items-center justify-between">
               <h3 className="font-display text-lg font-bold flex items-center gap-2">
@@ -635,6 +729,141 @@ export function AdminCosmeticsPanel() {
             from PostgreSQL at runtime.
           </p>
         </div>
+      )}
+
+      <ConfirmDialog
+        open={Boolean(confirmArchive)}
+        title={`Archive ${confirmArchive?.kind === "frame" ? "Avatar Frame" : "Animated Badge"}`}
+        message={`Archive "${confirmArchive?.title ?? ""}"? Riders who already own it keep access, while shop/unlock visibility is paused.`}
+        confirmLabel="Archive"
+        destructive
+        busy={archiveBusy}
+        onCancel={() => setConfirmArchive(null)}
+        onConfirm={async () => {
+          if (!confirmArchive) return;
+          setArchiveBusy(true);
+          setError(null);
+          try {
+            if (confirmArchive.kind === "frame") {
+              await archiveAdminFrame(confirmArchive.code);
+            } else {
+              await archiveAdminBadge(confirmArchive.code);
+            }
+            invalidateCosmeticsCatalogCache();
+            setNotice(`Archived "${confirmArchive.title}".`);
+            setConfirmArchive(null);
+            await loadAll();
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to archive cosmetic.");
+          } finally {
+            setArchiveBusy(false);
+          }
+        }}
+      />
+
+      {grantTarget && (
+        <ModalShell
+          open
+          onClose={() => {
+            if (!grantBusyUserId) setGrantTarget(null);
+          }}
+          title={
+            <h4 className="font-display text-base font-bold">
+              Grant {grantTarget.kind === "frame" ? "Frame" : "Badge"}: {grantTarget.title}
+            </h4>
+          }
+          subtitle="Select a rider to grant permanent access immediately."
+          maxWidthClass="max-w-lg"
+          panelClassName="p-5 space-y-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                value={riderQuery}
+                onChange={(e) => setRiderQuery(e.target.value)}
+                placeholder="Search rider name, @handle, email…"
+                className="w-full rounded-xl border border-border bg-secondary/40 py-2 pl-9 pr-3 text-xs focus:border-primary focus:outline-none"
+              />
+            </div>
+            {grantTarget.kind === "frame" && (
+              <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={grantAutoEquip}
+                  onChange={(e) => setGrantAutoEquip(e.target.checked)}
+                  className="accent-primary"
+                />
+                Auto-equip
+              </label>
+            )}
+          </div>
+
+          <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+            {riderList
+              .filter((r) => {
+                const q = riderQuery.trim().toLowerCase();
+                if (!q) return true;
+                return (
+                  (r.username || "").toLowerCase().includes(q) ||
+                  (r.first_name || "").toLowerCase().includes(q) ||
+                  (r.last_name || "").toLowerCase().includes(q) ||
+                  (r.email || "").toLowerCase().includes(q)
+                );
+              })
+              .slice(0, 30)
+              .map((r) => (
+                <div
+                  key={r.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-2.5"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <RevvAvatar
+                      src={r.avatar_url}
+                      name={r.first_name || r.username || "Rider"}
+                      size={32}
+                    />
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-bold text-foreground">
+                        {[r.first_name, r.last_name].filter(Boolean).join(" ") || r.username}
+                      </div>
+                      <div className="truncate text-[11px] text-muted-foreground">
+                        @{r.username || "rider"}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={Boolean(grantBusyUserId)}
+                    onClick={async () => {
+                      setGrantBusyUserId(r.id);
+                      setError(null);
+                      try {
+                        const itemType =
+                          grantTarget.code === "beta_pioneer" ? "early_user" : grantTarget.kind;
+                        await grantAdminUserCosmetic(r.id, {
+                          item_type: itemType,
+                          code: grantTarget.code,
+                          auto_equip: grantTarget.kind === "frame" ? grantAutoEquip : undefined,
+                        });
+                        invalidateCosmeticsCatalogCache();
+                        setNotice(`Granted "${grantTarget.title}" to @${r.username}.`);
+                        setGrantTarget(null);
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Grant failed.");
+                      } finally {
+                        setGrantBusyUserId(null);
+                      }
+                    }}
+                    className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {grantBusyUserId === r.id ? "Granting…" : "Grant"}
+                  </button>
+                </div>
+              ))}
+          </div>
+        </ModalShell>
       )}
     </div>
   );

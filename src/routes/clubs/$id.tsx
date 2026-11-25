@@ -17,7 +17,7 @@ function ClubDetailRoutePage() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <SiteHeader />
-      <main className="flex-1">
+      <main className={!isAuthenticated ? "flex-1 pt-16" : "flex-1"}>
         <ClubDetailView communityId={id} />
       </main>
       {!isAuthenticated && <SiteFooter />}

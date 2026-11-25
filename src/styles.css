@@ -1,23 +1,13 @@
-@import "tailwindcss" source(none);
-@source "../src";
+@import "tailwindcss";
 @import "tw-animate-css";
 
-/*
- * REVV — dark cockpit design system with light readability panels.
- * Dark values from the app's Flutter theme (revv_colors.dart):
- * background #0A0D10, surface #141A20, elevated #1C242C,
- * accent #EE4B3E, secondary text #9FB3C8, border #2D3843.
- * Light "panel" values from the app's daylight theme (#F4F5F7, #111418),
- * with darker secondary text for elderly-friendly contrast.
- */
+@custom-variant dark (&:where(.dark, .dark *, :root:not(.light), :root:not(.light) *));
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -37,134 +27,265 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-panel: var(--panel);
-  --color-panel-card: var(--panel-card);
-  --color-panel-fg: var(--panel-foreground);
-  --color-panel-foreground: var(--panel-foreground);
-  --color-panel-muted: var(--panel-muted);
-  --color-panel-border: var(--panel-border);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
-@theme {
-  --font-display: "Archivo", "Inter", sans-serif;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-}
-
+/* Dark theme (default) */
 :root {
   --radius: 0.75rem;
-  --background: oklch(0.15 0.008 255);
-  --foreground: oklch(0.975 0.005 250);
-  --card: oklch(0.21 0.016 245);
-  --card-foreground: oklch(0.975 0.005 250);
+  --background: oklch(0.145 0.015 245);
+  --foreground: oklch(0.97 0.005 240);
+  --card: oklch(0.185 0.015 245);
+  --card-foreground: oklch(0.97 0.005 240);
   --popover: oklch(0.19 0.015 245);
-  --popover-foreground: oklch(0.975 0.005 250);
-  --primary: oklch(0.645 0.205 25);
-  --primary-foreground: oklch(0.98 0.01 25);
-  --secondary: oklch(0.265 0.018 240);
-  --secondary-foreground: oklch(0.8 0.025 250);
-  --muted: oklch(0.24 0.014 245);
-  --muted-foreground: oklch(0.8 0.025 250);
-  --accent: oklch(0.265 0.018 240);
-  --accent-foreground: oklch(0.645 0.205 25);
-  --destructive: oklch(0.58 0.22 27);
-  --destructive-foreground: oklch(0.98 0.005 25);
-  --border: oklch(0.33 0.02 245);
-  --input: oklch(0.33 0.02 245);
-  --ring: oklch(0.645 0.205 25);
-  --success: oklch(0.79 0.14 162);
-  --warning: oklch(0.82 0.15 85);
-  --panel: oklch(0.965 0.006 255);
-  --panel-card: oklch(1 0 0);
-  --panel-foreground: oklch(0.225 0.008 250);
-  --panel-muted: oklch(0.42 0.02 245);
-  --panel-border: oklch(0.83 0.01 250);
+  --popover-foreground: oklch(0.97 0.005 240);
+  --primary: oklch(0.628 0.226 25);
+  --primary-foreground: oklch(0.99 0.002 240);
+  --secondary: oklch(0.24 0.016 245);
+  --secondary-foreground: oklch(0.95 0.006 240);
+  --muted: oklch(0.23 0.015 245);
+  --muted-foreground: oklch(0.75 0.014 240);
+  --accent: oklch(0.26 0.02 245);
+  --accent-foreground: oklch(0.97 0.005 240);
+  --destructive: oklch(0.62 0.22 25);
+  --destructive-foreground: oklch(0.99 0.002 240);
+  --border: oklch(0.3 0.015 245);
+  --input: oklch(0.28 0.015 245);
+  --ring: oklch(0.628 0.226 25);
+
+  --panel: oklch(0.185 0.015 245);
+  --panel-alt: oklch(0.225 0.016 245);
+  --panel-border: oklch(0.3 0.015 245);
+  --ink: oklch(0.97 0.005 240);
+  --ink-muted: oklch(0.74 0.014 240);
+  --accent-orange: oklch(0.64 0.22 28);
+  --accent-teal: oklch(0.72 0.14 190);
+}
+
+/* Light theme */
+:root.light {
+  --background: oklch(0.975 0.004 240);
+  --foreground: oklch(0.17 0.02 250);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.17 0.02 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.17 0.02 250);
+  --primary: oklch(0.57 0.23 25);
+  --primary-foreground: oklch(0.99 0.002 240);
+  --secondary: oklch(0.945 0.008 245);
+  --secondary-foreground: oklch(0.22 0.02 250);
+  --muted: oklch(0.95 0.006 245);
+  --muted-foreground: oklch(0.45 0.02 245);
+  --accent: oklch(0.935 0.01 245);
+  --accent-foreground: oklch(0.17 0.02 250);
+  --destructive: oklch(0.55 0.22 25);
+  --destructive-foreground: oklch(0.99 0.002 240);
+  --border: oklch(0.89 0.01 245);
+  --input: oklch(0.91 0.01 245);
+  --ring: oklch(0.57 0.23 25);
+
+  --panel: oklch(1 0 0);
+  --panel-alt: oklch(0.96 0.006 245);
+  --panel-border: oklch(0.89 0.01 245);
+  --ink: oklch(0.17 0.02 250);
+  --ink-muted: oklch(0.45 0.02 245);
+  --accent-orange: oklch(0.57 0.22 28);
+  --accent-teal: oklch(0.52 0.15 190);
 }
 
 @layer base {
   * {
-    border-color: var(--color-border);
+    @apply border-border;
   }
-
-  html {
-    scroll-behavior: smooth;
-  }
-
+  html,
   body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    @apply bg-background text-foreground;
     font-family: var(--font-sans);
-    font-size: 1.125rem;
+    font-size: 0.95rem;
+    line-height: 1.55;
     -webkit-font-smoothing: antialiased;
-  }
-
-  ::selection {
-    background-color: var(--color-primary);
-    color: var(--color-primary-foreground);
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
-/* Mono, letter-spaced eyebrow labels — "01 / 03 · RIDE TOGETHER" */
 @utility eyebrow {
-  @apply font-mono text-xs font-medium uppercase tracking-[0.3em] text-muted-foreground;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
 }
 
-/* Light-panel variant of the eyebrow label */
-@utility eyebrow-panel {
-  @apply font-mono text-xs font-medium uppercase tracking-[0.3em] text-panel-muted;
-}
-
-/* Heavy uppercase display headings — "EVERY ROAD HAS A STORY." */
 @utility display-heading {
-  @apply font-display font-black uppercase leading-[0.95] text-foreground;
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
-/* Light-panel variant of the display heading */
-@utility display-heading-panel {
-  @apply font-display font-black uppercase leading-[0.95] text-panel-foreground;
-}
-
-/* HUD-style bordered card (dark theme) */
 @utility hud-card {
-  @apply rounded-xl border border-border bg-card;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
 }
 
-/* Light readability section shell — bright surface, near-black text */
 @utility panel {
-  @apply bg-panel text-panel-foreground;
-}
-
-/* White card on the light panel */
-@utility panel-card {
-  @apply rounded-xl border border-panel-border bg-panel-card shadow-sm;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 1rem;
 }
 
 @utility btn-primary {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-7 py-4 font-display text-base font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary/90;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.35rem;
+  border-radius: 0.75rem;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
 }
 
 @utility btn-ghost {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-7 py-4 font-display text-base font-bold uppercase tracking-wide text-foreground transition-colors hover:bg-secondary;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.25rem;
+  border-radius: 0.75rem;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--panel-border);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
 }
 
-/* Ghost button for light sections */
-@utility btn-ghost-panel {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg border border-panel-border bg-transparent px-7 py-4 font-display text-base font-bold uppercase tracking-wide text-panel-foreground transition-colors hover:bg-panel;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
+@keyframes revv-frame-spin {
   to {
-    opacity: 1;
-    transform: translateY(0);
+    transform: rotate(360deg);
   }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+@keyframes revv-frame-pulse {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes revv-frame-scan {
+  0% {
+    transform: translateY(-28%);
+  }
+  50% {
+    transform: translateY(28%);
+  }
+  100% {
+    transform: translateY(-28%);
+  }
+}
+
+@keyframes revv-frame-float {
+  0%,
+  100% {
+    transform: translateY(-4%);
+  }
+  50% {
+    transform: translateY(4%);
+  }
+}
+
+@utility animate-revv-frame-spin {
+  animation: revv-frame-spin 4s linear infinite;
+}
+
+@utility animate-revv-frame-pulse {
+  animation: revv-frame-pulse 2.4s ease-in-out infinite;
+}
+
+@utility animate-revv-frame-scan {
+  animation: revv-frame-scan 2.8s ease-in-out infinite;
+}
+
+@utility animate-revv-frame-float {
+  animation: revv-frame-float 2.6s ease-in-out infinite;
+}
+
+/* Shared article typography used identically in /news and the WYSIWYG CMS Editor */
+.revv-rich-html {
+  font-family: var(--font-sans);
+  color: var(--foreground);
+  font-size: 0.975rem;
+  line-height: 1.7;
+}
+.revv-rich-html h2 {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 700;
+  margin-top: 1.4rem;
+  margin-bottom: 0.55rem;
+  letter-spacing: -0.015em;
+  color: var(--foreground);
+}
+.revv-rich-html h3 {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin-top: 1.1rem;
+  margin-bottom: 0.45rem;
+  color: var(--foreground);
+}
+.revv-rich-html p {
+  margin-bottom: 0.85rem;
+}
+.revv-rich-html blockquote {
+  border-left: 3px solid var(--primary);
+  padding: 0.35rem 0 0.35rem 0.9rem;
+  margin: 0.9rem 0;
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+.revv-rich-html ul {
+  list-style: disc;
+  padding-left: 1.4rem;
+  margin-bottom: 0.9rem;
+}
+.revv-rich-html ol {
+  list-style: decimal;
+  padding-left: 1.4rem;
+  margin-bottom: 0.9rem;
+}
+.revv-rich-html a {
+  color: var(--primary);
+  text-decoration: underline;
+  font-weight: 600;
+}
+.revv-rich-html img {
+  max-width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  margin: 0.9rem auto;
+  display: block;
 }

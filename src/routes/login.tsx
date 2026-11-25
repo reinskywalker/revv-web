@@ -263,19 +263,19 @@ function LoginPage() {
       {healthStatus?.maintenance && (
         <div className="mt-6 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-200">
           <div className="flex items-start gap-3">
-            <div className="rounded-lg bg-amber-500/20 p-2 text-amber-400 shrink-0">
+            <div className="rounded-lg bg-amber-500/20 p-2 text-amber-700 dark:text-amber-400 shrink-0">
               <ShieldAlert className="size-5" />
             </div>
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
                   {healthStatus.isDown ? "SERVICE DISRUPTION" : "MAINTENANCE MODE ACTIVE"}
                 </span>
               </div>
-              <h3 className="font-display text-sm font-bold uppercase text-amber-300">
+              <h3 className="font-display text-sm font-bold uppercase text-amber-800 dark:text-amber-300">
                 {healthStatus.title || "Under Scheduled Maintenance"}
               </h3>
-              <p className="text-xs text-amber-200/90 leading-relaxed">
+              <p className="text-xs text-amber-800/90 dark:text-amber-200/90 leading-relaxed">
                 {healthStatus.message ||
                   "REVV is currently undergoing scheduled maintenance. Only authorized administrators may log in."}
               </p>
@@ -357,11 +357,16 @@ function LoginPage() {
               user.role.toLowerCase() === "moderator") && (
               <Link
                 to="/admin"
+                {...(user.role.toLowerCase() === "moderator"
+                  ? { search: { tab: "news" } as never }
+                  : {})}
                 className="flex items-center justify-between rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 font-mono text-xs font-semibold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20"
               >
                 <span className="flex items-center gap-2">
                   <ShieldCheck className="size-4" />
-                  Administrator Console
+                  {user.role.toLowerCase() === "moderator"
+                    ? "Moderator News Desk"
+                    : "Administrator Console"}
                 </span>
                 <ChevronRight className="size-4" />
               </Link>

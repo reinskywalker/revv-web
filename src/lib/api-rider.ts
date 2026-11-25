@@ -396,10 +396,7 @@ export async function createGarageItemComment(
   );
 }
 
-export async function deleteGarageItemComment(
-  garageId: string,
-  commentId: string,
-): Promise<void> {
+export async function deleteGarageItemComment(garageId: string, commentId: string): Promise<void> {
   await authRequest(
     `/me/garage/${encodeURIComponent(garageId)}/items/comments/${encodeURIComponent(commentId)}`,
     { method: "DELETE" },
@@ -426,6 +423,7 @@ export interface CommunityMemberItem {
   display_name: string;
   avatar_url?: string | null;
   equipped_frame_code?: string | null;
+  is_verified_profile?: boolean;
   role: string;
   status: string;
   joined_at: string;
@@ -644,7 +642,9 @@ export async function rsvpCommunityEvent(
   });
 }
 
-export async function createEventShareLink(eventId: string): Promise<{ token: string; expires_at?: string }> {
+export async function createEventShareLink(
+  eventId: string,
+): Promise<{ token: string; expires_at?: string }> {
   return authRequest<{ token: string; expires_at?: string }>(
     `/events/${encodeURIComponent(eventId)}/share-link`,
     { method: "POST" },

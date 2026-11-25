@@ -5,7 +5,6 @@ import {
   AtSign,
   Bell,
   CheckCircle2,
-  ChevronRight,
   CloudOff,
   Database,
   FilePlus2,
@@ -332,6 +331,12 @@ function AdminPage() {
   };
 
   useEffect(() => {
+    if (!authLoading && (!isAuthenticated || !canEnterConsole)) {
+      void navigate({ to: "/" });
+    }
+  }, [authLoading, isAuthenticated, canEnterConsole, navigate]);
+
+  useEffect(() => {
     if (isAuthenticated && canEnterConsole) {
       refreshAllAdminData();
     } else {
@@ -347,61 +352,8 @@ function AdminPage() {
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="animate-fade-in mx-auto max-w-xl space-y-6 text-center py-16">
-        <div className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 text-primary">
-          <ShieldAlert className="size-8" />
-        </div>
-        <h1 className="font-display text-3xl font-black uppercase tracking-tight sm:text-4xl">
-          Restricted Command Deck
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          You must authenticate with administrator or moderator credentials to enter this console.
-        </p>
-        <div className="pt-2">
-          <Link to="/login" className="btn-primary inline-flex items-center gap-2">
-            Proceed to Login
-            <ChevronRight className="size-4" />
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (!canEnterConsole) {
-    return (
-      <div className="animate-fade-in mx-auto max-w-xl space-y-6 text-center py-16">
-        <div className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-destructive/30 bg-destructive/10 text-destructive">
-          <ShieldAlert className="size-8" />
-        </div>
-        <h1 className="font-display text-3xl font-black uppercase tracking-tight text-destructive sm:text-4xl">
-          Access Denied
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Your current account role is{" "}
-          <strong className="text-foreground uppercase">{user?.role || "user"}</strong>.
-          Administrator clearance is required to view or execute commands in this console.
-        </p>
-        <div className="pt-2">
-          {user?.username ? (
-            <Link
-              to="/id/$username"
-              params={{ username: user.username }}
-              className="btn-primary inline-flex items-center gap-2"
-            >
-              Return to Profile
-              <ChevronRight className="size-4" />
-            </Link>
-          ) : (
-            <Link to="/" className="btn-primary inline-flex items-center gap-2">
-              Go to Rider Feed
-              <ChevronRight className="size-4" />
-            </Link>
-          )}
-        </div>
-      </div>
-    );
+  if (!isAuthenticated || !canEnterConsole) {
+    return null;
   }
 
   return (
@@ -411,14 +363,16 @@ function AdminPage() {
         <div>
           <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-primary">
             <ShieldCheck className="size-3.5" />
-            <span>Superuser Command Deck</span>
+            <span>{isSuperuser ? "Superuser Command Deck" : "Editorial Moderation"}</span>
           </div>
-          <h1 className="font-display mt-1 text-3xl font-black uppercase tracking-tight text-foreground sm:text-4xl">
-            Administrator Console
+          <h1 className="font-display mt-1 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+            {isSuperuser ? "Administrator Console" : "Moderator News Desk"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Role: <span className="font-bold uppercase text-primary">{user?.role}</span> · Realtime
-            Control for Roster, Catalog, RBAC, and Push Broadcasts.
+            Role: <span className="font-bold uppercase text-primary">{user?.role}</span> ·{" "}
+            {isSuperuser
+              ? "Realtime Control for Roster, Catalog, RBAC, and Push Broadcasts."
+              : "Compose, edit, and publish Newsroom dispatches directly."}
           </p>
         </div>
 
@@ -536,7 +490,7 @@ function AdminPage() {
           )}
 
           {/* TAB 6: PUSH BROADCAST CMS */}
-          {activeSubTab === "broadcast" && (
+          {isSuperuser && activeSubTab === "broadcast" && (
             <div className="space-y-6">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
@@ -784,15 +738,15 @@ function AdminPage() {
                     notification drawer:
                   </p>
 
-                  <div className="mx-auto max-w-sm rounded-2xl border border-border/80 bg-[#0B0F14] p-4 shadow-xl">
-                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                  <div className="mx-auto max-w-sm rounded-2xl border border-border/80 bg-slate-950 p-4 text-slate-100 shadow-xl">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
                       <div className="flex items-center gap-1.5">
-                        <Smartphone className="size-3 text-muted-foreground" />
-                        <span className="text-xs font-semibold uppercase tracking-wider text-foreground/80">
+                        <Smartphone className="size-3 text-slate-400" />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">
                           REVV Mobile Push · now
                         </span>
                       </div>
-                      <span className="text-xs text-foreground/75">12:30</span>
+                      <span className="text-xs text-slate-400">12:30</span>
                     </div>
 
                     <div className="mt-3 flex items-start gap-3">
@@ -801,15 +755,15 @@ function AdminPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between">
-                          <span className="font-bold text-xs text-white">REVV Motorsport</span>
+                          <span className="font-bold text-xs text-slate-100">REVV Motorsport</span>
                           <span className="text-xs font-semibold text-primary uppercase">
                             {broadcastTargetType === "all" ? "BROADCAST" : "TARGETED"}
                           </span>
                         </div>
-                        <h5 className="mt-0.5 font-bold text-xs text-white line-clamp-1">
+                        <h5 className="mt-0.5 font-bold text-xs text-slate-100 line-clamp-1">
                           {broadcastTitle.trim() || "Notification Title Here"}
                         </h5>
-                        <p className="mt-0.5 text-xs leading-snug text-foreground/90 line-clamp-2">
+                        <p className="mt-0.5 text-xs leading-snug text-slate-300 line-clamp-2">
                           {broadcastBody.trim() ||
                             "Message content will appear here as received on Android or iOS push notification tray."}
                         </p>
@@ -859,13 +813,13 @@ function AdminPage() {
           )}
 
           {/* SUPPORT TICKETS INBOX */}
-          {activeSubTab === "support" && <SupportInboxTab onNotice={setNotice} />}
+          {isSuperuser && activeSubTab === "support" && <SupportInboxTab onNotice={setNotice} />}
 
           {/* PRIVACY & GLOBAL COMPLIANCE CMS */}
-          {activeSubTab === "legal" && <LegalCmsTab onNotice={setNotice} />}
+          {isSuperuser && activeSubTab === "legal" && <LegalCmsTab onNotice={setNotice} />}
 
           {/* TAB 7: SYSTEM HEALTH & MAINTENANCE CONTROL */}
-          {activeSubTab === "maintenance" && (
+          {isSuperuser && activeSubTab === "maintenance" && (
             <div className="space-y-6">
               <div className="grid gap-6 lg:grid-cols-2">
                 {/* Configuration Form Card */}
@@ -1019,7 +973,7 @@ function AdminPage() {
                   </div>
 
                   {/* Simulated Mobile Screen */}
-                  <div className="mx-auto w-full max-w-xs rounded-[28px] border-2 border-border/80 bg-[#0B0F14] p-5 shadow-2xl space-y-6 text-center my-auto">
+                  <div className="mx-auto w-full max-w-xs rounded-[28px] border-2 border-border/80 bg-slate-950 text-slate-100 p-5 shadow-2xl space-y-6 text-center my-auto">
                     {/* Status Bar */}
                     <div className="flex items-center justify-between text-xs text-foreground/75 px-1">
                       <span>09:41</span>
@@ -1190,7 +1144,14 @@ function NewsCmsTab({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim()) return;
+    const strippedBody = content
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .trim();
+    if (!title.trim() || !strippedBody) {
+      onNotice("Please provide both a headline title and non-empty article content.");
+      return;
+    }
     setSaving(true);
     onNotice(null);
     try {
@@ -1313,109 +1274,26 @@ function NewsCmsTab({
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="hud-card space-y-5 p-6">
-        <div className="flex items-center justify-between border-b border-border/50 pb-4">
-          <h3 className="font-display text-xl font-black uppercase tracking-tight text-foreground">
-            {editingId ? "Edit News Dispatch" : "Compose News Dispatch"}
-          </h3>
-          {editingId && (
-            <button
-              type="button"
-              onClick={resetForm}
-              className="font-mono text-xs uppercase text-muted-foreground hover:text-primary"
-            >
-              Cancel Edit
-            </button>
-          )}
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
-              Headline Title *
-            </label>
-            <input
-              required
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. REVV 2.4 Telemetry & Low-Latency Intercom"
-              className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-            />
+      {/* Inline Article WYSIWYG Canvas matching /news */}
+      <form onSubmit={handleSubmit} className="hud-card overflow-hidden p-0">
+        {/* Top Metadata & Cover Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/35 px-6 py-4">
+          <div className="flex items-center gap-2.5">
+            <h3 className="font-display text-lg font-bold text-foreground">
+              {editingId ? "Edit Dispatch" : "Compose Dispatch"}
+            </h3>
+            <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-bold text-primary">
+              WYSIWYG
+            </span>
           </div>
-
-          <div>
-            <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
-              Category
-            </label>
-            <select
-              value={NEWS_CATEGORIES.includes(category) ? category : "CUSTOM"}
-              onChange={(e) => setCategory(e.target.value === "CUSTOM" ? "" : e.target.value)}
-              className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-            >
-              {NEWS_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-              <option value="CUSTOM">Custom Category…</option>
-            </select>
-            {!NEWS_CATEGORIES.includes(category) && (
-              <input
-                type="text"
-                placeholder="Enter custom category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value.toUpperCase())}
-                className="mt-2 w-full rounded-lg border border-input bg-secondary/40 px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary"
-              />
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
-                Author
-              </label>
-              <input
-                type="text"
-                value={authorName}
-                onChange={(e) => setAuthorName(e.target.value)}
-                className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
-                Read Mins
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={60}
-                value={readingMinutes}
-                onChange={(e) => setReadingMinutes(Number(e.target.value) || 3)}
-                className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border/60 bg-secondary/30 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="font-mono text-xs font-bold uppercase text-foreground">
-                Cover Image &amp; Auto-Compressed Thumbnail
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Canvas-compressed (1280px WebP/JPEG cover + 480px card thumbnail for mobile RAM).
-              </p>
-            </div>
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-secondary/60 px-3 py-2 text-xs font-semibold text-foreground hover:border-primary">
+          <div className="flex items-center gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary">
               {uploadingCover ? (
-                <Loader2 className="size-4 animate-spin text-primary" />
+                <Loader2 className="size-3.5 animate-spin text-primary" />
               ) : (
-                <ImagePlus className="size-4 text-primary" />
+                <ImagePlus className="size-3.5 text-primary" />
               )}
-              Upload Cover
+              {coverUrl ? "Replace Cover" : "Add Cover Photo"}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -1423,90 +1301,154 @@ function NewsCmsTab({
                 onChange={handleCoverUpload}
               />
             </label>
-          </div>
-          {coverUrl && (
-            <div className="mt-3 flex items-center gap-4">
-              <img
-                src={resolveMediaUrl(thumbnailUrl || coverUrl) ?? undefined}
-                alt="Cover preview"
-                className="h-16 w-28 rounded-lg border border-border object-cover"
-              />
+            {coverUrl && (
               <button
                 type="button"
                 onClick={() => {
                   setCoverUrl("");
                   setThumbnailUrl("");
                 }}
-                className="text-xs font-semibold text-destructive hover:underline"
+                className="rounded-xl border border-destructive/40 px-2.5 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10"
               >
                 Remove Cover
               </button>
-            </div>
-          )}
+            )}
+            {editingId && (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="rounded-xl border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
+              >
+                New Draft
+              </button>
+            )}
+          </div>
         </div>
 
-        <div>
-          <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
-            Summary *
-          </label>
+        {/* Cover Banner rendered inline 1:1 like /news */}
+        {coverUrl && (
+          <div className="relative h-56 w-full overflow-hidden border-b border-border bg-secondary">
+            <img
+              src={resolveMediaUrl(coverUrl) ?? undefined}
+              alt="Article cover preview"
+              className="h-full w-full object-cover"
+            />
+          </div>
+        )}
+
+        <div className="space-y-5 p-6 md:p-8">
+          {/* Article Meta Bar (Category, Author, Read Time) */}
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={NEWS_CATEGORIES.includes(category) ? category : "CUSTOM"}
+              onChange={(e) => setCategory(e.target.value === "CUSTOM" ? "" : e.target.value)}
+              aria-label="Article Category"
+              className="rounded-lg bg-primary px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary-foreground outline-none"
+            >
+              {NEWS_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              <option value="CUSTOM">Custom…</option>
+            </select>
+            {!NEWS_CATEGORIES.includes(category) && (
+              <input
+                type="text"
+                placeholder="Category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value.toUpperCase())}
+                className="w-32 rounded-lg border border-input bg-secondary/40 px-2.5 py-1 text-xs font-bold uppercase text-foreground outline-none focus:border-primary"
+              />
+            )}
+
+            <input
+              type="text"
+              value={authorName}
+              onChange={(e) => setAuthorName(e.target.value)}
+              placeholder="Author"
+              aria-label="Author name"
+              className="w-40 rounded-lg border border-border bg-secondary/35 px-2.5 py-1 text-xs font-medium text-foreground outline-none focus:border-primary"
+            />
+
+            <label className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={readingMinutes}
+                onChange={(e) => setReadingMinutes(Number(e.target.value) || 3)}
+                className="w-14 rounded-lg border border-border bg-secondary/35 px-2 py-1 text-center text-xs font-semibold text-foreground outline-none focus:border-primary"
+              />
+              <span>min read</span>
+            </label>
+          </div>
+
+          {/* Inline Article Headline Input */}
+          <input
+            required
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Write article headline..."
+            className="w-full border-none bg-transparent font-display text-2xl font-extrabold tracking-tight text-foreground placeholder:text-muted-foreground/50 focus:outline-none sm:text-3xl"
+          />
+
+          {/* Summary Lead */}
           <textarea
             required
             rows={2}
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
-            placeholder="Concise summary displayed on Feed carousel and Newsroom cards…"
-            className="w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            placeholder="Concise summary displayed in Newsroom & feed cards…"
+            className="w-full rounded-xl border border-border/80 bg-secondary/30 px-3.5 py-2.5 text-sm leading-relaxed text-foreground/90 outline-none focus:border-primary"
           />
-        </div>
 
-        <div>
-          <label className="mb-1 block font-mono text-xs font-semibold uppercase text-muted-foreground">
-            Article Body (WYSIWYG — Bold, Italic, Underline, Quote &amp; Captioned Images) *
-          </label>
+          {/* Live Inline WYSIWYG Canvas matching .revv-rich-html */}
           <RichTextEditor
             value={content}
             onChange={setContent}
-            placeholder="Compose rich article body. Click Embed Image to upload compressed photos with 'Image : caption'…"
+            placeholder="Write formatted article content directly as it will appear in /news..."
           />
-        </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-border/60 bg-secondary/30 p-3.5">
-            <span className="text-sm font-semibold text-foreground">Feature as Highlight</span>
-            <input
-              type="checkbox"
-              checked={isHighlight}
-              onChange={(e) => setIsHighlight(e.target.checked)}
-              className="size-5 accent-primary"
-            />
-          </label>
+          <div className="grid gap-3 pt-2 sm:grid-cols-2">
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-border bg-secondary/30 p-3.5">
+              <span className="text-sm font-semibold text-foreground">Feature as Highlight</span>
+              <input
+                type="checkbox"
+                checked={isHighlight}
+                onChange={(e) => setIsHighlight(e.target.checked)}
+                className="size-5 accent-primary"
+              />
+            </label>
 
-          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-primary/40 bg-primary/10 p-3.5">
-            <div className="flex items-center gap-2">
-              <Megaphone className="size-4 shrink-0 text-primary" />
-              <div>
-                <span className="block text-sm font-bold text-foreground">
-                  High Importance Push
-                </span>
-                <span className="block text-xs text-muted-foreground">
-                  Send mobile push notification to active riders
-                </span>
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-primary/40 bg-primary/10 p-3.5">
+              <div className="flex items-center gap-2">
+                <Megaphone className="size-4 shrink-0 text-primary" />
+                <div>
+                  <span className="block text-sm font-bold text-foreground">
+                    High Importance Push
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    Send push notification to active riders
+                  </span>
+                </div>
               </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={highImportance}
-              onChange={(e) => setHighImportance(e.target.checked)}
-              className="size-5 accent-primary"
-            />
-          </label>
-        </div>
+              <input
+                type="checkbox"
+                checked={highImportance}
+                onChange={(e) => setHighImportance(e.target.checked)}
+                className="size-5 accent-primary"
+              />
+            </label>
+          </div>
 
-        <div className="flex justify-end">
-          <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-            {editingId ? "Update Dispatch" : "Publish Dispatch"}
-          </button>
+          <div className="flex justify-end">
+            <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50">
+              {saving ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+              {editingId ? "Update Dispatch" : "Publish Dispatch"}
+            </button>
+          </div>
         </div>
       </form>
 

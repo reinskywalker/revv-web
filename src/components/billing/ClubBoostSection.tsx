@@ -7,9 +7,9 @@ interface ClubBoostSectionProps {
   levels: ClubBoostLevelInfo[];
   quantity: number;
   onQuantityChange: (qty: number) => void;
-  itemOnlyEligible?: boolean;
-  itemAddonMonthly?: PlanPriceOption | null;
-  itemAddonYearly?: PlanPriceOption | null;
+  itemOnlyEligible?: boolean | undefined;
+  itemAddonMonthly?: PlanPriceOption | null | undefined;
+  itemAddonYearly?: PlanPriceOption | null | undefined;
   busyAction: string | null;
   onBoost: (option: PlanPriceOption) => void;
 }

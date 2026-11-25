@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, MessageSquare, Pencil, Plus, RefreshCw, Send, Trash2, Wrench } from "lucide-react";
+import {
+  AlertTriangle,
+  MessageSquare,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Send,
+  Trash2,
+  Wrench,
+} from "lucide-react";
 import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
 import { ModalShell } from "@/components/revv/ModalShell";
 import {
@@ -48,6 +57,7 @@ export function GarageMaintenancePanel({
   const [deleteTarget, setDeleteTarget] = useState<
     | { kind: "component"; id: string; label: string }
     | { kind: "log"; id: string; label: string }
+    | { kind: "comment"; id: string; label: string }
     | null
   >(null);
 
@@ -192,7 +202,11 @@ export function GarageMaintenancePanel({
     }
   }
 
-  async function openComments(itemType: "component" | "service_log", itemId: string, title: string) {
+  async function openComments(
+    itemType: "component" | "service_log",
+    itemId: string,
+    title: string,
+  ) {
     setCommentTarget({ itemType, itemId, title });
     setCommentInput("");
     try {
@@ -209,12 +223,18 @@ export function GarageMaintenancePanel({
     try {
       if (deleteTarget.kind === "component") {
         await deleteGarageComponent(garageId, deleteTarget.id);
+        onNotice("Record removed.");
+        await loadData();
+      } else if (deleteTarget.kind === "comment") {
+        await deleteGarageItemComment(garageId, deleteTarget.id);
+        setItemComments((prev) => prev.filter((x) => x.id !== deleteTarget.id));
+        onNotice("Comment deleted.");
       } else {
         await deleteMaintenanceLog(garageId, deleteTarget.id);
+        onNotice("Record removed.");
+        await loadData();
       }
       setDeleteTarget(null);
-      onNotice("Record removed.");
-      await loadData();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to delete record.");
     } finally {
@@ -468,7 +488,9 @@ export function GarageMaintenancePanel({
                     {typeof comp.interval_km === "number"
                       ? ` · Every ${comp.interval_km.toLocaleString("id-ID")} km`
                       : ""}
-                    {typeof comp.interval_months === "number" ? ` / ${comp.interval_months} mo` : ""}
+                    {typeof comp.interval_months === "number"
+                      ? ` / ${comp.interval_months} mo`
+                      : ""}
                   </p>
                 </div>
                 <div
@@ -490,8 +512,12 @@ export function GarageMaintenancePanel({
                       setEditingComp(comp);
                       setEditCompBrand(comp.brand_or_spec || "");
                       setEditCompReplacedKm(formatThousandsDot(comp.last_replaced_mileage));
-                      setEditCompIntervalKm(comp.interval_km ? formatThousandsDot(comp.interval_km) : "");
-                      setEditCompIntervalMonths(comp.interval_months ? String(comp.interval_months) : "");
+                      setEditCompIntervalKm(
+                        comp.interval_km ? formatThousandsDot(comp.interval_km) : "",
+                      );
+                      setEditCompIntervalMonths(
+                        comp.interval_months ? String(comp.interval_months) : "",
+                      );
                       setEditCompReminder(comp.is_reminder_enabled);
                     }}
                     aria-label={`Edit ${comp.name}`}
@@ -535,13 +561,19 @@ export function GarageMaintenancePanel({
                   {log.part_name_or_brand ? ` — ${log.part_name_or_brand}` : ""}
                 </div>
                 <div className="text-[11px] font-mono text-muted-foreground">
-                  {log.service_date.slice(0, 10)} · {log.mileage_at_service.toLocaleString("id-ID")} km
-                  {log.custom_interval_km ? ` · Every ${log.custom_interval_km.toLocaleString("id-ID")} km` : ""}
+                  {log.service_date.slice(0, 10)} · {log.mileage_at_service.toLocaleString("id-ID")}{" "}
+                  km
+                  {log.custom_interval_km
+                    ? ` · Every ${log.custom_interval_km.toLocaleString("id-ID")} km`
+                    : ""}
                   {log.workshop_name ? ` · ${log.workshop_name}` : ""}
                 </div>
                 {log.notes && <p className="text-[11px] text-muted-foreground">{log.notes}</p>}
               </div>
-              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+              <div
+                className="flex items-center gap-1 shrink-0"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <button
                   type="button"
                   onClick={() => void openComments("service_log", log.id, log.service_type)}
@@ -557,8 +589,12 @@ export function GarageMaintenancePanel({
                     setEditLogType(log.service_type);
                     setEditLogPart(log.part_name_or_brand || "");
                     setEditLogKm(formatThousandsDot(log.mileage_at_service));
-                    setEditLogIntervalKm(log.custom_interval_km ? formatThousandsDot(log.custom_interval_km) : "");
-                    setEditLogIntervalMonths(log.custom_interval_months ? String(log.custom_interval_months) : "");
+                    setEditLogIntervalKm(
+                      log.custom_interval_km ? formatThousandsDot(log.custom_interval_km) : "",
+                    );
+                    setEditLogIntervalMonths(
+                      log.custom_interval_months ? String(log.custom_interval_months) : "",
+                    );
                     setEditLogCost(log.cost || "");
                     setEditLogWorkshop(log.workshop_name || "");
                     setEditLogNotes(log.notes || "");
@@ -589,41 +625,78 @@ export function GarageMaintenancePanel({
         <ModalShell
           open
           onClose={() => setEditingComp(null)}
-          title={<h4 className="font-display text-sm font-bold uppercase">Edit {editingComp.name}</h4>}
+          title={
+            <h4 className="font-display text-sm font-bold uppercase">Edit {editingComp.name}</h4>
+          }
           maxWidthClass="max-w-md"
           panelClassName="p-5 space-y-3"
         >
-            <input value={editCompBrand} onChange={(e) => setEditCompBrand(e.target.value)} placeholder="Brand / spec" className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs" />
-            <input value={editCompReplacedKm} onChange={(e) => setEditCompReplacedKm(formatThousandsDot(e.target.value))} placeholder="Last replaced mileage (km)" className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs" />
-            <div className="grid grid-cols-2 gap-2">
-              <input value={editCompIntervalKm} onChange={(e) => setEditCompIntervalKm(formatThousandsDot(e.target.value))} placeholder="Every km (e.g. 3.000)" className="rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs" />
-              <input type="number" value={editCompIntervalMonths} onChange={(e) => setEditCompIntervalMonths(e.target.value)} placeholder="Every months" className="rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs" />
-            </div>
-            <label className="flex items-center gap-2 text-xs">
-              <input type="checkbox" checked={editCompReminder} onChange={(e) => setEditCompReminder(e.target.checked)} />
-              <span>Enable Push Reminder (FCM)</span>
-            </label>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setEditingComp(null)} className="rounded-lg border border-border px-3 py-1.5 text-xs">Cancel</button>
-              <button
-                type="button"
-                onClick={async () => {
-                  await updateGarageComponent(garageId, editingComp.id, {
-                    brand_or_spec: editCompBrand.trim(),
-                    last_replaced_mileage: parseThousandsDot(editCompReplacedKm),
-                    ...(editCompIntervalKm ? { custom_interval_km: parseThousandsDot(editCompIntervalKm) } : {}),
-                    ...(editCompIntervalMonths ? { custom_interval_months: Number(editCompIntervalMonths) } : {}),
-                    is_reminder_enabled: editCompReminder,
-                  });
-                  setEditingComp(null);
-                  onNotice("Component interval updated.");
-                  await loadData();
-                }}
-                className="btn-primary px-4 py-1.5 text-xs"
-              >
-                Save
-              </button>
-            </div>
+          <input
+            value={editCompBrand}
+            onChange={(e) => setEditCompBrand(e.target.value)}
+            placeholder="Brand / spec"
+            className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs"
+          />
+          <input
+            value={editCompReplacedKm}
+            onChange={(e) => setEditCompReplacedKm(formatThousandsDot(e.target.value))}
+            placeholder="Last replaced mileage (km)"
+            className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              value={editCompIntervalKm}
+              onChange={(e) => setEditCompIntervalKm(formatThousandsDot(e.target.value))}
+              placeholder="Every km (e.g. 3.000)"
+              className="rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs"
+            />
+            <input
+              type="number"
+              value={editCompIntervalMonths}
+              onChange={(e) => setEditCompIntervalMonths(e.target.value)}
+              placeholder="Every months"
+              className="rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={editCompReminder}
+              onChange={(e) => setEditCompReminder(e.target.checked)}
+            />
+            <span>Enable Push Reminder (FCM)</span>
+          </label>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setEditingComp(null)}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await updateGarageComponent(garageId, editingComp.id, {
+                  brand_or_spec: editCompBrand.trim(),
+                  last_replaced_mileage: parseThousandsDot(editCompReplacedKm),
+                  ...(editCompIntervalKm
+                    ? { custom_interval_km: parseThousandsDot(editCompIntervalKm) }
+                    : {}),
+                  ...(editCompIntervalMonths
+                    ? { custom_interval_months: Number(editCompIntervalMonths) }
+                    : {}),
+                  is_reminder_enabled: editCompReminder,
+                });
+                setEditingComp(null);
+                onNotice("Component interval updated.");
+                await loadData();
+              }}
+              className="btn-primary px-4 py-1.5 text-xs"
+            >
+              Save
+            </button>
+          </div>
         </ModalShell>
       )}
 
@@ -636,42 +709,94 @@ export function GarageMaintenancePanel({
           maxWidthClass="max-w-md"
           panelClassName="p-5 space-y-3"
         >
-            <input value={editLogType} onChange={(e) => setEditLogType(e.target.value)} placeholder="Service type" className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs" />
-            <input value={editLogPart} onChange={(e) => setEditLogPart(e.target.value)} placeholder="Parts / oil brand" className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs" />
-            <div className="grid grid-cols-3 gap-2">
-              <input value={editLogKm} onChange={(e) => setEditLogKm(formatThousandsDot(e.target.value))} placeholder="Odometer" className="rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs" />
-              <input value={editLogIntervalKm} onChange={(e) => setEditLogIntervalKm(formatThousandsDot(e.target.value))} placeholder="Every km" className="rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs" />
-              <input type="number" value={editLogIntervalMonths} onChange={(e) => setEditLogIntervalMonths(e.target.value)} placeholder="Months" className="rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs" />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <input value={editLogCost} onChange={(e) => setEditLogCost(e.target.value)} placeholder="Cost" className="rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs" />
-              <input value={editLogWorkshop} onChange={(e) => setEditLogWorkshop(e.target.value)} placeholder="Workshop" className="rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs" />
-            </div>
-            <textarea rows={2} value={editLogNotes} onChange={(e) => setEditLogNotes(e.target.value)} placeholder="Notes" className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs" />
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setEditingLog(null)} className="rounded-lg border border-border px-3 py-1.5 text-xs">Cancel</button>
-              <button
-                type="button"
-                onClick={async () => {
-                  await updateMaintenanceLog(garageId, editingLog.id, {
-                    service_type: editLogType.trim(),
-                    part_name_or_brand: editLogPart.trim(),
-                    mileage_at_service: parseThousandsDot(editLogKm),
-                    ...(editLogIntervalKm ? { custom_interval_km: parseThousandsDot(editLogIntervalKm) } : {}),
-                    ...(editLogIntervalMonths ? { custom_interval_months: Number(editLogIntervalMonths) } : {}),
-                    cost: editLogCost.trim() || "0",
-                    workshop_name: editLogWorkshop.trim(),
-                    notes: editLogNotes.trim(),
-                  });
-                  setEditingLog(null);
-                  onNotice("Service log updated.");
-                  await loadData();
-                }}
-                className="btn-primary px-4 py-1.5 text-xs"
-              >
-                Save Log
-              </button>
-            </div>
+          <input
+            value={editLogType}
+            onChange={(e) => setEditLogType(e.target.value)}
+            placeholder="Service type"
+            className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs"
+          />
+          <input
+            value={editLogPart}
+            onChange={(e) => setEditLogPart(e.target.value)}
+            placeholder="Parts / oil brand"
+            className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs"
+          />
+          <div className="grid grid-cols-3 gap-2">
+            <input
+              value={editLogKm}
+              onChange={(e) => setEditLogKm(formatThousandsDot(e.target.value))}
+              placeholder="Odometer"
+              className="rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs"
+            />
+            <input
+              value={editLogIntervalKm}
+              onChange={(e) => setEditLogIntervalKm(formatThousandsDot(e.target.value))}
+              placeholder="Every km"
+              className="rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs"
+            />
+            <input
+              type="number"
+              value={editLogIntervalMonths}
+              onChange={(e) => setEditLogIntervalMonths(e.target.value)}
+              placeholder="Months"
+              className="rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              value={editLogCost}
+              onChange={(e) => setEditLogCost(e.target.value)}
+              placeholder="Cost"
+              className="rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs"
+            />
+            <input
+              value={editLogWorkshop}
+              onChange={(e) => setEditLogWorkshop(e.target.value)}
+              placeholder="Workshop"
+              className="rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs"
+            />
+          </div>
+          <textarea
+            rows={2}
+            value={editLogNotes}
+            onChange={(e) => setEditLogNotes(e.target.value)}
+            placeholder="Notes"
+            className="w-full rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs"
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setEditingLog(null)}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await updateMaintenanceLog(garageId, editingLog.id, {
+                  service_type: editLogType.trim(),
+                  part_name_or_brand: editLogPart.trim(),
+                  mileage_at_service: parseThousandsDot(editLogKm),
+                  ...(editLogIntervalKm
+                    ? { custom_interval_km: parseThousandsDot(editLogIntervalKm) }
+                    : {}),
+                  ...(editLogIntervalMonths
+                    ? { custom_interval_months: Number(editLogIntervalMonths) }
+                    : {}),
+                  cost: editLogCost.trim() || "0",
+                  workshop_name: editLogWorkshop.trim(),
+                  notes: editLogNotes.trim(),
+                });
+                setEditingLog(null);
+                onNotice("Service log updated.");
+                await loadData();
+              }}
+              className="btn-primary px-4 py-1.5 text-xs"
+            >
+              Save Log
+            </button>
+          </div>
         </ModalShell>
       )}
 
@@ -680,67 +805,84 @@ export function GarageMaintenancePanel({
         <ModalShell
           open
           onClose={() => setCommentTarget(null)}
-          title={<h4 className="font-display text-sm font-bold uppercase truncate">Comments · {commentTarget.title}</h4>}
+          title={
+            <h4 className="font-display text-sm font-bold uppercase truncate">
+              Comments · {commentTarget.title}
+            </h4>
+          }
           maxWidthClass="max-w-md"
           panelClassName="p-5 space-y-3"
         >
-            <div className="max-h-60 space-y-2 overflow-y-auto">
-              {itemComments.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-4 text-center">No comments yet.</p>
-              ) : (
-                itemComments.map((c) => (
-                  <div key={c.id} className="rounded-lg border border-border/60 bg-secondary/20 p-2.5 flex justify-between gap-2 text-xs">
-                    <div>
-                      <div className="font-semibold text-primary">@{c.author_username || c.author_name}</div>
-                      <div className="text-foreground mt-0.5">{c.comment}</div>
+          <div className="max-h-60 space-y-2 overflow-y-auto">
+            {itemComments.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">No comments yet.</p>
+            ) : (
+              itemComments.map((c) => (
+                <div
+                  key={c.id}
+                  className="rounded-lg border border-border/60 bg-secondary/20 p-2.5 flex justify-between gap-2 text-xs"
+                >
+                  <div>
+                    <div className="font-semibold text-primary">
+                      @{c.author_username || c.author_name}
                     </div>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await deleteGarageItemComment(garageId, c.id);
-                        setItemComments((prev) => prev.filter((x) => x.id !== c.id));
-                      }}
-                      className="text-muted-foreground hover:text-destructive shrink-0"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
+                    <div className="text-foreground mt-0.5">{c.comment}</div>
                   </div>
-                ))
-              )}
-            </div>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (!commentInput.trim()) return;
-                const created = await createGarageItemComment(
-                  garageId,
-                  commentTarget.itemType,
-                  commentTarget.itemId,
-                  commentInput.trim(),
-                );
-                setItemComments((prev) => [...prev, created]);
-                setCommentInput("");
-              }}
-              className="flex gap-2"
-            >
-              <input
-                value={commentInput}
-                onChange={(e) => setCommentInput(e.target.value)}
-                placeholder="Write a comment or mechanic note…"
-                className="flex-1 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs"
-              />
-              <button type="submit" className="btn-primary px-3 py-2 text-xs">
-                <Send className="size-3.5" />
-              </button>
-            </form>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDeleteTarget({
+                        kind: "comment",
+                        id: c.id,
+                        label: `comment by @${c.author_username || c.author_name}`,
+                      })
+                    }
+                    className="text-muted-foreground hover:text-destructive shrink-0"
+                    title="Delete comment"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!commentInput.trim()) return;
+              const created = await createGarageItemComment(
+                garageId,
+                commentTarget.itemType,
+                commentTarget.itemId,
+                commentInput.trim(),
+              );
+              setItemComments((prev) => [...prev, created]);
+              setCommentInput("");
+            }}
+            className="flex gap-2"
+          >
+            <input
+              value={commentInput}
+              onChange={(e) => setCommentInput(e.target.value)}
+              placeholder="Write a comment or mechanic note…"
+              className="flex-1 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs"
+            />
+            <button type="submit" className="btn-primary px-3 py-2 text-xs">
+              <Send className="size-3.5" />
+            </button>
+          </form>
         </ModalShell>
       )}
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
-        title="Remove Maintenance Record"
-        message={`Remove "${deleteTarget?.label ?? "this record"}" from this bike's maintenance log?`}
-        confirmLabel="Remove"
+        title={deleteTarget?.kind === "comment" ? "Delete Comment" : "Remove Maintenance Record"}
+        message={
+          deleteTarget?.kind === "comment"
+            ? `Permanently delete ${deleteTarget.label}?`
+            : `Remove "${deleteTarget?.label ?? "this record"}" from this bike's maintenance log?`
+        }
+        confirmLabel={deleteTarget?.kind === "comment" ? "Delete" : "Remove"}
         destructive
         busy={busy}
         onCancel={() => setDeleteTarget(null)}
