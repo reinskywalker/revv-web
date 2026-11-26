@@ -1042,6 +1042,18 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
               {/* EVENTS TAB */}
               {activeTab === "events" && (
                 <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/70 px-4 py-2.5">
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      Club Ride Events &amp; Trip Plans
+                    </span>
+                    <Link
+                      to="/trip-planner"
+                      search={{ club: communityId, tab: "review" }}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-primary/35 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/20"
+                    >
+                      All Events &amp; Queue
+                    </Link>
+                  </div>
                   {(detail?.events ?? []).length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
                       No events scheduled for this club yet.

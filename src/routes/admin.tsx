@@ -162,11 +162,11 @@ function AdminPage() {
 
   // Sync tab with URL search params (?tab=...&sub=...)
   useEffect(() => {
+    const t = searchObj["tab"];
     if (isModerator && !isSuperuser) {
-      setActiveSubTab("news");
+      setActiveSubTab(t === "overview" ? "overview" : "news");
       return;
     }
-    const t = searchObj["tab"];
     if (
       t === "overview" ||
       t === "users" ||
@@ -245,7 +245,13 @@ function AdminPage() {
     try {
       setLoading(true);
       if (isModerator && !isSuperuser) {
-        const newsRes = await fetchAdminNewsArticles().catch(() => []);
+        const [statsRes, analyticsRes, newsRes] = await Promise.all([
+          fetchAdminDashboard().catch(() => null),
+          fetchAdminAnalytics().catch(() => null),
+          fetchAdminNewsArticles().catch(() => []),
+        ]);
+        if (statsRes) setAdminStats(statsRes);
+        if (analyticsRes) setAnalyticsData(analyticsRes);
         setAdminNews(newsRes);
         return;
       }
@@ -415,7 +421,7 @@ function AdminPage() {
       ) : (
         <>
           {/* TAB 1: OVERVIEW & ANALYTICS */}
-          {isSuperuser && activeSubTab === "overview" && (
+          {(isSuperuser || isModerator) && activeSubTab === "overview" && (
             <AdminOverviewAnalyticsPanel adminStats={adminStats} analytics={analyticsData} />
           )}
 

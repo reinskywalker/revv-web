@@ -345,8 +345,7 @@ export function RevvAvatar({
   const hasFrame = Boolean(normFrame.length > 0);
   const outerSize = hasFrame ? Math.round(size * 1.18) : size;
   const initials = (name || "R").trim().charAt(0).toUpperCase() || "R";
-  const isVerified =
-    showVerifiedBadge ?? (Boolean(frameMeta?.is_verified_badge) || hasVerifiedFrame(frameCode));
+  void showVerifiedBadge;
 
   const frameStyle = useMemo(
     () => resolveFrameStyle(frameCode, frameMeta?.metadata),
@@ -356,8 +355,6 @@ export function RevvAvatar({
     () => isGrandPaidFrame(frameCode, frameMeta?.source_type),
     [frameCode, frameMeta?.source_type],
   );
-
-  const badgeSize = Math.max(14, Math.min(28, Math.round(size * 0.3)));
 
   return (
     <div
@@ -470,13 +467,6 @@ export function RevvAvatar({
       {hasFrame && !framePngUrl && lottieData && !reducedMotion && (
         <div className="pointer-events-none absolute -top-1 -left-1 z-20 size-4 opacity-90">
           <LazyLottie lottieRef={lottieRef} src={lottieData} loop autoplay />
-        </div>
-      )}
-
-      {/* Verified Blue Checkmark at TOP-RIGHT so bottom-right profile buttons never collide */}
-      {isVerified && (
-        <div className="absolute -top-1 -right-1 z-30 flex items-center justify-center rounded-full bg-card p-0.5 shadow-sm">
-          <VerifiedCheckBadge size={badgeSize} />
         </div>
       )}
     </div>

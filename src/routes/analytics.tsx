@@ -20,7 +20,7 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { formatDateTime as formatShortDate, formatRelativeTime } from "@/lib/date";
-import { cn, isAdminRole } from "@/lib/utils";
+import { canAccessAdmin, cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/analytics")({
   head: () => ({
@@ -41,7 +41,7 @@ type UserSortKey = "last_active" | "last_login" | "logins" | "distance" | "trips
 function AdminAnalyticsPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = isAdminRole(user?.role);
+  const isAdmin = canAccessAdmin(user?.role);
 
   const [data, setData] = useState<AdminAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);

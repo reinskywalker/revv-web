@@ -42,7 +42,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Wordmark } from "./wordmark";
-import { RevvAvatar } from "./RevvAvatar";
+import { RevvAvatar, VerifiedCheckBadge } from "./RevvAvatar";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
@@ -299,38 +299,97 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     )
       .trim()
       .replace(/^\/+/, "");
+    const tripPlanId = String(notif.payload?.["trip_plan_id"] || "").trim();
+    const communityId = String(notif.payload?.["community_id"] || "").trim();
+    const action = String(notif.payload?.["action"] || "").trim().toLowerCase();
+
     setDesktopNotifOpen(false);
     setMobileNotifOpen(false);
+
+    if (
+      tripPlanId ||
+      rawRoute.startsWith("trip-planner") ||
+      rawRoute.includes("events-queue")
+    ) {
+      const search: Record<string, string> = {};
+      if (action === "review" || rawRoute.includes("events-queue")) {
+        search["tab"] = "review";
+      }
+      if (communityId) search["club"] = communityId;
+      if (tripPlanId) search["plan"] = tripPlanId;
+      navigate({ to: "/trip-planner", search });
+      return;
+    }
     if (notif.notif_type === "direct_message" || rawRoute.startsWith("chat/")) {
       navigate({ to: "/messages" });
       return;
     }
-    if (rawRoute.startsWith("news/")) {
+    if (notif.notif_type === "news_highlight" || rawRoute.startsWith("news")) {
       navigate({ to: "/news" });
-    } else if (rawRoute.startsWith("communities/") || rawRoute.startsWith("clubs/")) {
-      const clubId = rawRoute
-        .replace(/^(communities|clubs)\//, "")
-        .split("/")[0]
-        ?.trim();
+      return;
+    }
+    if (
+      rawRoute.startsWith("communities/") ||
+      rawRoute.startsWith("clubs/") ||
+      communityId
+    ) {
+      const clubId =
+        communityId ||
+        rawRoute
+          .replace(/^(communities|clubs)\//, "")
+          .split("/")[0]
+          ?.trim();
       if (clubId) {
         navigate({ to: "/clubs/$id", params: { id: clubId } });
       } else {
         navigate({ to: "/clubs" });
       }
-    } else if (rawRoute.startsWith("communities") || rawRoute.startsWith("clubs")) {
+      return;
+    }
+    if (
+      rawRoute.startsWith("communities") ||
+      rawRoute.startsWith("clubs") ||
+      rawRoute.startsWith("events") ||
+      notif.notif_type === "club_event" ||
+      notif.notif_type === "club_thread" ||
+      notif.notif_type === "channel_mention" ||
+      notif.notif_type === "channel_message" ||
+      notif.notif_type === "community_notice"
+    ) {
       navigate({ to: "/clubs" });
-    } else if (rawRoute.startsWith("events")) {
-      navigate({ to: "/clubs" });
-    } else if (rawRoute.startsWith("profile/")) {
+      return;
+    }
+    if (
+      rawRoute === "garage" ||
+      notif.notif_type.startsWith("motorcycle_") ||
+      notif.notif_type === "garage_comment" ||
+      notif.notif_type === "service_reminder"
+    ) {
+      navigate({ to: "/garage" });
+      return;
+    }
+    if (
+      rawRoute === "feed" ||
+      rawRoute.startsWith("feed/") ||
+      notif.notif_type === "post_comment" ||
+      notif.notif_type === "post_mention" ||
+      notif.notif_type === "club_comment" ||
+      notif.notif_type === "club_post_mention"
+    ) {
+      navigate({ to: "/" });
+      return;
+    }
+    if (rawRoute.startsWith("profile/")) {
       const targetUser = rawRoute.replace(/^profile\//, "").trim();
       if (targetUser) {
         navigate({ to: "/id/$username", params: { username: targetUser } });
       }
-    } else if (rawRoute === "garage") {
-      navigate({ to: "/garage" });
-    } else if (rawRoute === "feed") {
-      navigate({ to: "/" });
-    } else if (notif.notif_type !== "admin_broadcast" && notif.actor_username) {
+      return;
+    }
+    if (
+      (notif.notif_type === "friend_request" || notif.notif_type === "friend_accept") &&
+      notif.actor_username
+    ) {
       navigate({ to: "/id/$username", params: { username: notif.actor_username } });
     }
   };
@@ -502,11 +561,31 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     : isModerator
       ? [
           {
+            id: "admin-overview",
+            label: "Overview & Analytics",
+            to: "/admin",
+            search: { tab: "overview" },
+            icon: LayoutDashboard,
+          },
+          {
             id: "admin-news",
             label: "Moderator News Desk",
             to: "/admin",
             search: { tab: "news" },
             icon: Newspaper,
+          },
+          {
+            id: "mod-event-queue",
+            label: "Submitted Events Queue",
+            to: "/trip-planner",
+            search: { tab: "review" },
+            icon: Compass,
+          },
+          {
+            id: "mod-analytics",
+            label: "Telemetry Analytics",
+            to: "/analytics",
+            icon: BarChart3,
           },
         ]
       : [];
@@ -829,6 +908,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
                 size={26}
               />
               <span className="max-w-[76px] truncate">@{user.username}</span>
+              {user.is_verified_profile && <VerifiedCheckBadge size={13} />}
             </Link>
           )}
         </div>
@@ -875,8 +955,9 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
                       size={36}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-display text-sm font-bold">
-                        {user.first_name || user.username}
+                      <div className="flex min-w-0 items-center gap-1 font-display text-sm font-bold">
+                        <span className="truncate">{user.first_name || user.username}</span>
+                        {user.is_verified_profile && <VerifiedCheckBadge size={14} />}
                       </div>
                       <div className="truncate text-xs text-muted-foreground">@{user.username}</div>
                     </div>
@@ -1077,12 +1158,15 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
                     size={38}
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-bold text-foreground transition-colors group-hover:text-primary">
-                      {user.first_name || user.username}
+                    <div className="flex min-w-0 items-center gap-1 text-sm font-bold text-foreground transition-colors group-hover:text-primary">
+                      <span className="truncate">{user.first_name || user.username}</span>
+                      {user.is_verified_profile && <VerifiedCheckBadge size={14} />}
                     </div>
-                    <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                      <span>@{user.username}</span>
-                      {isAdministrator && <ShieldCheck className="inline size-3.5 text-primary" />}
+                    <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                      <span className="truncate">@{user.username}</span>
+                      {isAdministrator && (
+                        <ShieldCheck className="inline size-3.5 shrink-0 text-primary" />
+                      )}
                     </div>
                   </div>
                 </Link>

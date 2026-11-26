@@ -401,7 +401,7 @@ function LeaderboardPage() {
                             <Link
                               to="/id/$username"
                               params={{ username: item.username }}
-                              className="flex items-center gap-3 group"
+                              className="flex min-w-0 items-center gap-3 group"
                             >
                               <RevvAvatar
                                 src={item.avatar_url}
@@ -543,7 +543,7 @@ function PodiumCard({
         </div>
         <span
           className={cn(
-            "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-mono text-xs font-black",
+            "inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 font-mono text-xs font-black",
             badgeColors,
           )}
         >

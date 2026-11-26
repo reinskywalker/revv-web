@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Crosshair, Flag, MapPin, Minus, Plus, Search } from "lucide-react";
 import { authRequest } from "@/lib/api";
+import { fetchRoadRouteGeometry, type RoadRouteCoordinate } from "@/lib/api-trip-plans";
 import { cn } from "@/lib/utils";
 
 export interface MapPoint {
@@ -24,9 +25,11 @@ interface TripMapPickerProps {
   meeting: MapPoint | null;
   destination: MapPoint | null;
   waypoints: MapPoint[];
-  onPickMeeting: (pt: MapPoint) => void;
-  onPickDestination: (pt: MapPoint) => void;
-  onAddWaypoint: (pt: MapPoint) => void;
+  onPickMeeting?: (pt: MapPoint) => void;
+  onPickDestination?: (pt: MapPoint) => void;
+  onAddWaypoint?: (pt: MapPoint) => void;
+  readOnly?: boolean;
+  height?: number;
 }
 
 const TILE_SIZE = 256;
@@ -45,10 +48,39 @@ function worldPxToLatLng(x: number, y: number, zoom: number): { lat: number; lng
   const lng = (x / scale) * 360 - 180;
   const n = Math.PI - (2 * Math.PI * y) / scale;
   const lat = (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
-  return {
-    lat: Number(lat.toFixed(6)),
-    lng: Number((((lng + 540) % 360) - 180).toFixed(6)),
-  };
+  return { lat, lng };
+}
+
+function fitViewportForPoints(
+  points: RoadRouteCoordinate[],
+  viewportW: number,
+  viewportH: number,
+): { center: { lat: number; lng: number }; zoom: number } {
+  if (points.length === 0) {
+    return { center: { lat: -6.2088, lng: 106.8456 }, zoom: 11 };
+  }
+  if (points.length === 1) {
+    return { center: { lat: points[0]!.lat, lng: points[0]!.lng }, zoom: 13 };
+  }
+  let minLat = points[0]!.lat;
+  let maxLat = points[0]!.lat;
+  let minLng = points[0]!.lng;
+  let maxLng = points[0]!.lng;
+  for (const p of points) {
+    if (p.lat < minLat) minLat = p.lat;
+    if (p.lat > maxLat) maxLat = p.lat;
+    if (p.lng < minLng) minLng = p.lng;
+    if (p.lng > maxLng) maxLng = p.lng;
+  }
+  const center = { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 };
+  for (let z = 15; z >= 5; z--) {
+    const nw = latLngToWorldPx(maxLat, minLng, z);
+    const se = latLngToWorldPx(minLat, maxLng, z);
+    if (Math.abs(se.x - nw.x) <= viewportW * 0.78 && Math.abs(se.y - nw.y) <= viewportH * 0.72) {
+      return { center, zoom: z };
+    }
+  }
+  return { center, zoom: 5 };
 }
 
 export function TripMapPicker({
@@ -58,99 +90,186 @@ export function TripMapPicker({
   onPickMeeting,
   onPickDestination,
   onAddWaypoint,
+  readOnly = false,
+  height = 290,
 }: TripMapPickerProps) {
-  const initialCenter = meeting ?? destination ?? { name: "Jakarta", lat: -6.2088, lng: 106.8456 };
-  const [center, setCenter] = useState<{ lat: number; lng: number }>({
-    lat: initialCenter.lat,
-    lng: initialCenter.lng,
-  });
-  const [zoom, setZoom] = useState(12);
-  const [target, setTarget] = useState<MapPickTarget>(meeting ? "destination" : "meeting");
-  const [query, setQuery] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [results, setResults] = useState<GeoSearchPlace[]>([]);
+  const allPins = useMemo<RoadRouteCoordinate[]>(() => {
+    const pts: RoadRouteCoordinate[] = [];
+    if (meeting) pts.push({ lat: meeting.lat, lng: meeting.lng });
+    for (const wp of waypoints) pts.push({ lat: wp.lat, lng: wp.lng });
+    if (destination) pts.push({ lat: destination.lat, lng: destination.lng });
+    return pts;
+  }, [destination, meeting, waypoints]);
 
-  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const initialFit = useMemo(() => fitViewportForPoints(allPins, 520, height), [allPins, height]);
+
+  const [center, setCenter] = useState<{ lat: number; lng: number }>(initialFit.center);
+  const [zoom, setZoom] = useState<number>(initialFit.zoom);
+  const [target, setTarget] = useState<MapPickTarget>("meeting");
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<GeoSearchPlace[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [roadCoords, setRoadCoords] = useState<RoadRouteCoordinate[]>([]);
+  const [loadingRoute, setLoadingRoute] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{
-    active: boolean;
     startX: number;
     startY: number;
-    startLat: number;
-    startLng: number;
+    startWorldX: number;
+    startWorldY: number;
     moved: boolean;
   } | null>(null);
 
-  const [viewportSize, setViewportSize] = useState({ w: 640, h: 300 });
-  const measuredRef = useCallback((node: HTMLDivElement | null) => {
-    viewportRef.current = node;
-    if (!node) return;
-    setViewportSize({ w: node.clientWidth || 640, h: node.clientHeight || 300 });
-  }, []);
+  const pinsSignature = useMemo(
+    () => allPins.map((p) => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`).join("|"),
+    [allPins],
+  );
+
+  // Auto-fit read-only thumbnails whenever route pins change.
+  useEffect(() => {
+    if (!readOnly) return;
+    const width = containerRef.current?.clientWidth || 520;
+    const fit = fitViewportForPoints(allPins, width, height);
+    setCenter(fit.center);
+    setZoom(fit.zoom);
+  }, [allPins, height, pinsSignature, readOnly]);
+
+  // Fetch actual road navigation polyline from /geo/route whenever 2+ pins exist.
+  useEffect(() => {
+    if (allPins.length < 2) {
+      setRoadCoords([]);
+      setLoadingRoute(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingRoute(true);
+    void fetchRoadRouteGeometry(allPins).then((coords) => {
+      if (!cancelled) {
+        setRoadCoords(coords);
+        setLoadingRoute(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [allPins, pinsSignature]);
+
+  const viewportW = containerRef.current?.clientWidth || 560;
+  const viewportH = height;
 
   const centerWorld = useMemo(
     () => latLngToWorldPx(center.lat, center.lng, zoom),
     [center.lat, center.lng, zoom],
   );
 
-  const visibleTiles = useMemo(() => {
+  const tiles = useMemo(() => {
     const maxTile = 2 ** zoom;
-    const minX = Math.floor((centerWorld.x - viewportSize.w / 2) / TILE_SIZE);
-    const maxX = Math.floor((centerWorld.x + viewportSize.w / 2) / TILE_SIZE);
-    const minY = Math.floor((centerWorld.y - viewportSize.h / 2) / TILE_SIZE);
-    const maxY = Math.floor((centerWorld.y + viewportSize.h / 2) / TILE_SIZE);
+    const leftPx = centerWorld.x - viewportW / 2;
+    const topPx = centerWorld.y - viewportH / 2;
+    const minTx = Math.floor(leftPx / TILE_SIZE);
+    const maxTx = Math.floor((leftPx + viewportW) / TILE_SIZE);
+    const minTy = Math.floor(topPx / TILE_SIZE);
+    const maxTy = Math.floor((topPx + viewportH) / TILE_SIZE);
 
-    const tiles: Array<{ key: string; url: string; left: number; top: number }> = [];
-    for (let ty = minY; ty <= maxY; ty++) {
-      if (ty < 0 || ty >= maxTile) continue;
-      for (let tx = minX; tx <= maxX; tx++) {
-        const wrappedX = ((tx % maxTile) + maxTile) % maxTile;
-        tiles.push({
+    const out: Array<{ key: string; url: string; left: number; top: number }> = [];
+    for (let tx = minTx; tx <= maxTx; tx++) {
+      for (let ty = minTy; ty <= maxTy; ty++) {
+        if (ty < 0 || ty >= maxTile) continue;
+        const wrappedTx = ((tx % maxTile) + maxTile) % maxTile;
+        out.push({
           key: `${zoom}-${tx}-${ty}`,
-          url: `https://tile.openstreetmap.org/${zoom}/${wrappedX}/${ty}.png`,
-          left: tx * TILE_SIZE - (centerWorld.x - viewportSize.w / 2),
-          top: ty * TILE_SIZE - (centerWorld.y - viewportSize.h / 2),
+          url: `https://tile.openstreetmap.org/${zoom}/${wrappedTx}/${ty}.png`,
+          left: tx * TILE_SIZE - leftPx,
+          top: ty * TILE_SIZE - topPx,
         });
       }
     }
-    return tiles;
-  }, [centerWorld.x, centerWorld.y, viewportSize.h, viewportSize.w, zoom]);
+    return out;
+  }, [centerWorld.x, centerWorld.y, viewportH, viewportW, zoom]);
 
   const toScreen = useCallback(
     (lat: number, lng: number) => {
-      const world = latLngToWorldPx(lat, lng, zoom);
+      const pt = latLngToWorldPx(lat, lng, zoom);
       return {
-        x: world.x - (centerWorld.x - viewportSize.w / 2),
-        y: world.y - (centerWorld.y - viewportSize.h / 2),
+        x: pt.x - centerWorld.x + viewportW / 2,
+        y: pt.y - centerWorld.y + viewportH / 2,
       };
     },
-    [centerWorld.x, centerWorld.y, viewportSize.h, viewportSize.w, zoom],
+    [centerWorld.x, centerWorld.y, viewportH, viewportW, zoom],
   );
 
-  const dispatchPickedPoint = useCallback(
+  const applyPick = useCallback(
     (pt: MapPoint) => {
-      if (target === "meeting") onPickMeeting(pt);
-      else if (target === "destination") onPickDestination(pt);
-      else onAddWaypoint(pt);
+      if (target === "meeting") onPickMeeting?.(pt);
+      else if (target === "destination") onPickDestination?.(pt);
+      else onAddWaypoint?.(pt);
     },
     [onAddWaypoint, onPickDestination, onPickMeeting, target],
   );
 
-  const reverseAndApply = useCallback(
+  const resolveAndPick = useCallback(
     async (lat: number, lng: number) => {
-      const fallback = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-      dispatchPickedPoint({ name: fallback, lat, lng });
+      setResolving(true);
+      let label = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
       try {
-        const place = await authRequest<GeoSearchPlace>(
-          `/geo/reverse?lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lng))}`,
+        const res = await authRequest<GeoSearchPlace>(
+          `/geo/reverse?lat=${encodeURIComponent(lat.toFixed(6))}&lon=${encodeURIComponent(lng.toFixed(6))}`,
         );
-        const label = place?.name?.trim() || place?.display_name?.split(",")[0]?.trim() || fallback;
-        dispatchPickedPoint({ name: label, lat, lng });
+        const candidate = (res?.name || res?.display_name || "").trim();
+        if (candidate) label = candidate.split(",").slice(0, 2).join(", ").trim();
       } catch {
-        // Keep coordinate fallback if reverse geocode is unavailable.
+        // Coordinate fallback stays readable if reverse geocode is unavailable.
+      } finally {
+        setResolving(false);
       }
+      applyPick({ name: label, lat, lng });
     },
-    [dispatchPickedPoint],
+    [applyPick],
   );
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (readOnly) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startWorldX: centerWorld.x,
+      startWorldY: centerWorld.y,
+      moved: false,
+    };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (readOnly || !dragRef.current) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+      dragRef.current.moved = true;
+    }
+    if (dragRef.current.moved) {
+      const next = worldPxToLatLng(
+        dragRef.current.startWorldX - dx,
+        dragRef.current.startWorldY - dy,
+        zoom,
+      );
+      setCenter(next);
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (readOnly) return;
+    const drag = dragRef.current;
+    dragRef.current = null;
+    if (!drag || drag.moved) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    const worldX = centerWorld.x + (clickX - rect.width / 2);
+    const worldY = centerWorld.y + (clickY - rect.height / 2);
+    const picked = worldPxToLatLng(worldX, worldY, zoom);
+    void resolveAndPick(picked.lat, picked.lng);
+  };
 
   const handleSearch = async () => {
     const clean = query.trim();
@@ -168,151 +287,147 @@ export function TripMapPicker({
     }
   };
 
-  const routeScreenPoints = useMemo(() => {
-    const pts: Array<{ x: number; y: number }> = [];
-    if (meeting) pts.push(toScreen(meeting.lat, meeting.lng));
-    for (const wp of waypoints) pts.push(toScreen(wp.lat, wp.lng));
-    if (destination) pts.push(toScreen(destination.lat, destination.lng));
-    return pts;
-  }, [destination, meeting, toScreen, waypoints]);
+  const polylineSource = roadCoords.length >= 2 ? roadCoords : allPins;
+  const routeScreenPoints = useMemo(
+    () => polylineSource.map((pt) => toScreen(pt.lat, pt.lng)),
+    [polylineSource, toScreen],
+  );
 
   return (
-    <div className="rounded-xl border border-border bg-background/70 p-3 space-y-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {(
-            [
-              ["meeting", "Pick Meeting Point", "bg-emerald-600 text-white"],
-              ["waypoint", "Add Stop Waypoint", "bg-amber-500 text-slate-950"],
-              ["destination", "Pick Destination", "bg-primary text-primary-foreground"],
-            ] as const
-          ).map(([mode, label, activeCls]) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setTarget(mode)}
-              className={cn(
-                "rounded-lg px-2.5 py-1 text-[11px] font-bold transition",
-                target === mode ? activeCls : "bg-secondary text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+    <div
+      className={cn(
+        "rounded-xl border border-border bg-background/70",
+        readOnly ? "overflow-hidden" : "space-y-3 p-3.5",
+      )}
+    >
+      {!readOnly && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {(
+                [
+                  ["meeting", "Pick Start Point", "bg-emerald-600 text-white"],
+                  ["waypoint", "Add Stop", "bg-amber-500 text-slate-950"],
+                  ["destination", "Pick Destination", "bg-primary text-primary-foreground"],
+                ] as const
+              ).map(([mode, label, activeCls]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setTarget(mode)}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-semibold transition",
+                    target === mode
+                      ? activeCls
+                      : "bg-secondary text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
 
-        <div className="flex items-center gap-1.5">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void handleSearch();
-              }
-            }}
-            placeholder="Search place or city..."
-            className="w-44 sm:w-56 rounded-lg border border-border bg-card px-2.5 py-1 text-xs text-foreground"
-          />
-          <button
-            type="button"
-            disabled={searching}
-            onClick={() => void handleSearch()}
-            className="inline-flex items-center gap-1 rounded-lg border border-border bg-secondary px-2.5 py-1 text-xs font-bold text-foreground"
-          >
-            <Search className="size-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {results.length > 0 && (
-        <div className="max-h-32 overflow-y-auto rounded-lg border border-border bg-card divide-y divide-border/50">
-          {results.slice(0, 6).map((item, idx) => {
-            const lat = item.latitude ?? Number(item.lat ?? 0);
-            const lng = item.longitude ?? Number(item.lon ?? 0);
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-            return (
-              <button
-                key={`${item.name}-${idx}`}
-                type="button"
-                onClick={() => {
-                  const pt = { name: item.name || item.display_name || "Pinned Location", lat, lng };
-                  setCenter({ lat, lng });
-                  setZoom((z) => Math.max(z, 13));
-                  dispatchPickedPoint(pt);
-                  setResults([]);
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleSearch();
+                  }
                 }}
-                className="w-full text-left px-3 py-1.5 text-xs hover:bg-secondary/60"
+                placeholder="Search place or city..."
+                className="w-48 rounded-lg border border-border bg-background px-3 py-1.5 text-xs sm:w-56"
+              />
+              <button
+                type="button"
+                onClick={() => void handleSearch()}
+                disabled={searching}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-semibold hover:bg-secondary/80"
               >
-                <span className="font-bold text-foreground">{item.name}</span>
-                {item.display_name && (
-                  <span className="ml-2 text-muted-foreground">{item.display_name}</span>
-                )}
+                <Search className="size-3.5" />
+                {searching ? "..." : "Find"}
               </button>
-            );
-          })}
-        </div>
+            </div>
+          </div>
+
+          {results.length > 0 && (
+            <div className="max-h-40 divide-y divide-border overflow-y-auto rounded-lg border border-border bg-card">
+              {results.slice(0, 6).map((item, idx) => {
+                const lat = Number(item.latitude ?? item.lat);
+                const lng = Number(item.longitude ?? item.lon);
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+                return (
+                  <button
+                    key={`${lat}-${lng}-${idx}`}
+                    type="button"
+                    onClick={() => {
+                      const label = (item.name || item.display_name || "Pinned Location")
+                        .split(",")
+                        .slice(0, 2)
+                        .join(", ")
+                        .trim();
+                      setCenter({ lat, lng });
+                      setZoom(14);
+                      applyPick({ name: label, lat, lng });
+                      setResults([]);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-secondary/60"
+                  >
+                    <MapPin className="size-3.5 shrink-0 text-primary" />
+                    <span className="truncate font-medium">
+                      {item.display_name || item.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
       <div
-        ref={measuredRef}
-        onPointerDown={(e) => {
-          dragRef.current = {
-            active: true,
-            startX: e.clientX,
-            startY: e.clientY,
-            startLat: center.lat,
-            startLng: center.lng,
-            moved: false,
-          };
-          e.currentTarget.setPointerCapture(e.pointerId);
-        }}
-        onPointerMove={(e) => {
-          const drag = dragRef.current;
-          if (!drag?.active) return;
-          const dx = e.clientX - drag.startX;
-          const dy = e.clientY - drag.startY;
-          if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
-            drag.moved = true;
-          }
-          const startWorld = latLngToWorldPx(drag.startLat, drag.startLng, zoom);
-          const next = worldPxToLatLng(startWorld.x - dx, startWorld.y - dy, zoom);
-          setCenter(next);
-        }}
-        onPointerUp={(e) => {
-          const drag = dragRef.current;
-          dragRef.current = null;
-          if (!drag || drag.moved || !viewportRef.current) return;
-          const rect = viewportRef.current.getBoundingClientRect();
-          const localX = e.clientX - rect.left;
-          const localY = e.clientY - rect.top;
-          const worldX = centerWorld.x - viewportSize.w / 2 + localX;
-          const worldY = centerWorld.y - viewportSize.h / 2 + localY;
-          const coords = worldPxToLatLng(worldX, worldY, zoom);
-          void reverseAndApply(coords.lat, coords.lng);
-        }}
-        className="relative h-[280px] w-full select-none overflow-hidden rounded-xl border border-border bg-slate-900 cursor-crosshair touch-none"
+        ref={containerRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        style={{ height }}
+        className={cn(
+          "relative w-full select-none overflow-hidden bg-slate-900",
+          !readOnly && "cursor-crosshair rounded-lg border border-border",
+        )}
       >
-        {visibleTiles.map((t) => (
+        {tiles.map((tile) => (
           <img
-            key={t.key}
-            src={t.url}
+            key={tile.key}
+            src={tile.url}
             alt=""
             draggable={false}
-            style={{ left: t.left, top: t.top, width: TILE_SIZE, height: TILE_SIZE }}
-            className="pointer-events-none absolute max-w-none"
+            style={{ left: tile.left, top: tile.top, width: TILE_SIZE, height: TILE_SIZE }}
+            className="pointer-events-none absolute max-w-none opacity-90"
           />
         ))}
 
         {routeScreenPoints.length >= 2 && (
-          <svg className="pointer-events-none absolute inset-0 size-full">
+          <svg className="pointer-events-none absolute inset-0 h-full w-full">
             <polyline
               fill="none"
-              stroke="#ef4444"
-              strokeWidth="3"
+              stroke="#0f172a"
+              strokeWidth="6"
               strokeLinecap="round"
               strokeLinejoin="round"
+              strokeOpacity="0.45"
+              points={routeScreenPoints.map((p) => `${p.x},${p.y}`).join(" ")}
+            />
+            <polyline
+              fill="none"
+              stroke="#f97316"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray={roadCoords.length >= 2 ? undefined : "6 4"}
               points={routeScreenPoints.map((p) => `${p.x},${p.y}`).join(" ")}
             />
           </svg>
@@ -321,53 +436,64 @@ export function TripMapPicker({
         {meeting && (
           <MapPinMarker
             pos={toScreen(meeting.lat, meeting.lng)}
-            colorClass="bg-emerald-500 text-white"
-            label={`Meet: ${meeting.name}`}
-            icon={<MapPin className="size-3.5" />}
+            color="bg-emerald-600"
+            label={`Start: ${meeting.name}`}
+            icon={<Crosshair className="size-3.5 text-white" />}
           />
         )}
-
         {waypoints.map((wp, idx) => (
           <MapPinMarker
-            key={`wp-${idx}`}
+            key={`${wp.lat}-${wp.lng}-${idx}`}
             pos={toScreen(wp.lat, wp.lng)}
-            colorClass="bg-amber-500 text-slate-950"
-            label={`${idx + 1}. ${wp.name}`}
-            icon={<span className="text-[10px] font-black">{idx + 1}</span>}
+            color="bg-amber-500 text-slate-950"
+            label={`Stop ${idx + 1}: ${wp.name}`}
+            icon={<span className="text-[11px] font-black">{idx + 1}</span>}
           />
         ))}
-
         {destination && (
           <MapPinMarker
             pos={toScreen(destination.lat, destination.lng)}
-            colorClass="bg-primary text-primary-foreground"
-            label={`Dest: ${destination.name}`}
-            icon={<Flag className="size-3.5" />}
+            color="bg-primary"
+            label={`End: ${destination.name}`}
+            icon={<Flag className="size-3.5 text-white" />}
           />
         )}
 
-        <div className="absolute right-2.5 top-2.5 flex flex-col gap-1 z-20">
-          <button
-            type="button"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => setZoom((z) => Math.min(18, z + 1))}
-            className="rounded-lg border border-border bg-card/90 p-1.5 text-foreground shadow"
-          >
-            <Plus className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => setZoom((z) => Math.max(5, z - 1))}
-            className="rounded-lg border border-border bg-card/90 p-1.5 text-foreground shadow"
-          >
-            <Minus className="size-3.5" />
-          </button>
-        </div>
+        {!readOnly && (
+          <div className="absolute right-2.5 top-2.5 z-10 flex flex-col gap-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setZoom((z) => Math.min(18, z + 1));
+              }}
+              className="rounded-md bg-card/90 p-1.5 text-foreground shadow hover:bg-card"
+              aria-label="Zoom in"
+            >
+              <Plus className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setZoom((z) => Math.max(5, z - 1));
+              }}
+              className="rounded-md bg-card/90 p-1.5 text-foreground shadow hover:bg-card"
+              aria-label="Zoom out"
+            >
+              <Minus className="size-3.5" />
+            </button>
+          </div>
+        )}
 
-        <div className="pointer-events-none absolute left-2.5 bottom-2.5 rounded-lg bg-black/75 px-2.5 py-1 text-[11px] font-medium text-white flex items-center gap-1.5">
-          <Crosshair className="size-3 text-emerald-400" />
-          Drag to pan · Click map to set {target} pin (z{zoom})
+        <div className="pointer-events-none absolute bottom-2 left-2 rounded-md bg-black/70 px-2.5 py-1 text-xs font-medium text-white">
+          {readOnly
+            ? loadingRoute
+              ? "Loading navigation route..."
+              : `${allPins.length} route pins`
+            : resolving
+              ? "Resolving address..."
+              : "Drag to pan • Click map to drop pin"}
         </div>
       </div>
     </div>
@@ -376,31 +502,29 @@ export function TripMapPicker({
 
 function MapPinMarker({
   pos,
-  colorClass,
+  color,
   label,
   icon,
 }: {
   pos: { x: number; y: number };
-  colorClass: string;
+  color: string;
   label: string;
   icon: React.ReactNode;
 }) {
   return (
     <div
       style={{ left: pos.x, top: pos.y }}
-      className="pointer-events-none absolute -translate-x-1/2 -translate-y-full z-10 flex flex-col items-center"
+      className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+      title={label}
     >
-      <span className="mb-1 whitespace-nowrap rounded bg-black/80 px-1.5 py-0.5 text-[10px] font-bold text-white shadow">
-        {label}
-      </span>
-      <span
+      <div
         className={cn(
-          "flex size-6 items-center justify-center rounded-full border-2 border-white shadow-md",
-          colorClass,
+          "flex size-7 items-center justify-center rounded-full border-2 border-white shadow-md",
+          color,
         )}
       >
         {icon}
-      </span>
+      </div>
     </div>
   );
 }

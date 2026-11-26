@@ -60,8 +60,58 @@ export interface TripPlanItem {
   checklist_sections: TripChecklistSection[];
 }
 
-export async function fetchTripPlans(): Promise<TripPlanItem[]> {
-  return authRequest<TripPlanItem[]>("/trip-plans");
+export async function fetchTripPlans(communityId?: string): Promise<TripPlanItem[]> {
+  const qs = communityId ? `?community_id=${encodeURIComponent(communityId)}` : "";
+  return authRequest<TripPlanItem[]>(`/trip-plans${qs}`);
+}
+
+export interface RoadRouteCoordinate {
+  lat: number;
+  lng: number;
+}
+
+const roadRouteCache = new Map<string, RoadRouteCoordinate[]>();
+
+export async function fetchRoadRouteGeometry(
+  points: RoadRouteCoordinate[],
+): Promise<RoadRouteCoordinate[]> {
+  if (points.length < 2) return points;
+  const key = points.map((p) => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`).join(";");
+  const cached = roadRouteCache.get(key);
+  if (cached) return cached;
+
+  const origin = points[0]!;
+  const dest = points[points.length - 1]!;
+  const waypoints = points.slice(1, -1).map((p) => ({ lat: p.lat, lon: p.lng }));
+
+  try {
+    const raw = await authRequest<{
+      routes?: Array<{ geometry?: { coordinates?: Array<[number, number]> } }>;
+    }>("/geo/route", {
+      method: "POST",
+      body: JSON.stringify({
+        origin_lat: origin.lat,
+        origin_lon: origin.lng,
+        dest_lat: dest.lat,
+        dest_lon: dest.lng,
+        waypoints: waypoints.length > 0 ? waypoints : undefined,
+      }),
+    });
+    const coords = raw?.routes?.[0]?.geometry?.coordinates;
+    if (Array.isArray(coords) && coords.length >= 2) {
+      const parsed = coords
+        .filter((pair) => Array.isArray(pair) && pair.length >= 2)
+        .map(([lon, lat]) => ({ lat: Number(lat), lng: Number(lon) }))
+        .filter((pt) => Number.isFinite(pt.lat) && Number.isFinite(pt.lng));
+      if (parsed.length >= 2) {
+        roadRouteCache.set(key, parsed);
+        return parsed;
+      }
+    }
+  } catch {
+    // Fallback to direct pin sequence if routing upstream is unreachable.
+  }
+  return points;
 }
 
 export async function createTripPlan(payload: {

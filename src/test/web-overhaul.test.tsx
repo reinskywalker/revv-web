@@ -93,7 +93,7 @@ describe("Web Overhaul: AppOpenBanner, ThemeProvider, RevvAvatar & Country Curre
     expect(window.localStorage.getItem("revv_web_theme")).toBe("light");
   });
 
-  it("renders squircle RevvAvatar, PNG frame rim, and top-right VerifiedCheckBadge", () => {
+  it("renders squircle RevvAvatar and PNG frame rim without overlaying VerifiedCheckBadge on the avatar", () => {
     const { container } = render(
       <RevvAvatar name="Reinsky" frameCode="verified_patron" size={64} showVerifiedBadge={true} />,
     );
@@ -104,8 +104,7 @@ describe("Web Overhaul: AppOpenBanner, ThemeProvider, RevvAvatar & Country Curre
     const frameImg = container.querySelector('img[src="/frames/frame_verified_patron.png"]');
     expect(frameImg).not.toBeNull();
 
-    const badgeImg = screen.getByAltText("Verified REVV Member");
-    expect(badgeImg.getAttribute("src")).toBe("/frames/badge_verified_blue.png");
+    expect(screen.queryByAltText("Verified REVV Member")).toBeNull();
   });
 
   it("sends Bearer token on cosmetics catalog fetch and purges localStorage keys on country invalidation", async () => {
