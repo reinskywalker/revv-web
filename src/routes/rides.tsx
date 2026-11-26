@@ -16,6 +16,7 @@ import {
   Users,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
+import { VerifiedCheckBadge } from "@/components/revv/RevvAvatar";
 import { SupportDeskPanel } from "@/components/rides/SupportDeskPanel";
 import {
   deleteMyTrip,
@@ -308,9 +309,17 @@ function RidesHubPage() {
                         <Link
                           to="/clubs/$id"
                           params={{ id: club.id }}
-                          className="font-display text-base font-bold text-foreground hover:text-primary transition-colors"
+                          className="inline-flex min-w-0 items-center gap-1.5 font-display text-base font-bold text-foreground hover:text-primary transition-colors"
                         >
-                          {club.name}
+                          <span className="truncate">{club.name}</span>
+                          {(club.is_verified_club ||
+                            club.is_official ||
+                            (club.boost_count ?? 0) >= 1) && <VerifiedCheckBadge size={14} />}
+                          {club.custom_tag && (
+                            <span className="shrink-0 rounded border border-primary/40 bg-primary/15 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">
+                              [{club.custom_tag}]
+                            </span>
+                          )}
                         </Link>
                         <span className="rounded-full border border-border px-2.5 py-0.5 text-xs font-medium capitalize text-muted-foreground">
                           {club.visibility}

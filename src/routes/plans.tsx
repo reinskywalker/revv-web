@@ -407,22 +407,54 @@ function PlansPage() {
                       </p>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      {billingCatalog.club_boost.levels.map((lvl) => (
-                        <div
-                          key={lvl.boost_level}
-                          className="rounded-xl border border-border bg-secondary/40 p-3.5"
-                        >
-                          <div className="font-display text-sm font-black text-foreground">
-                            {lvl.level_name}
+                      {billingCatalog.club_boost.levels.map((lvl) => {
+                        const chLabel =
+                          lvl.max_text_channels >= 999
+                            ? t("billing.unlimited")
+                            : String(lvl.max_text_channels);
+                        return (
+                          <div
+                            key={lvl.boost_level}
+                            className="rounded-xl border border-border bg-secondary/40 p-3.5 space-y-2"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="font-display text-sm font-black text-foreground">
+                                {lvl.level_name}
+                              </div>
+                              <span className="rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[10px] font-bold text-primary">
+                                {lvl.required_boosts === 0
+                                  ? t("billing.freeForever")
+                                  : `${lvl.required_boosts} Boost`}
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {t("billing.boostLevelMeta", {
+                                channels: chLabel,
+                                voice: lvl.max_voice_channels,
+                                seats: lvl.max_voice_participants,
+                                members: lvl.member_limit,
+                              })}
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {lvl.allow_private_channels && (
+                                <span className="rounded-md border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                                  {t("billing.boostPerkPrivateRoles")}
+                                </span>
+                              )}
+                              {lvl.allow_vanity_url && (
+                                <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-300">
+                                  {t("billing.boostPerkVanityFrame")}
+                                </span>
+                              )}
+                              {(lvl.is_featured_discover || lvl.has_gold_crest) && (
+                                <span className="rounded-md border border-yellow-500/40 bg-yellow-500/15 px-1.5 py-0.5 text-[10px] font-bold text-yellow-700 dark:text-yellow-300">
+                                  {t("billing.boostPerkFeaturedCrest")}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {t("billing.boostLevelMeta", {
-                              members: lvl.member_limit,
-                              voice: lvl.max_voice_channels,
-                            })}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </section>
                 )}

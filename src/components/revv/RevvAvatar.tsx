@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { LottieHandle } from "lottie-react";
 import { Sparkles } from "lucide-react";
 import { LazyLottie } from "@/components/revv/LazyLottie";
@@ -38,6 +38,57 @@ const VERIFIED_FRAME_CODES = new Set([
 export function hasVerifiedFrame(frameCode?: string | null): boolean {
   const norm = (frameCode ?? "").trim().toLowerCase();
   return VERIFIED_FRAME_CODES.has(norm);
+}
+
+const CLUB_FLAME_STYLE_MAP: Record<string, { background: string; boxShadow: string }> = {
+  club_inferno_flame: {
+    background: "conic-gradient(from 0deg, #ff3b00, #ff9500, #ffd000, #ff1e00, #ff3b00)",
+    boxShadow: "0 0 22px rgba(255, 87, 34, 0.72), 0 0 8px rgba(255, 208, 0, 0.55)",
+  },
+  club_solar_blaze: {
+    background: "conic-gradient(from 45deg, #f59e0b, #fde047, #ffffff, #ea580c, #f59e0b)",
+    boxShadow: "0 0 22px rgba(250, 204, 21, 0.75), 0 0 10px rgba(249, 115, 22, 0.55)",
+  },
+  club_plasma_fire: {
+    background: "conic-gradient(from 90deg, #ec4899, #8b5cf6, #06b6d4, #f43f5e, #ec4899)",
+    boxShadow: "0 0 22px rgba(236, 72, 153, 0.7), 0 0 10px rgba(139, 92, 246, 0.6)",
+  },
+};
+
+export function resolveClubFlameRingStyle(frameCode?: string | null): CSSProperties | undefined {
+  const key = (frameCode ?? "").trim().toLowerCase();
+  const entry = CLUB_FLAME_STYLE_MAP[key];
+  if (!entry) return undefined;
+  return {
+    background: entry.background,
+    boxShadow: entry.boxShadow,
+  };
+}
+
+export function CustomRoleBadge({
+  label,
+  colorHex,
+}: {
+  label?: string | null | undefined;
+  colorHex?: string | null | undefined;
+}) {
+  const cleanLabel = (label ?? "").trim();
+  if (!cleanLabel) return null;
+  const validHex = /^#[0-9a-fA-F]{6}$/.test((colorHex ?? "").trim())
+    ? colorHex!.trim()
+    : "#f97316";
+  return (
+    <span
+      className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold tracking-tight"
+      style={{
+        borderColor: `${validHex}66`,
+        backgroundColor: `${validHex}1f`,
+        color: validHex,
+      }}
+    >
+      {cleanLabel}
+    </span>
+  );
 }
 
 const GRAND_PAID_FRAMES = new Set([

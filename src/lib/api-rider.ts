@@ -126,7 +126,14 @@ export interface CommunitySummary {
   country_code?: string | null;
   post_slow_mode_seconds?: number;
   boost_count?: number;
+  boost_level?: number;
   member_limit?: number;
+  slug?: string | null;
+  custom_tag?: string | null;
+  club_frame_code?: string | null;
+  is_verified_club?: boolean;
+  is_featured?: boolean;
+  has_gold_crest?: boolean;
 }
 
 export interface CommunityEventItem {
@@ -426,6 +433,10 @@ export interface CommunityMemberItem {
   equipped_frame_code?: string | null;
   is_verified_profile?: boolean;
   role: string;
+  custom_role_label?: string | null;
+  custom_role_color?: string | null;
+  primary_bike?: string | null;
+  primary_bike_name?: string | null;
   status: string;
   joined_at: string;
 }
@@ -455,6 +466,7 @@ export interface CommunityChatChannelItem {
   slow_mode_seconds?: number;
   max_voice_participants?: number;
   is_locked: boolean;
+  is_locked_by_downgrade?: boolean;
   last_message_preview?: string | null;
   last_message_sender?: string | null;
   last_message_at?: string | null;

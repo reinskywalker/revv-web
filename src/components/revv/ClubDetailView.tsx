@@ -25,7 +25,12 @@ import {
 import { AppOpenBanner } from "@/components/revv/AppOpenBanner";
 import { ClubEventPlannerModal } from "@/components/revv/ClubEventPlannerModal";
 import { ClubMembersPopupModal } from "@/components/revv/ClubMembersPopupModal";
-import { RevvAvatar, VerifiedCheckBadge } from "@/components/revv/RevvAvatar";
+import {
+  CustomRoleBadge,
+  RevvAvatar,
+  VerifiedCheckBadge,
+  resolveClubFlameRingStyle,
+} from "@/components/revv/RevvAvatar";
 import {
   fetchClubEventQueue,
   reviewClubEvent,
@@ -478,22 +483,37 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
             <div className="relative z-10 px-5 pb-6 sm:px-6">
               {/* Pull ONLY the avatar slightly onto the banner; identity & buttons sit cleanly on card body */}
               <div className="-mt-12 mb-4 flex items-end justify-between gap-4">
-                <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-4 border-card bg-secondary shadow-md">
-                  {community.avatar_url ? (
-                    <img
-                      src={resolveMediaUrl(community.avatar_url) || ""}
-                      alt={community.name}
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-primary">
-                      {community.name.slice(0, 2).toUpperCase()}
+                {(() => {
+                  const flameStyle = resolveClubFlameRingStyle(community.club_frame_code);
+                  return (
+                    <div
+                      className={cn(
+                        "h-24 w-24 shrink-0 rounded-2xl transition-all",
+                        flameStyle
+                          ? "p-[4px] animate-pulse"
+                          : "overflow-hidden border-4 border-card bg-secondary shadow-md",
+                      )}
+                      style={flameStyle}
+                    >
+                      <div className="h-full w-full overflow-hidden rounded-[12px] bg-secondary">
+                        {community.avatar_url ? (
+                          <img
+                            src={resolveMediaUrl(community.avatar_url) || ""}
+                            alt={community.name}
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-primary">
+                            {community.name.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
 
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -517,6 +537,17 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                         {community.country_code ? ` · ${community.country_code}` : ""}
                       </span>
                     )}
+                    {community.has_gold_crest && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-yellow-500/50 bg-yellow-500/15 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-yellow-700 dark:text-yellow-300">
+                        <Flame className="h-3.5 w-3.5 text-yellow-500" />
+                        Gold Crest
+                      </span>
+                    )}
+                    {community.custom_tag && (
+                      <span className="inline-flex items-center rounded-md border border-primary/40 bg-primary/15 px-2 py-0.5 font-mono text-xs font-extrabold tracking-wider text-primary">
+                        [{community.custom_tag}]
+                      </span>
+                    )}
                     {community.my_role && isApproved && (
                       <span className="inline-flex items-center gap-1 rounded-full border border-primary/35 bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">
                         <Shield className="h-3 w-3" />
@@ -524,9 +555,17 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                       </span>
                     )}
                   </div>
-                  <h1 className="mt-2 truncate text-2xl font-bold text-foreground sm:text-3xl">
-                    {community.name}
+                  <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold text-foreground sm:text-3xl">
+                    <span className="truncate">{community.name}</span>
+                    {(community.is_verified_club ||
+                      community.is_official ||
+                      (community.boost_count ?? 0) >= 1) && <VerifiedCheckBadge size={20} />}
                   </h1>
+                  {community.slug && (
+                    <p className="mt-0.5 font-mono text-xs text-primary/90">
+                      revv.app/clubs/{community.slug}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex shrink-0 flex-wrap items-center gap-2.5">
@@ -599,7 +638,7 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                 >
                   <Users className="h-3.5 w-3.5 text-primary" />
                   <span>
-                    {community.member_count} / {(community.member_limit ?? 30).toLocaleString()}{" "}
+                    {community.member_count} / {(community.member_limit ?? 500).toLocaleString()}{" "}
                     members
                   </span>
                 </button>
@@ -960,11 +999,13 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                                 <Hash className="h-4 w-4 shrink-0 text-muted-foreground" />
                               )}
                               <span className="truncate">{ch.name}</span>
-                              {(ch.slow_mode_seconds ?? 0) > 0 && (
+                              {ch.is_locked_by_downgrade ? (
+                                <Lock className="ml-auto h-3.5 w-3.5 shrink-0 text-amber-500" />
+                              ) : (ch.slow_mode_seconds ?? 0) > 0 ? (
                                 <span className="ml-auto rounded bg-warning/15 px-1.5 py-0.5 font-mono text-[10px] text-warning">
                                   {ch.slow_mode_seconds}s
                                 </span>
-                              )}
+                              ) : null}
                             </button>
                           ))}
                         </div>
@@ -1042,26 +1083,36 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                           )}
                         </div>
 
-                        <form
-                          onSubmit={(e) => void handleSendChat(e)}
-                          className="flex gap-2 border-t border-border p-4"
-                        >
-                          <input
-                            type="text"
-                            value={chatInput}
-                            onChange={(e) => setChatInput(e.target.value)}
-                            placeholder={`Message #${selectedChannel.name}...`}
-                            className="flex-1 rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm text-foreground outline-none focus:border-primary"
-                          />
-                          <button
-                            type="submit"
-                            disabled={sendingChat || !chatInput.trim()}
-                            className="inline-flex min-h-[42px] items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                        {selectedChannel.is_locked_by_downgrade ? (
+                          <div className="flex items-center gap-2 border-t border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs font-medium text-amber-700 dark:text-amber-300">
+                            <Lock className="h-4 w-4 shrink-0" />
+                            <span>
+                              This channel is locked because the club boost tier expired. Re-boost
+                              the club in REVV Mobile to unlock posting while keeping history safe.
+                            </span>
+                          </div>
+                        ) : (
+                          <form
+                            onSubmit={(e) => void handleSendChat(e)}
+                            className="flex gap-2 border-t border-border p-4"
                           >
-                            <Send className="h-4 w-4" />
-                            Send
-                          </button>
-                        </form>
+                            <input
+                              type="text"
+                              value={chatInput}
+                              onChange={(e) => setChatInput(e.target.value)}
+                              placeholder={`Message #${selectedChannel.name}...`}
+                              className="flex-1 rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm text-foreground outline-none focus:border-primary"
+                            />
+                            <button
+                              type="submit"
+                              disabled={sendingChat || !chatInput.trim()}
+                              className="inline-flex min-h-[42px] items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                            >
+                              <Send className="h-4 w-4" />
+                              Send
+                            </button>
+                          </form>
+                        )}
                       </>
                     ) : (
                       <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
@@ -1509,11 +1560,22 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                             <span className="truncate">{m.display_name}</span>
                             {m.is_verified_profile && <VerifiedCheckBadge size={14} />}
                           </p>
-                          <p className="truncate text-xs text-muted-foreground">@{m.username}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            @{m.username}
+                            {(m.primary_bike || m.primary_bike_name)
+                              ? ` · ${m.primary_bike || m.primary_bike_name}`
+                              : ""}
+                          </p>
                         </div>
-                        <span className="rounded-full border border-border bg-secondary px-2.5 py-0.5 text-xs font-medium text-foreground/85">
-                          {m.role}
-                        </span>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <span className="rounded-full border border-border bg-secondary px-2.5 py-0.5 text-xs font-medium text-foreground/85">
+                            {m.role}
+                          </span>
+                          <CustomRoleBadge
+                            label={m.custom_role_label}
+                            colorHex={m.custom_role_color}
+                          />
+                        </div>
                       </Link>
                     ))}
                 </div>

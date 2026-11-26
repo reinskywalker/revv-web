@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Flame, Shield, Users, X } from "lucide-react";
-import { RevvAvatar, VerifiedCheckBadge } from "@/components/revv/RevvAvatar";
+import { RevvAvatar, CustomRoleBadge, VerifiedCheckBadge } from "@/components/revv/RevvAvatar";
 import type { CommunityMemberItem, CommunitySummary } from "@/lib/api-rider";
 import { useI18n } from "@/lib/i18n";
 
@@ -23,7 +23,7 @@ export function ClubMembersPopupModal({
   const approvedMembers = members.filter((m) =>
     ["approved", "active"].includes((m.status || "").trim().toLowerCase()),
   );
-  const memberLimit = community.member_limit ?? 30;
+  const memberLimit = community.member_limit ?? 500;
   const count = community.member_count ?? approvedMembers.length;
   const pct = Math.min(100, Math.round((count / Math.max(1, memberLimit)) * 100));
   const nearCapacity = !community.is_official && pct >= 80;
@@ -125,12 +125,15 @@ export function ClubMembersPopupModal({
                     </div>
                   </div>
                 </div>
-                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary px-2.5 py-0.5 text-xs font-semibold">
-                  {["Founder", "Administrator"].includes(m.role) && (
-                    <Shield className="size-3 text-primary" />
-                  )}
-                  {m.role}
-                </span>
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                  <CustomRoleBadge label={m.custom_role_label} colorHex={m.custom_role_color} />
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary px-2.5 py-0.5 text-xs font-semibold">
+                    {["Founder", "Administrator"].includes(m.role) && (
+                      <Shield className="size-3 text-primary" />
+                    )}
+                    {m.role}
+                  </span>
+                </div>
               </Link>
             ))
           )}

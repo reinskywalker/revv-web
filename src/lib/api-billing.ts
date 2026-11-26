@@ -42,9 +42,16 @@ export interface ClubBoostLevelInfo {
   level_name: string;
   required_boosts: number;
   member_limit: number;
+  max_text_channels: number;
+  allow_private_channels: boolean;
   max_voice_channels: number;
   max_voice_participants: number;
   max_active_drafts: number;
+  allow_custom_roles: boolean;
+  allow_vanity_url: boolean;
+  allow_animated_frame: boolean;
+  is_featured_discover: boolean;
+  has_gold_crest: boolean;
 }
 
 export interface UserEntitlementsDto {
