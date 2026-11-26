@@ -68,6 +68,7 @@ export async function createClubEventWithPlanner(
     latitude?: number | null | undefined;
     longitude?: number | null | undefined;
     stops?: ClubEventStopInput[] | undefined;
+    route_polyline?: string | undefined;
     checklist_sections?: TripChecklistSection[] | undefined;
     save_as_draft?: boolean | undefined;
     submit_for_review?: boolean | undefined;

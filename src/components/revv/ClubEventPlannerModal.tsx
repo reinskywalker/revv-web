@@ -12,7 +12,11 @@ import {
   type ClubEventStopInput,
   createClubEventWithPlanner,
 } from "@/lib/api-club-events";
-import type { TripChecklistSection } from "@/lib/api-trip-plans";
+import {
+  encodeGooglePolyline5,
+  fetchRoadRouteGeometry,
+  type TripChecklistSection,
+} from "@/lib/api-trip-plans";
 import { type MapPoint, TripMapPicker } from "@/components/revv/TripMapPicker";
 
 const MAX_SECTIONS = 5;
@@ -42,7 +46,8 @@ export function ClubEventPlannerModal({
   const [startDate, setStartDate] = useState(() => {
     const dt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     dt.setMinutes(0, 0, 0);
-    return dt.toISOString().slice(0, 16);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
   });
   const [durationMinutes, setDurationMinutes] = useState(120);
   const [meetingPin, setMeetingPin] = useState<MapPoint | null>(null);
@@ -108,6 +113,17 @@ export function ClubEventPlannerModal({
     setSaving(true);
     setError(null);
     try {
+      const pinCoords = stops
+        .filter((s) => typeof s.latitude === "number" && typeof s.longitude === "number")
+        .map((s) => ({ lat: s.latitude!, lng: s.longitude! }));
+      let routePolyline: string | undefined;
+      if (pinCoords.length >= 2) {
+        const roadPts = await fetchRoadRouteGeometry(pinCoords);
+        if (roadPts.length >= 2) {
+          routePolyline = encodeGooglePolyline5(roadPts);
+        }
+      }
+
       const res = await createClubEventWithPlanner(communityId, {
         title: title.trim(),
         description: description.trim() || undefined,
@@ -117,6 +133,7 @@ export function ClubEventPlannerModal({
         latitude: meetingPin?.lat ?? destinationPin?.lat ?? null,
         longitude: meetingPin?.lng ?? destinationPin?.lng ?? null,
         stops: stops.length > 0 ? stops : undefined,
+        route_polyline: routePolyline,
         checklist_sections: sections.length > 0 ? sections : undefined,
         save_as_draft: saveAsDraft,
         submit_for_review: !saveAsDraft && !canPublishDirectly,

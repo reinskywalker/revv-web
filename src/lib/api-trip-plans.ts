@@ -1,4 +1,4 @@
-import { authRequest } from "@/lib/api";
+import { authRequest, authRequestRaw } from "@/lib/api";
 
 export interface TripPlanCollaborator {
   user_id: string;
@@ -72,6 +72,49 @@ export interface RoadRouteCoordinate {
 
 const roadRouteCache = new Map<string, RoadRouteCoordinate[]>();
 
+function parseOsrmGeometry(payload: unknown): RoadRouteCoordinate[] | null {
+  if (!payload || typeof payload !== "object") return null;
+  const obj = payload as Record<string, unknown>;
+  const nested = obj["data"] && typeof obj["data"] === "object" ? (obj["data"] as Record<string, unknown>) : null;
+  const routes = Array.isArray(obj["routes"])
+    ? obj["routes"]
+    : Array.isArray(nested?.["routes"])
+      ? nested["routes"]
+      : null;
+  if (!routes || routes.length === 0) return null;
+  const first = routes[0] as { geometry?: { coordinates?: Array<[number, number]> } };
+  const coords = first?.geometry?.coordinates;
+  if (!Array.isArray(coords) || coords.length < 2) return null;
+  const parsed = coords
+    .filter((pair) => Array.isArray(pair) && pair.length >= 2)
+    .map(([lon, lat]) => ({ lat: Number(lat), lng: Number(lon) }))
+    .filter((pt) => Number.isFinite(pt.lat) && Number.isFinite(pt.lng));
+  return parsed.length >= 2 ? parsed : null;
+}
+
+export function encodeGooglePolyline5(points: RoadRouteCoordinate[]): string {
+  let lastLat = 0;
+  let lastLng = 0;
+  let out = "";
+  const encodeSigned = (val: number) => {
+    let v = val < 0 ? ~(val << 1) : val << 1;
+    while (v >= 0x20) {
+      out += String.fromCharCode((0x20 | (v & 0x1f)) + 63);
+      v >>= 5;
+    }
+    out += String.fromCharCode(v + 63);
+  };
+  for (const pt of points) {
+    const lat = Math.round(pt.lat * 1e5);
+    const lng = Math.round(pt.lng * 1e5);
+    encodeSigned(lat - lastLat);
+    encodeSigned(lng - lastLng);
+    lastLat = lat;
+    lastLng = lng;
+  }
+  return out;
+}
+
 export async function fetchRoadRouteGeometry(
   points: RoadRouteCoordinate[],
 ): Promise<RoadRouteCoordinate[]> {
@@ -84,10 +127,9 @@ export async function fetchRoadRouteGeometry(
   const dest = points[points.length - 1]!;
   const waypoints = points.slice(1, -1).map((p) => ({ lat: p.lat, lon: p.lng }));
 
+  // 1. Primary: backend /geo/route returns raw OSRM JSON (not wrapped in { data }), so use authRequestRaw.
   try {
-    const raw = await authRequest<{
-      routes?: Array<{ geometry?: { coordinates?: Array<[number, number]> } }>;
-    }>("/geo/route", {
+    const raw = await authRequestRaw<unknown>("/geo/route", {
       method: "POST",
       body: JSON.stringify({
         origin_lat: origin.lat,
@@ -97,20 +139,34 @@ export async function fetchRoadRouteGeometry(
         waypoints: waypoints.length > 0 ? waypoints : undefined,
       }),
     });
-    const coords = raw?.routes?.[0]?.geometry?.coordinates;
-    if (Array.isArray(coords) && coords.length >= 2) {
-      const parsed = coords
-        .filter((pair) => Array.isArray(pair) && pair.length >= 2)
-        .map(([lon, lat]) => ({ lat: Number(lat), lng: Number(lon) }))
-        .filter((pt) => Number.isFinite(pt.lat) && Number.isFinite(pt.lng));
-      if (parsed.length >= 2) {
+    const degraded = (raw as unknown as Record<string, unknown>)?.["degraded"] === true;
+    const parsed = parseOsrmGeometry(raw);
+    if (parsed && (!degraded || parsed.length > points.length)) {
+      roadRouteCache.set(key, parsed);
+      return parsed;
+    }
+  } catch {
+    // Fall through to direct OSRM routing fallback.
+  }
+
+  // 2. Fallback: public OSRM road routing so multi-stop maps always follow real roads.
+  try {
+    const coordStr = points.map((p) => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(";");
+    const res = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`,
+    );
+    if (res.ok) {
+      const json = await res.json();
+      const parsed = parseOsrmGeometry(json);
+      if (parsed) {
         roadRouteCache.set(key, parsed);
         return parsed;
       }
     }
   } catch {
-    // Fallback to direct pin sequence if routing upstream is unreachable.
+    // Keep direct pin sequence if completely offline.
   }
+
   return points;
 }
 

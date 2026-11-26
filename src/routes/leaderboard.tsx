@@ -109,7 +109,7 @@ function LeaderboardPage() {
         setOptInMessage("You are now hidden from the public rider rankings across Web & Mobile.");
       } else {
         setOptInMessage(
-          "You're back on the leaderboard! Your rank will appear after the midnight WIB daily update.",
+          "You're back on the leaderboard! Your rank will appear after the 00:00 UTC daily update.",
         );
       }
     } catch (err) {
@@ -199,14 +199,14 @@ function LeaderboardPage() {
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-wider text-primary">
                 <Trophy className="size-3.5" />
-                <span>Updated Daily at Midnight WIB</span>
+                <span>Updated Daily at 00:00 UTC</span>
               </div>
               <h1 className="font-display text-2xl sm:text-4xl font-black uppercase tracking-tight">
                 REVV Rider Leaderboard
               </h1>
               <p className="text-sm text-muted-foreground max-w-2xl">
                 Ranked across verified rides (0.3 km or longer). Rankings update automatically every
-                night at midnight WIB.
+                night at 00:00 UTC.
               </p>
             </div>
 
@@ -228,7 +228,7 @@ function LeaderboardPage() {
                   onClick={handleToggleOptIn}
                   title={
                     changesRemaining <= 0
-                      ? "Daily visibility change limit reached. Try again after midnight WIB."
+                      ? "Daily visibility change limit reached. Try again after 00:00 UTC."
                       : undefined
                   }
                   className={cn(
@@ -244,8 +244,8 @@ function LeaderboardPage() {
                       ? "Updating…"
                       : changesRemaining <= 0
                         ? optIn
-                          ? "Ranked (Locked until 00:00 WIB)"
-                          : "Hidden (Locked until 00:00 WIB)"
+                          ? "Ranked (Locked until 00:00 UTC)"
+                          : "Hidden (Locked until 00:00 UTC)"
                         : optIn
                           ? "Show My Ranking: ON"
                           : "Hidden from Rankings: OFF"}
@@ -473,7 +473,7 @@ function LeaderboardPage() {
             <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
               Turning this off immediately removes your profile from the public leaderboard across
               Web &amp; Mobile. Turning it back on only updates after{" "}
-              <strong className="text-foreground">00:00 WIB</strong> and uses 1 of your daily
+              <strong className="text-foreground">00:00 UTC</strong> and uses 1 of your daily
               visibility changes ({changesRemaining} left today).
             </p>
             <div className="mt-5 flex items-center justify-end gap-2">

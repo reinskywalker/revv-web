@@ -219,7 +219,7 @@ function AdminAnalyticsPage() {
                     14-Day Ride Distance &amp; Active Riders Trend
                   </h2>
                   <p className="text-xs text-muted-foreground">
-                    Daily kilometers ridden (bars) vs active riders &amp; trips (WIB / GMT+7)
+                    Daily kilometers ridden (bars) vs active riders &amp; trips (UTC)
                   </p>
                 </div>
                 <span className="font-mono text-[11px] text-primary">LAST 14 DAYS</span>
@@ -296,7 +296,7 @@ function AdminAnalyticsPage() {
             <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-5 space-y-4">
               <div>
                 <h2 className="font-display text-sm font-black uppercase tracking-wider">
-                  Hourly Riding Distribution (00:00 – 23:00 WIB)
+                  Hourly Riding Distribution (00:00 – 23:00 UTC)
                 </h2>
                 <p className="text-xs text-muted-foreground">
                   Peak departure hours across all recorded rides
