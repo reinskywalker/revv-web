@@ -530,6 +530,50 @@ function PublicSharedEventPage() {
               </section>
             )}
 
+            {/* Shared Event Checklist (Read-Only Bullet Points) */}
+            {(() => {
+              const checklistSections = (ev.checklist_sections ?? [])
+                .map((sec) => ({
+                  ...sec,
+                  items: (sec.items ?? []).filter((item) => item.label?.trim().length > 0),
+                }))
+                .filter((sec) => sec.items.length > 0 || sec.title?.trim().length > 0);
+              if (checklistSections.length === 0) return null;
+              return (
+                <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="text-lg font-bold text-foreground">Ride Checklist</h2>
+                      <p className="text-xs text-muted-foreground">
+                        Gear &amp; prep list for riders (interactive checkboxes available in the REVV mobile app).
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    {checklistSections.map((section) => (
+                      <div
+                        key={section.id || section.title}
+                        className="rounded-xl border border-border bg-background/70 p-4"
+                      >
+                        <h3 className="text-sm font-bold text-foreground">
+                          {section.title || "Checklist"}
+                        </h3>
+                        {section.items.length > 0 ? (
+                          <ul className="mt-2.5 list-disc space-y-1.5 pl-5 text-sm text-foreground/85 marker:text-primary">
+                            {section.items.map((item) => (
+                              <li key={item.id || item.label}>{item.label}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="mt-2 text-xs text-muted-foreground">No items listed.</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })()}
+
             {/* Participants List */}
             <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

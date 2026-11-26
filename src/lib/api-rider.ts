@@ -7,6 +7,7 @@ import {
   getApiBaseUrl,
   optionalAuthRequest,
 } from "./api";
+import type { TripChecklistSection } from "./api-trip-plans";
 
 export interface SavedRouteItem {
   id: string;
@@ -748,6 +749,7 @@ export interface PublicSharedEventInfo {
   lifecycle_state: string;
   cancelled_at?: string | null;
   stops: PublicSharedEventStop[];
+  checklist_sections?: TripChecklistSection[];
   going_count: number;
   tentative_count: number;
   not_going_count: number;
