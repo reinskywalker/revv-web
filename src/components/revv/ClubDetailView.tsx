@@ -23,8 +23,15 @@ import {
   XCircle,
 } from "lucide-react";
 import { AppOpenBanner } from "@/components/revv/AppOpenBanner";
+import { ClubEventPlannerModal } from "@/components/revv/ClubEventPlannerModal";
 import { ClubMembersPopupModal } from "@/components/revv/ClubMembersPopupModal";
 import { RevvAvatar, VerifiedCheckBadge } from "@/components/revv/RevvAvatar";
+import {
+  fetchClubEventQueue,
+  reviewClubEvent,
+  submitClubEventForReview,
+  type QueuedClubEventItem,
+} from "@/lib/api-club-events";
 import { resolveMediaUrl, type FeedPostItem } from "@/lib/api";
 import {
   AuthApiError,
@@ -46,7 +53,7 @@ import {
   type CommunitySummary,
 } from "@/lib/api-rider";
 import { useAuth } from "@/lib/auth-context";
-import { cn } from "@/lib/utils";
+import { canAccessAdmin, cn } from "@/lib/utils";
 
 type ClubTab = "feed" | "channels" | "events" | "threads" | "members";
 
@@ -92,7 +99,12 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPrivateBlocked, setIsPrivateBlocked] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<ClubTab>("feed");
+  const [activeTab, setActiveTab] = useState<ClubTab>(() => {
+    if (typeof window === "undefined") return "feed";
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "events" || t === "channels" || t === "threads" || t === "members") return t;
+    return "feed";
+  });
   const [membershipLoading, setMembershipLoading] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
@@ -127,6 +139,16 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
   const [showMembersPopup, setShowMembersPopup] = useState(false);
 
   const [sharingEventId, setSharingEventId] = useState<string | null>(null);
+  const [showEventPlannerModal, setShowEventPlannerModal] = useState(false);
+  const [showEventQueue, setShowEventQueue] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("queue") === "1";
+  });
+  const [queuedEvents, setQueuedEvents] = useState<QueuedClubEventItem[]>([]);
+  const [loadingQueue, setLoadingQueue] = useState(false);
+  const [queueReviewBusyId, setQueueReviewBusyId] = useState<string | null>(null);
+  const [reviseTargetId, setReviseTargetId] = useState<string | null>(null);
+  const [reviseReason, setReviseReason] = useState("");
 
   const loadClub = useCallback(async () => {
     setLoading(true);
@@ -196,6 +218,17 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
       sortedChannels.filter((c) => (c.visibility || "member").toLowerCase() !== "administrator"),
     [sortedChannels],
   );
+
+  // Auto-load club event queue when opened via notification (?tab=events&queue=1)
+  useEffect(() => {
+    if (activeTab === "events" && showEventQueue && isApproved) {
+      setLoadingQueue(true);
+      void fetchClubEventQueue(communityId)
+        .then(setQueuedEvents)
+        .catch(() => setQueuedEvents([]))
+        .finally(() => setLoadingQueue(false));
+    }
+  }, [activeTab, showEventQueue, isApproved, communityId]);
 
   // Auto-select first channel when entering channels tab
   useEffect(() => {
@@ -1044,17 +1077,202 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/70 px-4 py-2.5">
                     <span className="text-xs font-semibold text-muted-foreground">
-                      Club Ride Events &amp; Trip Plans
+                      Club Ride Events &amp; Planner
                     </span>
-                    <Link
-                      to="/trip-planner"
-                      search={{ club: communityId, tab: "review" }}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-primary/35 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/20"
-                    >
-                      All Events &amp; Queue
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(isApproved || canAccessAdmin(user?.role)) && (
+                        <button
+                          type="button"
+                          onClick={() => setShowEventPlannerModal(true)}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
+                        >
+                          <Plus className="size-3.5" />
+                          {canManage || canAccessAdmin(user?.role)
+                            ? "Create Event"
+                            : "Propose Event"}
+                        </button>
+                      )}
+                      {(isApproved || canAccessAdmin(user?.role)) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = !showEventQueue;
+                            setShowEventQueue(next);
+                          }}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition",
+                            showEventQueue
+                              ? "border-amber-500/60 bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                              : "border-primary/35 bg-primary/10 text-primary hover:bg-primary/20",
+                          )}
+                        >
+                          {showEventQueue ? "Published Events" : "All Events"}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {(detail?.events ?? []).length === 0 ? (
+
+                  {showEventQueue ? (
+                    loadingQueue ? (
+                      <div className="flex items-center justify-center rounded-2xl border border-border bg-card py-12">
+                        <Loader2 className="size-6 animate-spin text-primary" />
+                      </div>
+                    ) : queuedEvents.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
+                        No pending, draft, revised, or rejected club events in queue.
+                      </div>
+                    ) : (
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {queuedEvents.map((qev) => (
+                          <div
+                            key={qev.id}
+                            className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <h3 className="truncate font-display text-base font-bold">
+                                  {qev.title}
+                                </h3>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  By <span className="font-semibold">@{qev.creator_username}</span>{" "}
+                                  •{" "}
+                                  {new Date(qev.submitted_at || qev.created_at).toLocaleString()}
+                                </p>
+                              </div>
+                              <span className="shrink-0 rounded-full border border-amber-500/40 bg-amber-500/15 px-2.5 py-0.5 text-xs font-semibold uppercase text-amber-700 dark:text-amber-300">
+                                {qev.approval_status.replace("_", " ")}
+                              </span>
+                            </div>
+                            {qev.location_name && (
+                              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <MapPin className="size-3.5 text-primary" />
+                                {qev.location_name}
+                              </p>
+                            )}
+                            {qev.review_note && (
+                              <div className="rounded-lg border border-orange-500/35 bg-orange-500/10 px-3 py-2 text-xs text-orange-800 dark:text-orange-200">
+                                <strong>Moderator note:</strong> {qev.review_note}
+                              </div>
+                            )}
+                            {qev.can_review && qev.approval_status === "pending_review" && (
+                              <div className="space-y-2 pt-1">
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={queueReviewBusyId === qev.id}
+                                    onClick={async () => {
+                                      setQueueReviewBusyId(qev.id);
+                                      try {
+                                        await reviewClubEvent(qev.id, "approve");
+                                        setActionNotice("Event approved & published!");
+                                        setQueuedEvents(await fetchClubEventQueue(communityId));
+                                        await loadClub();
+                                      } catch (err) {
+                                        setActionNotice(
+                                          err instanceof Error ? err.message : "Approval failed.",
+                                        );
+                                      } finally {
+                                        setQueueReviewBusyId(null);
+                                      }
+                                    }}
+                                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={queueReviewBusyId === qev.id}
+                                    onClick={() => {
+                                      setReviseTargetId(qev.id);
+                                      setReviseReason("");
+                                    }}
+                                    className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600"
+                                  >
+                                    Revise
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={queueReviewBusyId === qev.id}
+                                    onClick={async () => {
+                                      setQueueReviewBusyId(qev.id);
+                                      try {
+                                        await reviewClubEvent(qev.id, "reject");
+                                        setActionNotice("Event rejected.");
+                                        setQueuedEvents(await fetchClubEventQueue(communityId));
+                                      } finally {
+                                        setQueueReviewBusyId(null);
+                                      }
+                                    }}
+                                    className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                                {reviseTargetId === qev.id && (
+                                  <div className="space-y-2 pt-1">
+                                    <textarea
+                                      rows={2}
+                                      value={reviseReason}
+                                      onChange={(e) => setReviseReason(e.target.value)}
+                                      placeholder="Write revision reason (required)..."
+                                      className="w-full rounded-lg border border-border bg-background p-2 text-xs"
+                                    />
+                                    <div className="flex justify-end gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setReviseTargetId(null)}
+                                        className="rounded-lg border border-border px-2.5 py-1 text-xs"
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={!reviseReason.trim() || queueReviewBusyId === qev.id}
+                                        onClick={async () => {
+                                          setQueueReviewBusyId(qev.id);
+                                          try {
+                                            await reviewClubEvent(
+                                              qev.id,
+                                              "revise",
+                                              reviseReason.trim(),
+                                            );
+                                            setReviseTargetId(null);
+                                            setActionNotice("Revision requested.");
+                                            setQueuedEvents(await fetchClubEventQueue(communityId));
+                                          } finally {
+                                            setQueueReviewBusyId(null);
+                                          }
+                                        }}
+                                        className="rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground"
+                                      >
+                                        Send Revision
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {qev.can_edit &&
+                              (qev.approval_status === "draft" ||
+                                qev.approval_status === "needs_revision") && (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await submitClubEventForReview(qev.id);
+                                    setActionNotice("Event submitted!");
+                                    setQueuedEvents(await fetchClubEventQueue(communityId));
+                                    await loadClub();
+                                  }}
+                                  className="w-fit rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+                                >
+                                  {qev.can_review ? "Publish Now" : "Submit for Review"}
+                                </button>
+                              )}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  ) : (detail?.events ?? []).length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
                       No events scheduled for this club yet.
                     </div>
@@ -1308,6 +1526,23 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
             community={community}
             members={detail?.members ?? []}
           />
+          {showEventPlannerModal && (
+            <ClubEventPlannerModal
+              communityId={communityId}
+              communityName={community.name}
+              canPublishDirectly={canManage || canAccessAdmin(user?.role)}
+              onClose={() => setShowEventPlannerModal(false)}
+              onCreated={(msg) => {
+                setActionNotice(msg);
+                void loadClub();
+                if (showEventQueue) {
+                  void fetchClubEventQueue(communityId)
+                    .then(setQueuedEvents)
+                    .catch(() => {});
+                }
+              }}
+            />
+          )}
         </div>
       )}
     </div>

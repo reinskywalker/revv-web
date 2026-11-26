@@ -306,6 +306,14 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     setDesktopNotifOpen(false);
     setMobileNotifOpen(false);
 
+    if (rawRoute.includes("events-queue") && communityId) {
+      navigate({
+        to: "/clubs/$id",
+        params: { id: communityId },
+        search: { tab: "events", queue: "1" } as never,
+      });
+      return;
+    }
     if (
       tripPlanId ||
       rawRoute.startsWith("trip-planner") ||
