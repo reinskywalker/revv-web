@@ -609,21 +609,24 @@ export function AdminUsersTablePanel({
                         </div>
                       </div>
 
-                      <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-                        <input
-                          type="checkbox"
-                          checked={autoEquipOnGrant}
-                          onChange={(e) => setAutoEquipOnGrant(e.target.checked)}
-                          className="accent-primary"
-                        />
-                        Auto-equip frame on rider profile when granting
-                      </label>
+                      <div className="rounded-xl border border-border bg-secondary/30 px-3.5 py-2.5">
+                        <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground">
+                          <input
+                            type="checkbox"
+                            checked={autoEquipOnGrant}
+                            onChange={(e) => setAutoEquipOnGrant(e.target.checked)}
+                            className="accent-primary"
+                          />
+                          Auto-equip frame on rider profile when granting any frame (including paid
+                          frames)
+                        </label>
+                      </div>
                     </div>
 
                     {/* Catalog Frames */}
                     <div className="space-y-2.5">
                       <h5 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Avatar Frames
+                        Avatar Frames ({catalogCosmetics?.frames.length ?? 0})
                       </h5>
                       <div className="grid gap-2.5 sm:grid-cols-2">
                         {(catalogCosmetics?.frames ?? []).map((frame) => {
@@ -631,6 +634,32 @@ export function AdminUsersTablePanel({
                             (o) => o.frame_code === frame.code,
                           );
                           const equipped = userCosmetics?.equipped_frame_code === frame.code;
+                          const isPaidShop =
+                            frame.source_type === "purchase" ||
+                            frame.source_type === "shop" ||
+                            (frame.price_idr ?? 0) > 0 ||
+                            (frame.price_usd_cents ?? 0) > 0;
+                          const sourceTag =
+                            frame.code === "beta_pioneer"
+                              ? "Beta"
+                              : isPaidShop
+                                ? "Paid / Shop"
+                                : frame.source_type === "subscription"
+                                  ? "Patron"
+                                  : frame.source_type === "milestone"
+                                    ? "Milestone"
+                                    : frame.source_type === "event"
+                                      ? "Event"
+                                      : frame.source_type;
+                          const busyGrant =
+                            cosmeticBusy === `grant_frame_${frame.code}` ||
+                            (frame.code === "beta_pioneer" &&
+                              cosmeticBusy === "grant_early_user_early");
+                          const busyRevoke =
+                            cosmeticBusy === `revoke_frame_${frame.code}` ||
+                            (frame.code === "beta_pioneer" &&
+                              cosmeticBusy === "revoke_early_user_early");
+
                           return (
                             <div
                               key={frame.code}
@@ -639,11 +668,26 @@ export function AdminUsersTablePanel({
                               <div className="flex min-w-0 items-center gap-2.5">
                                 <RevvAvatar name={frame.title} frameCode={frame.code} size={34} />
                                 <div className="min-w-0">
-                                  <div className="truncate text-xs font-bold text-foreground">
-                                    {frame.title}
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="truncate text-xs font-bold text-foreground">
+                                      {frame.title}
+                                    </span>
+                                    <span
+                                      className={cn(
+                                        "shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase",
+                                        isPaidShop
+                                          ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                                          : "bg-secondary text-muted-foreground",
+                                      )}
+                                    >
+                                      {sourceTag}
+                                    </span>
                                   </div>
-                                  <div className="text-[11px] text-muted-foreground">
+                                  <div className="truncate text-[11px] text-muted-foreground">
                                     {equipped ? "Equipped" : owned ? "Owned" : "Locked"}
+                                    {frame.bundled_badge_code
+                                      ? ` · +Badge (${frame.bundled_badge_code})`
+                                      : ""}
                                   </div>
                                 </div>
                               </div>
@@ -651,19 +695,27 @@ export function AdminUsersTablePanel({
                                 <button
                                   type="button"
                                   disabled={Boolean(cosmeticBusy)}
-                                  onClick={() => void handleRevokeCosmetic("frame", frame.code)}
+                                  onClick={() =>
+                                    void (frame.code === "beta_pioneer"
+                                      ? handleRevokeCosmetic("early_user")
+                                      : handleRevokeCosmetic("frame", frame.code))
+                                  }
                                   className="shrink-0 rounded-lg border border-destructive/40 px-2.5 py-1 text-[11px] font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
                                 >
-                                  Revoke
+                                  {busyRevoke ? "Revoking…" : "Revoke"}
                                 </button>
                               ) : (
                                 <button
                                   type="button"
                                   disabled={Boolean(cosmeticBusy)}
-                                  onClick={() => void handleGrantCosmetic("frame", frame.code)}
+                                  onClick={() =>
+                                    void (frame.code === "beta_pioneer"
+                                      ? handleGrantCosmetic("early_user")
+                                      : handleGrantCosmetic("frame", frame.code))
+                                  }
                                   className="shrink-0 rounded-lg bg-secondary px-2.5 py-1 text-[11px] font-semibold text-foreground hover:bg-primary hover:text-primary-foreground disabled:opacity-50"
                                 >
-                                  Grant
+                                  {busyGrant ? "Granting…" : "Grant"}
                                 </button>
                               )}
                             </div>

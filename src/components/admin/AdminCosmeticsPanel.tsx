@@ -79,6 +79,7 @@ export function AdminCosmeticsPanel() {
   const [riderQuery, setRiderQuery] = useState("");
   const [grantAutoEquip, setGrantAutoEquip] = useState(true);
   const [grantBusyUserId, setGrantBusyUserId] = useState<string | null>(null);
+  const [grantError, setGrantError] = useState<string | null>(null);
 
   const openGrantModal = async (target: {
     kind: "frame" | "badge";
@@ -87,11 +88,12 @@ export function AdminCosmeticsPanel() {
   }) => {
     setGrantTarget(target);
     setRiderQuery("");
+    setGrantError(null);
     if (riderList.length === 0) {
       try {
         setRiderList(await fetchAdminUsers());
-      } catch {
-        setError("Could not load rider directory.");
+      } catch (err) {
+        setGrantError(err instanceof Error ? err.message : "Could not load rider directory.");
       }
     }
   };
@@ -765,17 +767,25 @@ export function AdminCosmeticsPanel() {
         <ModalShell
           open
           onClose={() => {
-            if (!grantBusyUserId) setGrantTarget(null);
+            if (!grantBusyUserId) {
+              setGrantError(null);
+              setGrantTarget(null);
+            }
           }}
           title={
             <h4 className="font-display text-base font-bold">
               Grant {grantTarget.kind === "frame" ? "Frame" : "Badge"}: {grantTarget.title}
             </h4>
           }
-          subtitle="Select a rider to grant permanent access immediately."
+          subtitle="Select a rider to grant permanent access immediately (including paid shop items and bundled badges)."
           maxWidthClass="max-w-lg"
           panelClassName="p-5 space-y-4"
         >
+          {grantError && (
+            <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {grantError}
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -839,19 +849,25 @@ export function AdminCosmeticsPanel() {
                     onClick={async () => {
                       setGrantBusyUserId(r.id);
                       setError(null);
+                      setGrantError(null);
                       try {
                         const itemType =
                           grantTarget.code === "beta_pioneer" ? "early_user" : grantTarget.kind;
-                        await grantAdminUserCosmetic(r.id, {
+                        const res = await grantAdminUserCosmetic(r.id, {
                           item_type: itemType,
                           code: grantTarget.code,
                           auto_equip: grantTarget.kind === "frame" ? grantAutoEquip : undefined,
                         });
                         invalidateCosmeticsCatalogCache();
-                        setNotice(`Granted "${grantTarget.title}" to @${r.username}.`);
+                        const bundleSuffix = res.bundled_badge_code
+                          ? ` (+ bundled badge ${res.bundled_badge_code})`
+                          : "";
+                        setNotice(`Granted "${grantTarget.title}"${bundleSuffix} to @${r.username}.`);
                         setGrantTarget(null);
                       } catch (err) {
-                        setError(err instanceof Error ? err.message : "Grant failed.");
+                        const msg = err instanceof Error ? err.message : "Grant failed.";
+                        setGrantError(msg);
+                        setError(msg);
                       } finally {
                         setGrantBusyUserId(null);
                       }
