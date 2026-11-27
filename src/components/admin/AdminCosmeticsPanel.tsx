@@ -862,7 +862,9 @@ export function AdminCosmeticsPanel() {
                         const bundleSuffix = res.bundled_badge_code
                           ? ` (+ bundled badge ${res.bundled_badge_code})`
                           : "";
-                        setNotice(`Granted "${grantTarget.title}"${bundleSuffix} to @${r.username}.`);
+                        setNotice(
+                          `Granted "${grantTarget.title}"${bundleSuffix} to @${r.username}.`,
+                        );
                         setGrantTarget(null);
                       } catch (err) {
                         const msg = err instanceof Error ? err.message : "Grant failed.";

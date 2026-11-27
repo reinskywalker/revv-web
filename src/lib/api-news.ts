@@ -71,12 +71,15 @@ export async function fetchNewsArticles(params?: {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6000);
-
-    const res = await fetch(`${baseUrl}/news?page=${page}&limit=${limit}`, {
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
+    let res: Response;
+    try {
+      res = await fetch(`${baseUrl}/news?page=${page}&limit=${limit}`, {
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (res.ok) {
       const data: ApiResponse<NewsArticle[]> = await res.json();
@@ -99,12 +102,15 @@ export async function fetchNewsArticleBySlug(slug: string): Promise<NewsArticle 
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6000);
-
-    const res = await fetch(`${baseUrl}/news/${encodeURIComponent(slug)}`, {
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
+    let res: Response;
+    try {
+      res = await fetch(`${baseUrl}/news/${encodeURIComponent(slug)}`, {
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (res.ok) {
       const data: ApiResponse<NewsArticle> = await res.json();

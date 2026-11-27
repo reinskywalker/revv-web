@@ -22,7 +22,6 @@ import {
   fetchMyProfile,
   fetchSystemHealth,
   getGoogleOAuthUrl,
-  getSavedSession,
   requestOtp,
   signInWithOtp,
   type SystemHealthStatus,
@@ -359,16 +358,12 @@ function LoginPage() {
             {canAccessAdmin(user.role) && (
               <Link
                 to="/admin"
-                {...(isModeratorRole(user.role)
-                  ? { search: { tab: "news" } as never }
-                  : {})}
+                {...(isModeratorRole(user.role) ? { search: { tab: "news" } as never } : {})}
                 className="flex items-center justify-between rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 font-mono text-xs font-semibold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20"
               >
                 <span className="flex items-center gap-2">
                   <ShieldCheck className="size-4" />
-                  {isModeratorRole(user.role)
-                    ? "Moderator News Desk"
-                    : "Administrator Console"}
+                  {isModeratorRole(user.role) ? "Moderator News Desk" : "Administrator Console"}
                 </span>
                 <ChevronRight className="size-4" />
               </Link>

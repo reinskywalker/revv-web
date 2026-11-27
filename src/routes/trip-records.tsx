@@ -355,7 +355,7 @@ function AdminTripRecordsPage() {
                   <button
                     type="button"
                     disabled={loadingMoreRecent}
-                    onClick={() => void loadRecent(recentPage + 1, true, search)}
+                    onClick={() => void loadRecent(recentPage + 1, true, debouncedSearch)}
                     className="inline-flex items-center gap-2 rounded-xl border border-primary/50 bg-primary/15 px-6 py-2.5 font-mono text-xs font-bold uppercase text-primary hover:bg-primary/25 disabled:opacity-50"
                   >
                     {loadingMoreRecent ? (
@@ -520,7 +520,7 @@ function AdminTripRecordsPage() {
                   <button
                     type="button"
                     disabled={loadingMoreRiders}
-                    onClick={() => void loadRiders(riderPage + 1, true, search)}
+                    onClick={() => void loadRiders(riderPage + 1, true, debouncedSearch)}
                     className="inline-flex items-center gap-2 rounded-xl border border-primary/50 bg-primary/15 px-6 py-2.5 font-mono text-xs font-bold uppercase text-primary hover:bg-primary/25 disabled:opacity-50"
                   >
                     {loadingMoreRiders ? (

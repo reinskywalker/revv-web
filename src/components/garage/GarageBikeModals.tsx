@@ -154,7 +154,6 @@ export function EditBikeModal({ bike, onClose, onSaved, onError }: EditBikeModal
       maxWidthClass="max-w-md"
     >
       <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
-
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="text-[11px] font-mono uppercase text-muted-foreground block mb-1">

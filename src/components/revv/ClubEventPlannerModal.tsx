@@ -1,17 +1,6 @@
 import { useState } from "react";
-import {
-  ArrowDown,
-  ArrowUp,
-  CheckCircle2,
-  Save,
-  Send,
-  Trash2,
-  X,
-} from "lucide-react";
-import {
-  type ClubEventStopInput,
-  createClubEventWithPlanner,
-} from "@/lib/api-club-events";
+import { ArrowDown, ArrowUp, CheckCircle2, Save, Send, Trash2, X } from "lucide-react";
+import { type ClubEventStopInput, createClubEventWithPlanner } from "@/lib/api-club-events";
 import {
   encodeGooglePolyline5,
   fetchRoadRouteGeometry,
@@ -330,10 +319,7 @@ export function ClubEventPlannerModal({
                 onClick={() => {
                   const clean = sectionDraft.trim();
                   if (!clean) return;
-                  setSections((prev) => [
-                    ...prev,
-                    { id: makeId("sec"), title: clean, items: [] },
-                  ]);
+                  setSections((prev) => [...prev, { id: makeId("sec"), title: clean, items: [] }]);
                   setSectionDraft("");
                 }}
                 className="rounded-xl bg-secondary px-3.5 py-2 text-xs font-semibold hover:bg-secondary/80 disabled:opacity-50"
@@ -401,10 +387,7 @@ export function ClubEventPlannerModal({
                             ? s
                             : {
                                 ...s,
-                                items: [
-                                  ...s.items,
-                                  { id: makeId("item"), label, checked: false },
-                                ],
+                                items: [...s.items, { id: makeId("item"), label, checked: false }],
                               },
                         ),
                       );

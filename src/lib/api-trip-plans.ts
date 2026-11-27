@@ -25,11 +25,7 @@ export interface TripWaypointStop {
 }
 
 export type TripPlanStatus =
-  | "draft"
-  | "pending_review"
-  | "needs_revision"
-  | "approved"
-  | "rejected";
+  "draft" | "pending_review" | "needs_revision" | "approved" | "rejected";
 
 export interface TripPlanItem {
   id: string;
@@ -75,7 +71,10 @@ const roadRouteCache = new Map<string, RoadRouteCoordinate[]>();
 function parseOsrmGeometry(payload: unknown): RoadRouteCoordinate[] | null {
   if (!payload || typeof payload !== "object") return null;
   const obj = payload as Record<string, unknown>;
-  const nested = obj["data"] && typeof obj["data"] === "object" ? (obj["data"] as Record<string, unknown>) : null;
+  const nested =
+    obj["data"] && typeof obj["data"] === "object"
+      ? (obj["data"] as Record<string, unknown>)
+      : null;
   const routes = Array.isArray(obj["routes"])
     ? obj["routes"]
     : Array.isArray(nested?.["routes"])

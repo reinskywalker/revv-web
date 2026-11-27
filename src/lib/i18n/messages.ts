@@ -202,7 +202,8 @@ export const WEB_MESSAGES = {
     "clubCap.fullSoftFreeze": "満員です（招待待ち中）",
     "clubCap.approachingCap": "あと少しで満員！",
     "clubCap.capacityLabel": "クラブ定員",
-    "clubCap.boostPitch": "アプリ内の Paddock Boost でチャンネル枠や限定ロール、バニティURL、炎フレームを解放しよう！",
+    "clubCap.boostPitch":
+      "アプリ内の Paddock Boost でチャンネル枠や限定ロール、バニティURL、炎フレームを解放しよう！",
     "clubCap.boostCta": "アプリでブースト",
     "clubCap.emptyMembers": "まだメンバーが見当たらないみたい。これから増やそう！",
     "billing.heroEyebrow": "地域別ライブ料金",
@@ -228,9 +229,11 @@ export const WEB_MESSAGES = {
     "billing.freeForever": "ずっと無料",
     "billing.subscribed": "加入中",
     "billing.clubBoostTitle": "Paddock クラブブースト",
-    "billing.clubBoostSubtitle": "アプリからチャンネル数、ボイス席、カスタムロール、バニティURL、炎フレームを拡張できます。",
+    "billing.clubBoostSubtitle":
+      "アプリからチャンネル数、ボイス席、カスタムロール、バニティURL、炎フレームを拡張できます。",
     "billing.boostLevelsHeading": "ブーストレベリング",
-    "billing.boostLevelMeta": "チャンネル {channels} · ボイス {voice}枠（{seats}人）· 上限 {members}人",
+    "billing.boostLevelMeta":
+      "チャンネル {channels} · ボイス {voice}枠（{seats}人）· 上限 {members}人",
     "billing.unlimited": "無制限",
     "billing.boostPerkPrivateRoles": "非公開 + カスタムロール & タグ",
     "billing.boostPerkVanityFrame": "独自URL + 炎フレーム & 認証マーク",

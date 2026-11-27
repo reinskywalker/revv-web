@@ -74,9 +74,7 @@ export function CustomRoleBadge({
 }) {
   const cleanLabel = (label ?? "").trim();
   if (!cleanLabel) return null;
-  const validHex = /^#[0-9a-fA-F]{6}$/.test((colorHex ?? "").trim())
-    ? colorHex!.trim()
-    : "#f97316";
+  const validHex = /^#[0-9a-fA-F]{6}$/.test((colorHex ?? "").trim()) ? colorHex!.trim() : "#f97316";
   return (
     <span
       className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold tracking-tight"

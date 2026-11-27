@@ -136,8 +136,11 @@ function PublicSharedEventPage() {
     setPage(1);
   }, [token, initialData, initialError]);
 
+  const requestSeqRef = useRef(0);
+
   const loadSharedEvent = useCallback(
     async (tab: RsvpTab, nextPage: number, background: boolean) => {
+      const reqId = ++requestSeqRef.current;
       if (background) {
         setTabLoading(true);
       } else {
@@ -150,10 +153,12 @@ function PublicSharedEventPage() {
           page: nextPage,
           limit: 10,
         });
+        if (reqId !== requestSeqRef.current) return;
         hasDataRef.current = Boolean(res);
         setData(res);
         setFatalError(null);
       } catch (err) {
+        if (reqId !== requestSeqRef.current) return;
         const message =
           err instanceof Error ? err.message : "Unable to load event details right now.";
         const isNotFound = err instanceof SharedEventError ? err.isNotFound : false;
@@ -163,8 +168,10 @@ function PublicSharedEventPage() {
           setFatalError({ message, isNotFound });
         }
       } finally {
-        setLoading(false);
-        setTabLoading(false);
+        if (reqId === requestSeqRef.current) {
+          setLoading(false);
+          setTabLoading(false);
+        }
       }
     },
     [token],
@@ -548,7 +555,8 @@ function PublicSharedEventPage() {
                     <div>
                       <h2 className="text-lg font-bold text-foreground">Ride Checklist</h2>
                       <p className="text-xs text-muted-foreground">
-                        Gear &amp; prep list for riders (interactive checkboxes available in the REVV mobile app).
+                        Gear &amp; prep list for riders (interactive checkboxes available in the
+                        REVV mobile app).
                       </p>
                     </div>
                   </div>

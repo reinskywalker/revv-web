@@ -41,7 +41,6 @@ const CATEGORIES = [
 
 export function AdminMasterDataPanel({
   activeMasterSub,
-  onSelectMasterSub,
   brands,
   motorcycles,
   components,
@@ -52,7 +51,6 @@ export function AdminMasterDataPanel({
   onNotice,
 }: {
   activeMasterSub: MasterSubTab;
-  onSelectMasterSub: (sub: MasterSubTab) => void;
   brands: MasterBrandItem[];
   motorcycles: MasterMotorcycleItem[];
   components: MasterComponentItem[];
@@ -1091,9 +1089,7 @@ export function AdminMasterDataPanel({
                   await onReload();
                   onNotice("Component updated.");
                 } catch (err) {
-                  onNotice(
-                    err instanceof Error ? err.message : "Failed to update component.",
-                  );
+                  onNotice(err instanceof Error ? err.message : "Failed to update component.");
                 }
               }}
               className="btn-primary px-4 py-1.5 text-xs"
@@ -1183,9 +1179,7 @@ export function AdminMasterDataPanel({
                   onNotice("Notification template saved.");
                 } catch (err) {
                   onNotice(
-                    err instanceof Error
-                      ? err.message
-                      : "Failed to save notification template.",
+                    err instanceof Error ? err.message : "Failed to save notification template.",
                   );
                 }
               }}

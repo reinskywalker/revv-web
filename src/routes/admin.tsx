@@ -10,10 +10,8 @@ import {
   FilePlus2,
   FileText,
   ImagePlus,
-  LayoutDashboard,
   Loader2,
   Megaphone,
-  MessageSquare,
   Pencil,
   Power,
   Radio,
@@ -176,53 +174,43 @@ function AdminPage() {
   const [broadcastIsSending, setBroadcastIsSending] = useState(false);
 
   // Sync tab with URL search params (?tab=...&sub=...)
+  const searchTab = searchObj["tab"];
+  const searchSub = searchObj["sub"];
   useEffect(() => {
-    const t = searchObj["tab"];
     if (isModerator && !isSuperuser) {
-      setActiveSubTab(t === "overview" ? "overview" : "news");
+      setActiveSubTab(searchTab === "overview" ? "overview" : "news");
       return;
     }
     if (
-      t === "overview" ||
-      t === "users" ||
-      t === "subscriptions" ||
-      t === "cosmetics" ||
-      t === "master" ||
-      t === "news" ||
-      t === "broadcast" ||
-      t === "support" ||
-      t === "legal" ||
-      t === "maintenance"
+      searchTab === "overview" ||
+      searchTab === "users" ||
+      searchTab === "subscriptions" ||
+      searchTab === "cosmetics" ||
+      searchTab === "master" ||
+      searchTab === "news" ||
+      searchTab === "broadcast" ||
+      searchTab === "support" ||
+      searchTab === "legal" ||
+      searchTab === "maintenance"
     ) {
-      setActiveSubTab(t);
+      setActiveSubTab(searchTab);
     }
-    const s = searchObj["sub"];
     if (
-      s === "brands" ||
-      s === "components" ||
-      s === "notifications" ||
-      s === "emails" ||
-      s === "settings"
+      searchSub === "brands" ||
+      searchSub === "components" ||
+      searchSub === "notifications" ||
+      searchSub === "emails" ||
+      searchSub === "settings"
     ) {
-      setActiveMasterSub(s);
+      setActiveMasterSub(searchSub);
     }
-  }, [searchObj["tab"], searchObj["sub"], isModerator, isSuperuser]);
+  }, [searchTab, searchSub, isModerator, isSuperuser]);
 
   const selectSubTab = (tab: AdminSubTab) => {
     setActiveSubTab(tab);
     void navigate({
       to: "/admin",
       search: (tab === "master" ? { tab, sub: activeMasterSub } : { tab }) as never,
-      replace: true,
-    });
-  };
-
-  const selectMasterSub = (sub: MasterSubTab) => {
-    setActiveMasterSub(sub);
-    setActiveSubTab("master");
-    void navigate({
-      to: "/admin",
-      search: { tab: "master", sub } as never,
       replace: true,
     });
   };
@@ -256,7 +244,7 @@ function AdminPage() {
     }
   };
 
-  const refreshAllAdminData = async () => {
+  const refreshAllAdminData = useCallback(async () => {
     try {
       setLoading(true);
       let failedCount = 0;
@@ -336,7 +324,7 @@ function AdminPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isModerator, isSuperuser]);
 
   const handleSaveSystemStatus = async (overrideMaintenance?: boolean) => {
     setIsSavingStatus(true);
@@ -372,7 +360,7 @@ function AdminPage() {
     } else {
       setLoading(false);
     }
-  }, [isAuthenticated, canEnterConsole]);
+  }, [isAuthenticated, canEnterConsole, refreshAllAdminData]);
 
   return (
     <div className="animate-fade-in space-y-8">
@@ -469,7 +457,6 @@ function AdminPage() {
           {isSuperuser && activeSubTab === "master" && (
             <AdminMasterDataPanel
               activeMasterSub={activeMasterSub}
-              onSelectMasterSub={selectMasterSub}
               brands={adminBrands}
               motorcycles={adminMotorcycles}
               components={adminComponents}

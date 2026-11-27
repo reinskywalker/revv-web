@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   BadgeCheck,
@@ -141,6 +141,7 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
   const [sharingEventId, setSharingEventId] = useState<string | null>(null);
   const [showEventPlannerModal, setShowEventPlannerModal] = useState(false);
   const [showEventQueue, setShowEventQueue] = useState(false);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -151,6 +152,12 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
     if (params.get("queue") === "1") {
       setShowEventQueue(true);
     }
+  }, [communityId]);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    };
   }, []);
   const [queuedEvents, setQueuedEvents] = useState<QueuedClubEventItem[]>([]);
   const [loadingQueue, setLoadingQueue] = useState(false);
@@ -275,7 +282,8 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopiedUrl(true);
-      setTimeout(() => setCopiedUrl(false), 2000);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(() => setCopiedUrl(false), 2000);
     } catch {
       setActionNotice(`Share URL: ${shareUrl}`);
     }
@@ -1189,8 +1197,7 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                                 </h3>
                                 <p className="mt-0.5 text-xs text-muted-foreground">
                                   By <span className="font-semibold">@{qev.creator_username}</span>{" "}
-                                  •{" "}
-                                  {new Date(qev.submitted_at || qev.created_at).toLocaleString()}
+                                  • {new Date(qev.submitted_at || qev.created_at).toLocaleString()}
                                 </p>
                               </div>
                               <span className="shrink-0 rounded-full border border-amber-500/40 bg-amber-500/15 px-2.5 py-0.5 text-xs font-semibold uppercase text-amber-700 dark:text-amber-300">
@@ -1281,7 +1288,9 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                                       </button>
                                       <button
                                         type="button"
-                                        disabled={!reviseReason.trim() || queueReviewBusyId === qev.id}
+                                        disabled={
+                                          !reviseReason.trim() || queueReviewBusyId === qev.id
+                                        }
                                         onClick={async () => {
                                           setQueueReviewBusyId(qev.id);
                                           try {
@@ -1565,7 +1574,7 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                           </p>
                           <p className="truncate text-xs text-muted-foreground">
                             @{m.username}
-                            {(m.primary_bike || m.primary_bike_name)
+                            {m.primary_bike || m.primary_bike_name
                               ? ` · ${m.primary_bike || m.primary_bike_name}`
                               : ""}
                           </p>

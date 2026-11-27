@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Award,
@@ -114,89 +114,111 @@ function ProfilePage() {
     (!!user?.username && user.username.toLowerCase() === username.toLowerCase()) ||
     (!!user?.id && user.id === username);
 
-  const syncEditFields = (data: {
-    username?: string | null;
-    first_name?: string | null;
-    middle_name?: string | null;
-    last_name?: string | null;
-    city?: string | null;
-    country?: string | null;
-    job?: string | null;
-    bio?: string | null;
-    account_visibility?: string | null;
-    show_motorcycle_count?: boolean | null;
-    show_garage_details?: boolean | null;
-    show_city?: boolean | null;
-    show_country?: boolean | null;
-    show_job?: boolean | null;
-    privacy_saved_routes?: string | null;
-  }) => {
-    setEditUsername(data.username || "");
-    setEditFirstName(data.first_name || "");
-    setEditMiddleName(data.middle_name || "");
-    setEditLastName(data.last_name || "");
-    setEditCity(data.city || "");
-    setEditCountry(data.country || "");
-    setEditJob(data.job || "");
-    setEditBio(data.bio || "");
-    const vis = (data.account_visibility || "PUBLIC").toUpperCase();
-    setEditVisibility(
-      vis === "PRIVATE" || vis === "CUSTOM" || vis === "FRIENDS_ONLY" ? vis : "PUBLIC",
-    );
-    setEditShowMotorcycleCount(data.show_motorcycle_count ?? true);
-    setEditShowGarageDetails(data.show_garage_details ?? true);
-    setEditShowCity(data.show_city ?? true);
-    setEditShowCountry(data.show_country ?? true);
-    setEditShowJob(data.show_job ?? true);
-    const rVis = (data.privacy_saved_routes || "public").toLowerCase();
-    setEditPrivacySavedRoutes(rVis === "friends" || rVis === "private" ? rVis : "public");
-  };
+  const syncEditFields = useCallback(
+    (data: {
+      username?: string | null;
+      first_name?: string | null;
+      middle_name?: string | null;
+      last_name?: string | null;
+      city?: string | null;
+      country?: string | null;
+      job?: string | null;
+      bio?: string | null;
+      account_visibility?: string | null;
+      show_motorcycle_count?: boolean | null;
+      show_garage_details?: boolean | null;
+      show_city?: boolean | null;
+      show_country?: boolean | null;
+      show_job?: boolean | null;
+      privacy_saved_routes?: string | null;
+    }) => {
+      setEditUsername(data.username || "");
+      setEditFirstName(data.first_name || "");
+      setEditMiddleName(data.middle_name || "");
+      setEditLastName(data.last_name || "");
+      setEditCity(data.city || "");
+      setEditCountry(data.country || "");
+      setEditJob(data.job || "");
+      setEditBio(data.bio || "");
+      const vis = (data.account_visibility || "PUBLIC").toUpperCase();
+      setEditVisibility(
+        vis === "PRIVATE" || vis === "CUSTOM" || vis === "FRIENDS_ONLY" ? vis : "PUBLIC",
+      );
+      setEditShowMotorcycleCount(data.show_motorcycle_count ?? true);
+      setEditShowGarageDetails(data.show_garage_details ?? true);
+      setEditShowCity(data.show_city ?? true);
+      setEditShowCountry(data.show_country ?? true);
+      setEditShowJob(data.show_job ?? true);
+      const rVis = (data.privacy_saved_routes || "public").toLowerCase();
+      setEditPrivacySavedRoutes(rVis === "friends" || rVis === "private" ? rVis : "public");
+    },
+    [],
+  );
 
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
-    setAchievementsError(null);
-    try {
-      const data = await fetchPublicProfile(username);
-      setProfile(data);
-      if (isSelf) {
-        syncEditFields(data);
-      }
-      if (!data.is_private && data.show_achievements !== false) {
-        fetchPublicUserAchievements(data.username || data.id)
-          .then((ach) => setAchievements(ach))
-          .catch((achErr: unknown) => {
-            setAchievements(null);
-            setAchievementsError(
-              achErr instanceof Error ? achErr.message : "Achievements unavailable",
-            );
-          });
-      } else {
-        setAchievements(null);
-      }
-    } catch (err: unknown) {
-      if (isSelf) {
-        try {
-          const myProf = await fetchMyProfile();
-          setProfile(mapRiderProfileToPublicProfile(myProf));
-          syncEditFields(myProf);
-          fetchPublicUserAchievements(myProf.username || myProf.id)
-            .then((ach) => setAchievements(ach))
-            .catch(() => {});
-          return;
-        } catch {
-          // ignore
+  const loadData = useCallback(
+    async (isCancelled?: () => boolean) => {
+      setLoading(true);
+      setError(null);
+      setAchievementsError(null);
+      try {
+        const data = await fetchPublicProfile(username);
+        if (isCancelled?.()) return;
+        setProfile(data);
+        if (isSelf) {
+          syncEditFields(data);
+        }
+        if (!data.is_private && data.show_achievements !== false) {
+          fetchPublicUserAchievements(data.username || data.id)
+            .then((ach) => {
+              if (!isCancelled?.()) setAchievements(ach);
+            })
+            .catch((achErr: unknown) => {
+              if (isCancelled?.()) return;
+              setAchievements(null);
+              setAchievementsError(
+                achErr instanceof Error ? achErr.message : "Achievements unavailable",
+              );
+            });
+        } else {
+          setAchievements(null);
+        }
+      } catch (err: unknown) {
+        if (isCancelled?.()) return;
+        if (isSelf) {
+          try {
+            const myProf = await fetchMyProfile();
+            if (isCancelled?.()) return;
+            setProfile(mapRiderProfileToPublicProfile(myProf));
+            syncEditFields(myProf);
+            fetchPublicUserAchievements(myProf.username || myProf.id)
+              .then((ach) => {
+                if (!isCancelled?.()) setAchievements(ach);
+              })
+              .catch(() => {});
+            return;
+          } catch {
+            // ignore
+          }
+        }
+        if (!isCancelled?.()) {
+          setError(err instanceof Error ? err.message : "Failed to load rider profile");
+        }
+      } finally {
+        if (!isCancelled?.()) {
+          setLoading(false);
         }
       }
-      setError(err instanceof Error ? err.message : "Failed to load rider profile");
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [username, isSelf, syncEditFields],
+  );
 
   useEffect(() => {
-    void loadData();
-  }, [username]);
+    let cancelled = false;
+    void loadData(() => cancelled);
+    return () => {
+      cancelled = true;
+    };
+  }, [loadData]);
 
   useEffect(() => {
     if (!previewImage) return;

@@ -531,8 +531,8 @@ function TripPlannerPage() {
             Trip Planner &amp; Club Queue
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Plan road routes, build sectioned checklists (up to 5 × 10), and sync directly with
-            REVV Mobile.
+            Plan road routes, build sectioned checklists (up to 5 × 10), and sync directly with REVV
+            Mobile.
           </p>
         </div>
         <button
@@ -688,9 +688,7 @@ function TripPlannerPage() {
                   <div className="space-y-1.5 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <span className="size-2.5 shrink-0 rounded-full bg-emerald-500" />
-                      <span className="truncate">
-                        {plan.meeting_point || "Meeting point TBC"}
-                      </span>
+                      <span className="truncate">{plan.meeting_point || "Meeting point TBC"}</span>
                     </div>
                     {pts.waypoints.length > 0 && (
                       <div className="flex items-center gap-2 pl-0.5 text-xs text-amber-600 dark:text-amber-400">
@@ -700,9 +698,7 @@ function TripPlannerPage() {
                     )}
                     <div className="flex items-center gap-2">
                       <span className="size-2.5 shrink-0 rounded-full bg-primary" />
-                      <span className="truncate">
-                        {plan.destination_name || "Destination TBC"}
-                      </span>
+                      <span className="truncate">{plan.destination_name || "Destination TBC"}</span>
                     </div>
                   </div>
 
@@ -745,8 +741,9 @@ function TripPlannerPage() {
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Submitted by <span className="font-semibold">@{selectedPlan.creator_username}</span>{" "}
-                  • {formatSubmittedDate(selectedPlan.updated_at)}
+                  Submitted by{" "}
+                  <span className="font-semibold">@{selectedPlan.creator_username}</span> •{" "}
+                  {formatSubmittedDate(selectedPlan.updated_at)}
                   {selectedPlan.community_name ? ` • ${selectedPlan.community_name}` : ""}
                 </p>
               </div>
@@ -909,8 +906,8 @@ function TripPlannerPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h3 className="text-sm font-bold">
-                      Sectioned Pre-Ride Checklist ({(localChecklists[selectedPlan.id] ?? []).length}
-                      /{MAX_SECTIONS} sections)
+                      Sectioned Pre-Ride Checklist (
+                      {(localChecklists[selectedPlan.id] ?? []).length}/{MAX_SECTIONS} sections)
                     </h3>
                     <p className="text-xs text-muted-foreground">
                       Changes stay local until you click Save Checklist — synced to Mobile swipe
@@ -1184,8 +1181,7 @@ function TripPlannerPage() {
                     <Edit3 className="size-4" />
                     Edit Plan
                   </button>
-                  {(selectedPlan.status === "draft" ||
-                    selectedPlan.status === "needs_revision") &&
+                  {(selectedPlan.status === "draft" || selectedPlan.status === "needs_revision") &&
                     selectedPlan.community_id && (
                       <button
                         type="button"
@@ -1252,7 +1248,9 @@ function TripPlannerPage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1.5 block text-sm font-semibold">Departure Date &amp; Time</label>
+                  <label className="mb-1.5 block text-sm font-semibold">
+                    Departure Date &amp; Time
+                  </label>
                   <input
                     type="datetime-local"
                     value={departureDate}
@@ -1356,9 +1354,7 @@ function TripPlannerPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() =>
-                          setWaypointPins((prev) => prev.filter((_, i) => i !== idx))
-                        }
+                        onClick={() => setWaypointPins((prev) => prev.filter((_, i) => i !== idx))}
                         className="rounded p-1 text-muted-foreground hover:text-rose-500"
                         aria-label="Remove stop"
                       >
@@ -1376,9 +1372,7 @@ function TripPlannerPage() {
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-semibold text-primary">Destination</div>
                     <div className="truncate text-sm font-medium">
-                      {destinationPin
-                        ? destinationPin.name
-                        : "Click map above to set Destination"}
+                      {destinationPin ? destinationPin.name : "Click map above to set Destination"}
                     </div>
                   </div>
                   {destinationPin && (

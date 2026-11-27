@@ -743,11 +743,15 @@ export async function fetchSystemHealth(): Promise<SystemHealthStatus> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(`${baseUrl}/health`, {
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
+    let res: Response;
+    try {
+      res = await fetch(`${baseUrl}/health`, {
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) {
       if (res.status === 503) {
         const body = await res.json().catch(() => null);

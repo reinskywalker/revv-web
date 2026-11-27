@@ -394,22 +394,29 @@ async function performRefreshSession(): Promise<string | null> {
     const { accessToken, refreshToken: refreshTokenNew } = extractTokenPair(body?.data ?? body);
 
     if (accessToken) {
+      lastRefreshRejected = false;
       localStorage.setItem("revv_access_token", accessToken);
       if (refreshTokenNew) {
         localStorage.setItem("revv_refresh_token", refreshTokenNew);
       }
       return accessToken;
     }
+    if (res.status === 401 || res.status === 403) {
+      lastRefreshRejected = true;
+    }
   } catch {
-    // ignore refresh network errors
+    lastRefreshRejected = false;
   }
   return null;
 }
+
+let lastRefreshRejected = false;
 
 export async function tryRefreshSession(): Promise<string | null> {
   if (refreshInFlight) {
     return refreshInFlight;
   }
+  lastRefreshRejected = false;
   refreshInFlight = performRefreshSession().finally(() => {
     refreshInFlight = null;
   });
@@ -475,7 +482,9 @@ export async function authRequestRaw<T>(
       token = refreshed;
       res = await doFetch(token);
     } else {
-      clearSavedSession();
+      if (lastRefreshRejected) {
+        clearSavedSession();
+      }
       throw new AuthApiError("Your session has expired. Please sign in again.", 401);
     }
   }

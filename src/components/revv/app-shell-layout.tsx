@@ -301,7 +301,9 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
       .replace(/^\/+/, "");
     const tripPlanId = String(notif.payload?.["trip_plan_id"] || "").trim();
     const communityId = String(notif.payload?.["community_id"] || "").trim();
-    const action = String(notif.payload?.["action"] || "").trim().toLowerCase();
+    const action = String(notif.payload?.["action"] || "")
+      .trim()
+      .toLowerCase();
 
     setDesktopNotifOpen(false);
     setMobileNotifOpen(false);
@@ -314,11 +316,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
       });
       return;
     }
-    if (
-      tripPlanId ||
-      rawRoute.startsWith("trip-planner") ||
-      rawRoute.includes("events-queue")
-    ) {
+    if (tripPlanId || rawRoute.startsWith("trip-planner") || rawRoute.includes("events-queue")) {
       const search: Record<string, string> = {};
       if (action === "review" || rawRoute.includes("events-queue")) {
         search["tab"] = "review";
@@ -336,11 +334,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
       navigate({ to: "/news" });
       return;
     }
-    if (
-      rawRoute.startsWith("communities/") ||
-      rawRoute.startsWith("clubs/") ||
-      communityId
-    ) {
+    if (rawRoute.startsWith("communities/") || rawRoute.startsWith("clubs/") || communityId) {
       const clubId =
         communityId ||
         rawRoute

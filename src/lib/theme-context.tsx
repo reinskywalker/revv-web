@@ -91,7 +91,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     };
     mql.addEventListener?.("change", listener);
     return () => mql.removeEventListener?.("change", listener);
-  }, [mode]);
+  }, [mode, hydrated]);
 
   const setMode = useCallback((next: ThemeMode) => {
     setModeState(next);

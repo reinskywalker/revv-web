@@ -2,11 +2,7 @@ import { authRequest } from "@/lib/api";
 import type { TripChecklistSection } from "@/lib/api-trip-plans";
 
 export type ClubEventApprovalStatus =
-  | "draft"
-  | "pending_review"
-  | "needs_revision"
-  | "approved"
-  | "rejected";
+  "draft" | "pending_review" | "needs_revision" | "approved" | "rejected";
 
 export interface ClubEventStopInput {
   order: number;

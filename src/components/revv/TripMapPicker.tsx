@@ -377,9 +377,7 @@ export function TripMapPicker({
                     className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-secondary/60"
                   >
                     <MapPin className="size-3.5 shrink-0 text-primary" />
-                    <span className="truncate font-medium">
-                      {item.display_name || item.name}
-                    </span>
+                    <span className="truncate font-medium">{item.display_name || item.name}</span>
                   </button>
                 );
               })}
