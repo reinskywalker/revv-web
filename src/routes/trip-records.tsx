@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   ChevronDown,
   ChevronRight,
@@ -16,6 +16,7 @@ import {
   Zap,
 } from "lucide-react";
 import { ModalShell } from "@/components/revv/ModalShell";
+import { RequireRole } from "@/components/revv/RequireRole";
 import {
   type AdminRiderTripGroup,
   type AdminTripDetailRecord,
@@ -25,7 +26,6 @@ import {
   fetchAdminTripsByRider,
   resolveMediaUrl,
 } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
 import { formatDateTime, formatDuration } from "@/lib/date";
 import { cn, getErrorMessage, isAdminRole } from "@/lib/utils";
 
@@ -40,14 +40,25 @@ export const Route = createFileRoute("/trip-records")({
       },
     ],
   }),
-  component: AdminTripRecordsPage,
+  component: AdminTripRecordsPageGuard,
 });
 
-function AdminTripRecordsPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const navigate = useNavigate();
-  const isAdmin = isAdminRole(user?.role);
+function AdminTripRecordsPageGuard() {
+  return (
+    <RequireRole
+      allowed={isAdminRole}
+      loadingFallback={
+        <div className="p-8">
+          <div className="h-40 rounded-2xl border border-border bg-card animate-pulse" />
+        </div>
+      }
+    >
+      <AdminTripRecordsPage />
+    </RequireRole>
+  );
+}
 
+function AdminTripRecordsPage() {
   const [activeTab, setActiveTab] = useState<"recent" | "riders">("recent");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -125,13 +136,12 @@ function AdminTripRecordsPage() {
   }, [search]);
 
   useEffect(() => {
-    if (!isAuthenticated || !isAdmin) return;
     if (activeTab === "recent") {
       void loadRecent(1, false, debouncedSearch);
     } else {
       void loadRiders(1, false, debouncedSearch);
     }
-  }, [isAuthenticated, isAdmin, activeTab, debouncedSearch, loadRecent, loadRiders]);
+  }, [activeTab, debouncedSearch, loadRecent, loadRiders]);
 
   const handleOpenTripDetail = async (tripId: string) => {
     setSelectedTripId(tripId);
@@ -151,24 +161,6 @@ function AdminTripRecordsPage() {
   const toggleExpandRider = (userId: string) => {
     setExpandedRiderIds((prev) => ({ ...prev, [userId]: !prev[userId] }));
   };
-
-  useEffect(() => {
-    if (!authLoading && (!isAuthenticated || !isAdmin)) {
-      void navigate({ to: "/" });
-    }
-  }, [authLoading, isAuthenticated, isAdmin, navigate]);
-
-  if (authLoading) {
-    return (
-      <div className="p-8">
-        <div className="h-40 rounded-2xl border border-border bg-card animate-pulse" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated || !isAdmin) {
-    return null;
-  }
 
   return (
     <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6 pb-20">

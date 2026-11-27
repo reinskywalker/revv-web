@@ -32,15 +32,18 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<RiderProfile | null>(null);
+  const [hasToken, setHasToken] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = useCallback(async (): Promise<RiderProfile | null> => {
     const session = getSavedSession();
     if (!session.token) {
+      setHasToken(false);
       setUser(null);
       return null;
     }
 
+    setHasToken(true);
     try {
       const prof = await fetchMyProfile();
       setUser(prof);
@@ -53,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         (err as { statusCode?: unknown }).statusCode === 401
       ) {
         clearSavedSession();
+        setHasToken(false);
         setUser(null);
       }
       return null;
@@ -61,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (tokens: AuthTokens, username?: string) => {
     saveAuthSession(tokens.access_token, tokens.refresh_token, username);
+    setHasToken(Boolean(tokens.access_token));
     try {
       const prof = await fetchMyProfile();
       setUser(prof);
@@ -82,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     void logoutSession();
     invalidateCosmeticsCatalogCache();
+    setHasToken(false);
     setUser(null);
   }, []);
 
@@ -90,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkUrlForAuthTokens();
 
     const session = getSavedSession();
+    setHasToken(Boolean(session.token));
     if (session.token) {
       void refreshUser().finally(() => setIsLoading(false));
     } else {
@@ -97,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshUser]);
 
-  const isAuthenticated = !!user || !!getSavedSession().token;
+  const isAuthenticated = !!user || hasToken;
 
   const contextValue = useMemo(
     () => ({

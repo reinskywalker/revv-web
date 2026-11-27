@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
@@ -112,6 +112,8 @@ function PublicSharedEventPage() {
   const { isAuthenticated } = useAuth();
 
   const [data, setData] = useState<PublicSharedEventResponse | null>(initialData);
+  const hasDataRef = useRef(Boolean(initialData));
+  hasDataRef.current = Boolean(data);
   const [fatalError, setFatalError] = useState<{
     message: string;
     isNotFound: boolean;
@@ -127,6 +129,7 @@ function PublicSharedEventPage() {
 
   useEffect(() => {
     setData(initialData);
+    hasDataRef.current = Boolean(initialData);
     setFatalError(initialData ? null : initialError);
     setTabError(null);
     setActiveTab("going");
@@ -147,13 +150,14 @@ function PublicSharedEventPage() {
           page: nextPage,
           limit: 10,
         });
+        hasDataRef.current = Boolean(res);
         setData(res);
         setFatalError(null);
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Unable to load event details right now.";
         const isNotFound = err instanceof SharedEventError ? err.isNotFound : false;
-        if (background && data) {
+        if (background && hasDataRef.current) {
           setTabError(message);
         } else {
           setFatalError({ message, isNotFound });
@@ -163,16 +167,15 @@ function PublicSharedEventPage() {
         setTabLoading(false);
       }
     },
-    [token, data],
+    [token],
   );
 
-  // If SSR failed transiently with no data, try fetching on client once
+  // If SSR failed transiently with no data, try fetching on client once per route load.
   useEffect(() => {
-    if (!data && fatalError && !fatalError.isNotFound) {
-      void loadSharedEvent(activeTab, page, false);
+    if (!initialData && initialError && !initialError.isNotFound) {
+      void loadSharedEvent("going", 1, false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, initialData, initialError, loadSharedEvent]);
 
   const handleSelectTab = (tab: RsvpTab) => {
     setActiveTab(tab);

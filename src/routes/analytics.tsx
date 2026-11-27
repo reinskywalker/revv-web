@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   Activity,
   BarChart3,
@@ -13,14 +13,14 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+import { RequireRole } from "@/components/revv/RequireRole";
 import {
   type AdminAnalyticsResponse,
   fetchAdminAnalytics,
   type UserTelemetryMetricItem,
 } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
 import { formatDateTime as formatShortDate, formatRelativeTime } from "@/lib/date";
-import { canAccessAdmin, cn } from "@/lib/utils";
+import { cn, isAdminRole } from "@/lib/utils";
 
 export const Route = createFileRoute("/analytics")({
   head: () => ({
@@ -33,16 +33,27 @@ export const Route = createFileRoute("/analytics")({
       },
     ],
   }),
-  component: AdminAnalyticsPage,
+  component: AdminAnalyticsPageGuard,
 });
+
+function AdminAnalyticsPageGuard() {
+  return (
+    <RequireRole
+      allowed={isAdminRole}
+      loadingFallback={
+        <div className="p-8">
+          <div className="h-40 rounded-2xl border border-border bg-card animate-pulse" />
+        </div>
+      }
+    >
+      <AdminAnalyticsPage />
+    </RequireRole>
+  );
+}
 
 type UserSortKey = "last_active" | "last_login" | "logins" | "distance" | "trips";
 
 function AdminAnalyticsPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const navigate = useNavigate();
-  const isAdmin = canAccessAdmin(user?.role);
-
   const [data, setData] = useState<AdminAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,12 +74,8 @@ function AdminAnalyticsPage() {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated && isAdmin) {
-      void loadAnalytics();
-    } else if (!authLoading) {
-      setLoading(false);
-    }
-  }, [isAuthenticated, isAdmin, authLoading, loadAnalytics]);
+    void loadAnalytics();
+  }, [loadAnalytics]);
 
   const filteredUsers = useMemo(() => {
     const list = [...(data?.user_metrics ?? [])];
@@ -91,24 +98,6 @@ function AdminAnalyticsPage() {
         (u.last_device_model || "").toLowerCase().includes(q),
     );
   }, [data?.user_metrics, search, sortBy]);
-
-  useEffect(() => {
-    if (!authLoading && (!isAuthenticated || !isAdmin)) {
-      void navigate({ to: "/" });
-    }
-  }, [authLoading, isAuthenticated, isAdmin, navigate]);
-
-  if (authLoading) {
-    return (
-      <div className="p-8">
-        <div className="h-40 rounded-2xl border border-border bg-card animate-pulse" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated || !isAdmin) {
-    return null;
-  }
 
   const s = data?.summary;
   const maxDailyKm = Math.max(1, ...(data?.daily_series.map((d) => d.distance_km) ?? [1]));

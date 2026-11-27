@@ -1077,18 +1077,24 @@ export function AdminMasterDataPanel({
             <button
               type="button"
               onClick={async () => {
-                await updateAdminComponent(editingComp.id, {
-                  code: editCompCode.trim().toUpperCase(),
-                  name: (editCompNameEn || editCompNameId).trim(),
-                  name_en: editCompNameEn.trim(),
-                  name_id: editCompNameId.trim(),
-                  default_interval_km: Number(editCompKm) || null,
-                  default_interval_months: Number(editCompMonths) || null,
-                  applicable_transmission: editCompTrans,
-                });
-                setEditingComp(null);
-                await onReload();
-                onNotice("Component updated.");
+                try {
+                  await updateAdminComponent(editingComp.id, {
+                    code: editCompCode.trim().toUpperCase(),
+                    name: (editCompNameEn || editCompNameId).trim(),
+                    name_en: editCompNameEn.trim(),
+                    name_id: editCompNameId.trim(),
+                    default_interval_km: Number(editCompKm) || null,
+                    default_interval_months: Number(editCompMonths) || null,
+                    applicable_transmission: editCompTrans,
+                  });
+                  setEditingComp(null);
+                  await onReload();
+                  onNotice("Component updated.");
+                } catch (err) {
+                  onNotice(
+                    err instanceof Error ? err.message : "Failed to update component.",
+                  );
+                }
               }}
               className="btn-primary px-4 py-1.5 text-xs"
             >
@@ -1166,14 +1172,22 @@ export function AdminMasterDataPanel({
             <button
               type="button"
               onClick={async () => {
-                if (editingNotif.id) {
-                  await updateAdminNotificationTemplate(editingNotif.id, notifForm);
-                } else {
-                  await createAdminNotificationTemplate(notifForm);
+                try {
+                  if (editingNotif.id) {
+                    await updateAdminNotificationTemplate(editingNotif.id, notifForm);
+                  } else {
+                    await createAdminNotificationTemplate(notifForm);
+                  }
+                  setEditingNotif(null);
+                  await onReload();
+                  onNotice("Notification template saved.");
+                } catch (err) {
+                  onNotice(
+                    err instanceof Error
+                      ? err.message
+                      : "Failed to save notification template.",
+                  );
                 }
-                setEditingNotif(null);
-                await onReload();
-                onNotice("Notification template saved.");
               }}
               className="btn-primary px-4 py-1.5 text-xs"
             >

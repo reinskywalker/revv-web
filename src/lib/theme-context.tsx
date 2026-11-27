@@ -57,13 +57,21 @@ function applyRootThemeClass(resolved: ResolvedTheme): void {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>(() => readStoredMode());
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => {
-    const m = readStoredMode();
-    return m === "system" ? resolveSystemTheme() : m;
-  });
+  const [mode, setModeState] = useState<ThemeMode>("dark");
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>("dark");
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    const stored = readStoredMode();
+    const initialResolved = stored === "system" ? resolveSystemTheme() : stored;
+    setModeState(stored);
+    setResolvedTheme(initialResolved);
+    applyRootThemeClass(initialResolved);
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
     const nextResolved = mode === "system" ? resolveSystemTheme() : mode;
     setResolvedTheme(nextResolved);
     applyRootThemeClass(nextResolved);

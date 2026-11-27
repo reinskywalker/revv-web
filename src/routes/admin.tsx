@@ -29,6 +29,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/revv/ConfirmDialog";
+import { RequireRole } from "@/components/revv/RequireRole";
 import { RichTextEditor } from "@/components/revv/RichTextEditor";
 import { AdminOverviewAnalyticsPanel } from "@/components/admin/AdminOverviewAnalyticsPanel";
 import { AdminCosmeticsPanel } from "@/components/admin/AdminCosmeticsPanel";
@@ -77,7 +78,7 @@ import {
   upsertAdminLegalDocument,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { cn } from "@/lib/utils";
+import { canAccessAdmin, cn, isAdminRole, isModeratorRole } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -90,8 +91,23 @@ export const Route = createFileRoute("/admin")({
       },
     ],
   }),
-  component: AdminPage,
+  component: AdminPageGuard,
 });
+
+function AdminPageGuard() {
+  return (
+    <RequireRole
+      allowed={canAccessAdmin}
+      loadingFallback={
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <Loader2 className="size-8 animate-spin text-primary" />
+        </div>
+      }
+    >
+      <AdminPage />
+    </RequireRole>
+  );
+}
 
 type AdminSubTab =
   | "overview"
@@ -113,14 +129,13 @@ type AdminConfirmAction =
 const NEWS_CATEGORIES = ["EDITORIAL", "UPDATE", "SAFETY", "COMMUNITY", "TELEMETRY", "EVENT"];
 
 function AdminPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const searchObj = (location.search ?? {}) as Record<string, string | undefined>;
-  const roleLower = user?.role?.toLowerCase() ?? "";
-  const isSuperuser = roleLower === "administrator";
-  const isModerator = roleLower === "moderator";
-  const canEnterConsole = isSuperuser || isModerator;
+  const isSuperuser = isAdminRole(user?.role);
+  const isModerator = isModeratorRole(user?.role);
+  const canEnterConsole = canAccessAdmin(user?.role);
 
   const [activeSubTab, setActiveSubTab] = useState<AdminSubTab>("overview");
   const [activeMasterSub, setActiveMasterSub] = useState<MasterSubTab>("brands");
@@ -244,15 +259,25 @@ function AdminPage() {
   const refreshAllAdminData = async () => {
     try {
       setLoading(true);
+      let failedCount = 0;
+      const track = <T,>(promise: Promise<T>, fallback: T): Promise<T> =>
+        promise.catch(() => {
+          failedCount += 1;
+          return fallback;
+        });
+
       if (isModerator && !isSuperuser) {
-        const [statsRes, analyticsRes, newsRes] = await Promise.all([
-          fetchAdminDashboard().catch(() => null),
-          fetchAdminAnalytics().catch(() => null),
-          fetchAdminNewsArticles().catch(() => []),
+        const [statsRes, newsRes] = await Promise.all([
+          track(fetchAdminDashboard(), null),
+          track(fetchAdminNewsArticles(), []),
         ]);
         if (statsRes) setAdminStats(statsRes);
-        if (analyticsRes) setAnalyticsData(analyticsRes);
         setAdminNews(newsRes);
+        if (failedCount > 0) {
+          setNotice(
+            `${failedCount} administrator data request${failedCount === 1 ? "" : "s"} failed to load.`,
+          );
+        }
         return;
       }
 
@@ -270,18 +295,18 @@ function AdminPage() {
         broadcasts,
         sysStatus,
       ] = await Promise.all([
-        fetchAdminDashboard().catch(() => null),
-        fetchAdminAnalytics().catch(() => null),
-        fetchAdminUsers().catch(() => []),
-        fetchAdminBrands().catch(() => []),
-        fetchAdminMotorcycles().catch(() => []),
-        fetchAdminComponents().catch(() => []),
-        fetchAdminNotificationTemplates().catch(() => []),
-        fetchAdminEmailTemplates().catch(() => []),
-        fetchAdminGeneralSettings().catch(() => []),
-        fetchAdminNewsArticles().catch(() => []),
-        fetchAdminBroadcasts().catch(() => []),
-        fetchAdminSystemStatus().catch(() => null),
+        track(fetchAdminDashboard(), null),
+        track(fetchAdminAnalytics(), null),
+        track(fetchAdminUsers(), []),
+        track(fetchAdminBrands(), []),
+        track(fetchAdminMotorcycles(), []),
+        track(fetchAdminComponents(), []),
+        track(fetchAdminNotificationTemplates(), []),
+        track(fetchAdminEmailTemplates(), []),
+        track(fetchAdminGeneralSettings(), []),
+        track(fetchAdminNewsArticles(), []),
+        track(fetchAdminBroadcasts(), []),
+        track(fetchAdminSystemStatus(), null),
       ]);
       setAdminStats(stats);
       setAnalyticsData(analyticsRes);
@@ -300,6 +325,11 @@ function AdminPage() {
         setStatusTitle(sysStatus.title);
         setStatusMessage(sysStatus.message);
         setStatusIcon(sysStatus.icon);
+      }
+      if (failedCount > 0) {
+        setNotice(
+          `${failedCount} administrator data request${failedCount === 1 ? "" : "s"} failed to load.`,
+        );
       }
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Failed to load administrator data.");
@@ -337,30 +367,12 @@ function AdminPage() {
   };
 
   useEffect(() => {
-    if (!authLoading && (!isAuthenticated || !canEnterConsole)) {
-      void navigate({ to: "/" });
-    }
-  }, [authLoading, isAuthenticated, canEnterConsole, navigate]);
-
-  useEffect(() => {
     if (isAuthenticated && canEnterConsole) {
       refreshAllAdminData();
     } else {
       setLoading(false);
     }
   }, [isAuthenticated, canEnterConsole]);
-
-  if (authLoading) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated || !canEnterConsole) {
-    return null;
-  }
 
   return (
     <div className="animate-fade-in space-y-8">

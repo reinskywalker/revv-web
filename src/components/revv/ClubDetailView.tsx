@@ -75,7 +75,7 @@ function isPendingMemberStatus(status?: string | null): boolean {
   return (status || "").trim().toLowerCase() === "pending";
 }
 
-function isAdminRole(role?: string | null): boolean {
+function isClubAdminRole(role?: string | null): boolean {
   const r = (role || "").trim().toLowerCase();
   return r === "founder" || r === "owner" || r === "administrator" || r === "admin";
 }
@@ -104,12 +104,7 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPrivateBlocked, setIsPrivateBlocked] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<ClubTab>(() => {
-    if (typeof window === "undefined") return "feed";
-    const t = new URLSearchParams(window.location.search).get("tab");
-    if (t === "events" || t === "channels" || t === "threads" || t === "members") return t;
-    return "feed";
-  });
+  const [activeTab, setActiveTab] = useState<ClubTab>("feed");
   const [membershipLoading, setMembershipLoading] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
@@ -145,10 +140,18 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
 
   const [sharingEventId, setSharingEventId] = useState<string | null>(null);
   const [showEventPlannerModal, setShowEventPlannerModal] = useState(false);
-  const [showEventQueue, setShowEventQueue] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return new URLSearchParams(window.location.search).get("queue") === "1";
-  });
+  const [showEventQueue, setShowEventQueue] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("tab");
+    if (t === "events" || t === "channels" || t === "threads" || t === "members") {
+      setActiveTab(t);
+    }
+    if (params.get("queue") === "1") {
+      setShowEventQueue(true);
+    }
+  }, []);
   const [queuedEvents, setQueuedEvents] = useState<QueuedClubEventItem[]>([]);
   const [loadingQueue, setLoadingQueue] = useState(false);
   const [queueReviewBusyId, setQueueReviewBusyId] = useState<string | null>(null);
@@ -204,7 +207,7 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
   const isApproved = Boolean(community && (isOwner || isApprovedMemberStatus(community.my_status)));
   const isPending = Boolean(community && isPendingMemberStatus(community.my_status));
   const isPrivate = (community?.visibility || "public").toLowerCase() === "private";
-  const canManage = Boolean(community && (isOwner || isAdminRole(community.my_role)));
+  const canManage = Boolean(community && (isOwner || isClubAdminRole(community.my_role)));
 
   const sortedChannels = useMemo(() => {
     const raw = detail?.channels ?? [];

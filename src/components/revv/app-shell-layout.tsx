@@ -54,7 +54,7 @@ import {
   markNotificationAsRead,
   type WebNotificationItem,
 } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { canAccessAdmin, cn, isAdminRole, isModeratorRole } from "@/lib/utils";
 
 interface AppShellLayoutProps {
   children: ReactNode;
@@ -422,10 +422,9 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     return <div className="min-h-screen bg-background text-foreground antialiased">{children}</div>;
   }
 
-  const roleLower = user?.role?.toLowerCase() ?? "user";
-  const isAdministrator = roleLower === "administrator";
-  const isModerator = roleLower === "moderator";
-  const canAccessAdminSection = isAdministrator || isModerator;
+  const isAdministrator = isAdminRole(user?.role);
+  const isModerator = isModeratorRole(user?.role);
+  const canAccessAdminSection = canAccessAdmin(user?.role);
 
   const myProfilePath = user?.username ? `/id/${encodeURIComponent(user.username)}` : "/id/me";
 

@@ -28,7 +28,7 @@ import {
   type SystemHealthStatus,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { cn, isAdminRole } from "@/lib/utils";
+import { canAccessAdmin, cn, isAdminRole, isModeratorRole } from "@/lib/utils";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -89,12 +89,12 @@ function LoginPage() {
       setErrorMessage(
         "System is currently under maintenance. Only administrators can sign in at this time.",
       );
+    } else if (errParam === "oauth_failed" || errParam === "access_denied") {
+      setErrorMessage("OAuth sign-in was cancelled or denied. Please try again.");
+    } else if (errParam === "session_expired") {
+      setErrorMessage("Your session expired. Please sign in again.");
     } else if (errParam) {
-      setErrorMessage(
-        errParam === "oauth_failed" || errParam === "access_denied"
-          ? "OAuth sign-in was cancelled or denied. Please try again."
-          : errParam.replace(/[<>]/g, "").slice(0, 160),
-      );
+      setErrorMessage("Sign-in could not be completed. Please try again.");
     }
 
     const oauthSession = checkUrlForAuthTokens();
@@ -115,7 +115,7 @@ function LoginPage() {
             return;
           }
 
-          login(
+          await login(
             {
               access_token: oauthSession.token!,
               refresh_token: oauthSession.refreshToken || "",
@@ -195,7 +195,7 @@ function LoginPage() {
         // Fallback to basic session
       }
 
-      login(res.tokens, profile?.username || res.identifier);
+      await login(res.tokens, profile?.username || res.identifier);
 
       // Navigate directly away from /login!
       const targetUsername = profile?.username || res.identifier;
@@ -356,18 +356,17 @@ function LoginPage() {
               <ChevronRight className="size-4 text-muted-foreground" />
             </Link>
 
-            {(user.role.toLowerCase() === "administrator" ||
-              user.role.toLowerCase() === "moderator") && (
+            {canAccessAdmin(user.role) && (
               <Link
                 to="/admin"
-                {...(user.role.toLowerCase() === "moderator"
+                {...(isModeratorRole(user.role)
                   ? { search: { tab: "news" } as never }
                   : {})}
                 className="flex items-center justify-between rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 font-mono text-xs font-semibold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20"
               >
                 <span className="flex items-center gap-2">
                   <ShieldCheck className="size-4" />
-                  {user.role.toLowerCase() === "moderator"
+                  {isModeratorRole(user.role)
                     ? "Moderator News Desk"
                     : "Administrator Console"}
                 </span>

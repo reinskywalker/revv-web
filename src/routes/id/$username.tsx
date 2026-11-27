@@ -42,6 +42,7 @@ import {
   fetchMyProfile,
   fetchPublicProfile,
   fetchPublicUserAchievements,
+  mapRiderProfileToPublicProfile,
   resolveMediaUrl,
   sendFriendRequest,
   unfriendRider,
@@ -177,41 +178,7 @@ function ProfilePage() {
       if (isSelf) {
         try {
           const myProf = await fetchMyProfile();
-          setProfile({
-            id: myProf.id,
-            username: myProf.username || "rider",
-            noreg: myProf.noreg || null,
-            first_name: myProf.first_name || null,
-            middle_name: myProf.middle_name || null,
-            last_name: myProf.last_name || null,
-            avatar_url: myProf.avatar_url || null,
-            equipped_frame_code: myProf.equipped_frame_code ?? null,
-            equipped_badges: myProf.equipped_badges ?? [],
-            is_verified_profile: myProf.is_verified_profile ?? false,
-            subscription_tier: myProf.subscription_tier ?? null,
-            banner_url: myProf.banner_url || null,
-            bio: myProf.bio || null,
-            city: myProf.city || null,
-            country: myProf.country ?? null,
-            job: myProf.job || null,
-            account_visibility:
-              (myProf.account_visibility as PublicProfileResponse["account_visibility"]) ||
-              "PUBLIC",
-            show_motorcycle_count: myProf.show_motorcycle_count ?? null,
-            show_garage_details: myProf.show_garage_details ?? null,
-            show_city: myProf.show_city ?? null,
-            show_country: myProf.show_country ?? null,
-            show_job: myProf.show_job ?? null,
-            show_achievements: myProf.show_achievements ?? null,
-            show_riding_stats: myProf.show_riding_stats ?? null,
-            privacy_saved_routes: myProf.privacy_saved_routes ?? null,
-            is_friend: true,
-            has_pending_request: false,
-            is_private: false,
-            motorcycle_count: null,
-            garage: null,
-            posts: null,
-          });
+          setProfile(mapRiderProfileToPublicProfile(myProf));
           syncEditFields(myProf);
           fetchPublicUserAchievements(myProf.username || myProf.id)
             .then((ach) => setAchievements(ach))
