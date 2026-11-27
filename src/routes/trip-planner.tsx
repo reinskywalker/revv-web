@@ -1222,6 +1222,7 @@ function TripPlannerPage() {
                   <label className="mb-1.5 block text-sm font-semibold">Trip Title *</label>
                   <input
                     type="text"
+                    maxLength={180}
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="e.g. Sunday Morning Run to Puncak"
@@ -1262,6 +1263,7 @@ function TripPlannerPage() {
                   <label className="mb-1.5 block text-sm font-semibold">Short Description</label>
                   <input
                     type="text"
+                    maxLength={500}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Pace, bike class, briefing notes..."

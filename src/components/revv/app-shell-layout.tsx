@@ -290,24 +290,54 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
       markNotificationAsRead(notif.id).catch(() => {});
     }
     const customData = notif.payload?.["custom_data"] as Record<string, unknown> | undefined;
+    const rawNested = notif.payload?.["data"];
+    let nestedData: Record<string, unknown> | undefined;
+    if (rawNested && typeof rawNested === "object") {
+      nestedData = rawNested as Record<string, unknown>;
+    } else if (typeof rawNested === "string" && rawNested.trim().startsWith("{")) {
+      try {
+        const parsed = JSON.parse(rawNested);
+        if (parsed && typeof parsed === "object") {
+          nestedData = parsed as Record<string, unknown>;
+        }
+      } catch {
+        // ignore invalid JSON string
+      }
+    }
     const rawRoute = String(
       notif.payload?.["route"] ||
         notif.payload?.["link"] ||
         customData?.["route"] ||
         customData?.["link"] ||
+        nestedData?.["route"] ||
+        nestedData?.["link"] ||
         "",
     )
       .trim()
       .replace(/^\/+/, "");
-    const tripPlanId = String(notif.payload?.["trip_plan_id"] || "").trim();
-    const communityId = String(notif.payload?.["community_id"] || "").trim();
-    const action = String(notif.payload?.["action"] || "")
+    const tripPlanId = String(
+      notif.payload?.["trip_plan_id"] || nestedData?.["trip_plan_id"] || "",
+    ).trim();
+    const communityId = String(
+      notif.payload?.["community_id"] || nestedData?.["community_id"] || "",
+    ).trim();
+    const action = String(notif.payload?.["action"] || nestedData?.["action"] || "")
       .trim()
       .toLowerCase();
 
     setDesktopNotifOpen(false);
     setMobileNotifOpen(false);
 
+    if (tripPlanId || rawRoute.startsWith("trip-planner")) {
+      const search: Record<string, string> = {};
+      if (action === "review" || rawRoute.includes("events-queue")) {
+        search["tab"] = "review";
+      }
+      if (communityId) search["club"] = communityId;
+      if (tripPlanId) search["plan"] = tripPlanId;
+      navigate({ to: "/trip-planner", search });
+      return;
+    }
     if (rawRoute.includes("events-queue") && communityId) {
       navigate({
         to: "/clubs/$id",
@@ -316,14 +346,8 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
       });
       return;
     }
-    if (tripPlanId || rawRoute.startsWith("trip-planner") || rawRoute.includes("events-queue")) {
-      const search: Record<string, string> = {};
-      if (action === "review" || rawRoute.includes("events-queue")) {
-        search["tab"] = "review";
-      }
-      if (communityId) search["club"] = communityId;
-      if (tripPlanId) search["plan"] = tripPlanId;
-      navigate({ to: "/trip-planner", search });
+    if (notif.notif_type === "system") {
+      navigate({ to: "/plans" });
       return;
     }
     if (notif.notif_type === "direct_message" || rawRoute.startsWith("chat/")) {

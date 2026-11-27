@@ -145,7 +145,7 @@ export function SupportDeskPanel() {
           <textarea
             required
             rows={4}
-            maxLength={2000}
+            maxLength={320}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Share details, device model, or ride session context…"
@@ -260,6 +260,7 @@ export function SupportDeskPanel() {
                 {t.can_user_reply !== false && t.status.toLowerCase() !== "closed" && (
                   <div className="flex gap-2 pt-1">
                     <input
+                      maxLength={320}
                       value={replyText[t.id] ?? ""}
                       onChange={(e) =>
                         setReplyText((prev) => ({ ...prev, [t.id]: e.target.value }))

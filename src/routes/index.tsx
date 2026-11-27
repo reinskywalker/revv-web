@@ -814,14 +814,20 @@ function AuthenticatedHome({ user }: { user: RiderProfile | null }) {
                         >
                           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary font-display text-xs font-bold text-primary overflow-hidden border border-border">
                             {resolveMediaUrl(r.avatar_url) ? (
-                              <img
-                                src={resolveMediaUrl(r.avatar_url) ?? ""}
-                                alt={r.display_name}
-                                className="size-full object-cover"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = "none";
-                                }}
-                              />
+                              <>
+                                <img
+                                  src={resolveMediaUrl(r.avatar_url) ?? ""}
+                                  alt={r.display_name}
+                                  className="size-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.classList.add("hidden");
+                                    e.currentTarget.nextElementSibling?.classList.remove("hidden");
+                                  }}
+                                />
+                                <span className="hidden">
+                                  {r.username.charAt(0).toUpperCase()}
+                                </span>
+                              </>
                             ) : (
                               r.username.charAt(0).toUpperCase()
                             )}
@@ -890,14 +896,20 @@ function AuthenticatedHome({ user }: { user: RiderProfile | null }) {
                     >
                       <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary font-display text-xs font-bold text-primary overflow-hidden border border-border">
                         {resolveMediaUrl(req.avatar_url) ? (
-                          <img
-                            src={resolveMediaUrl(req.avatar_url) ?? ""}
-                            alt={req.display_name}
-                            className="size-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                            }}
-                          />
+                          <>
+                            <img
+                              src={resolveMediaUrl(req.avatar_url) ?? ""}
+                              alt={req.display_name}
+                              className="size-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.classList.add("hidden");
+                                e.currentTarget.nextElementSibling?.classList.remove("hidden");
+                              }}
+                            />
+                            <span className="hidden">
+                              {req.username.charAt(0).toUpperCase()}
+                            </span>
+                          </>
                         ) : (
                           req.username.charAt(0).toUpperCase()
                         )}
@@ -992,14 +1004,20 @@ function AuthenticatedHome({ user }: { user: RiderProfile | null }) {
                     <div className="flex items-center gap-3 overflow-hidden">
                       <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary font-display text-xs font-bold text-primary overflow-hidden border border-border">
                         {resolveMediaUrl(friend.avatar_url) ? (
-                          <img
-                            src={resolveMediaUrl(friend.avatar_url) ?? ""}
-                            alt={friend.display_name}
-                            className="size-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                            }}
-                          />
+                          <>
+                            <img
+                              src={resolveMediaUrl(friend.avatar_url) ?? ""}
+                              alt={friend.display_name}
+                              className="size-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.classList.add("hidden");
+                                e.currentTarget.nextElementSibling?.classList.remove("hidden");
+                              }}
+                            />
+                            <span className="hidden">
+                              {friend.username.charAt(0).toUpperCase()}
+                            </span>
+                          </>
                         ) : (
                           friend.username.charAt(0).toUpperCase()
                         )}

@@ -105,7 +105,7 @@ export function ProfileEditorForm({
             htmlFor="edit-display-name"
             className="text-[11px] font-mono uppercase text-muted-foreground block mb-1"
           >
-            Display Name
+            Middle Name (Optional)
           </label>
           <input
             id="edit-display-name"

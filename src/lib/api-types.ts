@@ -67,14 +67,18 @@ export interface RiderProfile {
   date_of_birth?: string | null;
   bio?: string | null;
   city?: string | null;
+  state?: string | null;
   country?: string | null;
   job?: string | null;
   account_visibility?: string | null;
   show_motorcycle_count?: boolean | null;
   show_garage_details?: boolean | null;
   show_city?: boolean | null;
+  show_state?: boolean | null;
   show_country?: boolean | null;
   show_job?: boolean | null;
+  show_real_name?: boolean | null;
+  has_pin?: boolean;
   show_achievements?: boolean | null;
   show_riding_stats?: boolean | null;
   privacy_country?: string | null;
@@ -240,7 +244,8 @@ export interface PublicProfileGarageItem {
   nickname: string | null;
   category: string | null;
   transmission: string | null;
-  image_path: string | null;
+  image_url?: string | null;
+  image_path?: string | null;
   plate_number: string | null;
   manufacture_year: number | null;
   engine_capacity_cc: number | null;
@@ -263,6 +268,7 @@ export interface PublicProfileResponse {
   banner_url: string | null;
   bio: string | null;
   city: string | null;
+  state?: string | null;
   country?: string | null;
   job: string | null;
   account_visibility: "PUBLIC" | "FRIENDS_ONLY" | "PRIVATE" | "CUSTOM";
@@ -272,8 +278,10 @@ export interface PublicProfileResponse {
   total_distance_km?: number | null;
   max_speed_kmh?: number | null;
   show_city?: boolean | null;
+  show_state?: boolean | null;
   show_country?: boolean | null;
   show_job?: boolean | null;
+  show_real_name?: boolean | null;
   show_motorcycle_count?: boolean | null;
   show_garage_details?: boolean | null;
   show_achievements?: boolean | null;

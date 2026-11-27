@@ -508,14 +508,20 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                     >
                       <div className="h-full w-full overflow-hidden rounded-[12px] bg-secondary">
                         {community.avatar_url ? (
-                          <img
-                            src={resolveMediaUrl(community.avatar_url) || ""}
-                            alt={community.name}
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                            }}
-                            className="h-full w-full object-cover"
-                          />
+                          <>
+                            <img
+                              src={resolveMediaUrl(community.avatar_url) || ""}
+                              alt={community.name}
+                              onError={(e) => {
+                                e.currentTarget.classList.add("hidden");
+                                e.currentTarget.nextElementSibling?.classList.remove("hidden");
+                              }}
+                              className="h-full w-full object-cover"
+                            />
+                            <div className="hidden h-full w-full items-center justify-center text-2xl font-bold text-primary flex">
+                              {community.name.slice(0, 2).toUpperCase()}
+                            </div>
+                          </>
                         ) : (
                           <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-primary">
                             {community.name.slice(0, 2).toUpperCase()}
@@ -787,11 +793,22 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                       >
                         <div className="flex items-center gap-3">
                           {post.author_avatar_url ? (
-                            <img
-                              src={resolveMediaUrl(post.author_avatar_url) || ""}
-                              alt={post.author_display_name}
-                              className="h-10 w-10 rounded-full object-cover border border-border"
-                            />
+                            <div className="h-10 w-10 overflow-hidden rounded-full border border-border bg-secondary flex items-center justify-center text-xs font-bold text-foreground">
+                              <img
+                                src={resolveMediaUrl(post.author_avatar_url) || ""}
+                                alt={post.author_display_name}
+                                onError={(e) => {
+                                  e.currentTarget.classList.add("hidden");
+                                  e.currentTarget.nextElementSibling?.classList.remove("hidden");
+                                }}
+                                className="h-full w-full object-cover"
+                              />
+                              <span className="hidden">
+                                {(post.author_display_name || post.author_username || "R")
+                                  .slice(0, 2)
+                                  .toUpperCase()}
+                              </span>
+                            </div>
                           ) : (
                             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-xs font-bold text-foreground">
                               {(post.author_display_name || post.author_username || "R")
@@ -1060,11 +1077,22 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                             messages.map((m) => (
                               <div key={m.id} className="flex items-start gap-3">
                                 {m.sender_avatar_url ? (
-                                  <img
-                                    src={resolveMediaUrl(m.sender_avatar_url) || ""}
-                                    alt={m.sender_display_name}
-                                    className="h-8 w-8 rounded-full object-cover border border-border"
-                                  />
+                                  <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-border bg-secondary flex items-center justify-center text-xs font-bold text-foreground">
+                                    <img
+                                      src={resolveMediaUrl(m.sender_avatar_url) || ""}
+                                      alt={m.sender_display_name}
+                                      onError={(e) => {
+                                        e.currentTarget.classList.add("hidden");
+                                        e.currentTarget.nextElementSibling?.classList.remove("hidden");
+                                      }}
+                                      className="h-full w-full object-cover"
+                                    />
+                                    <span className="hidden">
+                                      {(m.sender_display_name || m.sender_username || "R")
+                                        .slice(0, 2)
+                                        .toUpperCase()}
+                                    </span>
+                                  </div>
                                 ) : (
                                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold text-foreground">
                                     {(m.sender_display_name || m.sender_username || "R")
@@ -1109,6 +1137,7 @@ export function ClubDetailView({ communityId }: ClubDetailViewProps) {
                           >
                             <input
                               type="text"
+                              maxLength={4000}
                               value={chatInput}
                               onChange={(e) => setChatInput(e.target.value)}
                               placeholder={`Message #${selectedChannel.name}...`}

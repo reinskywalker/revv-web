@@ -34,6 +34,7 @@ function makeProfile(overrides: Partial<PublicProfileResponse> = {}): PublicProf
         brand_name: "Honda",
         series_name: "PCX 160",
         nickname: null,
+        image_url: null,
         image_path: null,
         plate_number: null,
         manufacture_year: null,

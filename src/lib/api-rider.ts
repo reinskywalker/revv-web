@@ -28,6 +28,8 @@ export interface RideTripSummary {
   user_id: string;
   title: string;
   status: string;
+  trip_type?: string | null;
+  trip_session_id?: string | null;
   start_time: string;
   end_time?: string | null;
   total_distance_km: number;
@@ -226,6 +228,7 @@ export async function fetchMyTrips(params?: {
   page?: number;
   limit?: number;
   q?: string;
+  status?: string;
   sort_by?: "date" | "name";
   sort_dir?: "asc" | "desc";
 }): Promise<TripsPagedResult> {
@@ -234,6 +237,7 @@ export async function fetchMyTrips(params?: {
     limit: String(params?.limit ?? 15),
   });
   if (params?.q?.trim()) qs.set("q", params.q.trim());
+  if (params?.status?.trim()) qs.set("status", params.status.trim());
   if (params?.sort_by) qs.set("sort_by", params.sort_by);
   if (params?.sort_dir) qs.set("sort_dir", params.sort_dir);
 
