@@ -736,6 +736,8 @@ export interface PublicSharedEventParticipant {
   username: string;
   display_name: string;
   avatar_url?: string | null;
+  equipped_frame_code?: string | null;
+  is_verified_profile?: boolean;
   motorcycle_name?: string | null;
   status: string;
   created_at: string;

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import type { LottieHandle } from "lottie-react";
 import { Sparkles } from "lucide-react";
 import { LazyLottie } from "@/components/revv/LazyLottie";
 import { resolveMediaUrl } from "@/lib/api";
@@ -385,12 +384,6 @@ export function RevvAvatar({
     return catalog.frames.find((f) => f.code === frameCode) ?? null;
   }, [frameCode, catalog]);
 
-  const lottieData = useLottieAsset(
-    !framePngUrl ? frameMeta?.asset_hash : null,
-    !framePngUrl ? frameMeta?.lottie_url : null,
-  );
-  const lottieRef = useRef<LottieHandle | null>(null);
-
   const hasFrame = Boolean(normFrame.length > 0);
   const outerSize = hasFrame ? Math.round(size * 1.18) : size;
   const initials = (name || "R").trim().charAt(0).toUpperCase() || "R";
@@ -510,13 +503,6 @@ export function RevvAvatar({
           onError={() => setFramePngFailed(true)}
           className="pointer-events-none absolute inset-0 z-20 size-full scale-[1.05] object-contain"
         />
-      )}
-
-      {/* Optional subtle animated DB Lottie accents if custom admin frame (clipped outside photo via CSS mask or small badge) */}
-      {hasFrame && !framePngUrl && lottieData && !reducedMotion && (
-        <div className="pointer-events-none absolute -top-1 -left-1 z-20 size-4 opacity-90">
-          <LazyLottie lottieRef={lottieRef} src={lottieData} loop autoplay />
-        </div>
       )}
     </div>
   );

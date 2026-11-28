@@ -387,7 +387,12 @@ async function performRefreshSession(): Promise<string | null> {
       body: JSON.stringify({ refresh_token: refreshToken }),
     });
     if (!res.ok) {
-      clearSavedSession();
+      if (res.status === 401 || res.status === 403) {
+        lastRefreshRejected = true;
+        clearSavedSession();
+      } else {
+        lastRefreshRejected = false;
+      }
       return null;
     }
     const body = await res.json().catch(() => null);
@@ -477,15 +482,21 @@ export async function authRequestRaw<T>(
 
   let res = await doFetch(token);
   if (res.status === 401) {
-    const refreshed = await tryRefreshSession();
-    if (refreshed) {
-      token = refreshed;
+    const latestToken = getSavedSession().token;
+    if (latestToken && latestToken !== token) {
+      token = latestToken;
       res = await doFetch(token);
     } else {
-      if (lastRefreshRejected) {
-        clearSavedSession();
+      const refreshed = await tryRefreshSession();
+      if (refreshed) {
+        token = refreshed;
+        res = await doFetch(token);
+      } else {
+        if (lastRefreshRejected) {
+          clearSavedSession();
+        }
+        throw new AuthApiError("Your session has expired. Please sign in again.", 401);
       }
-      throw new AuthApiError("Your session has expired. Please sign in again.", 401);
     }
   }
 

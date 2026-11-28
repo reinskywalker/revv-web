@@ -30,7 +30,7 @@ import {
   type DirectConversationItem,
   type DirectMessageItem,
 } from "@/lib/api-rider";
-import { RevvAvatar } from "@/components/revv/RevvAvatar";
+import { RevvAvatar, VerifiedCheckBadge } from "@/components/revv/RevvAvatar";
 import { useAuth } from "@/lib/auth-context";
 import { formatRelativeTime } from "@/lib/date";
 import { getErrorMessage } from "@/lib/utils";
@@ -309,13 +309,22 @@ function MessagesPage() {
                     <Link
                       to="/id/$username"
                       params={{ username: r.username }}
-                      className="min-w-0 hover:text-primary"
+                      className="flex min-w-0 flex-1 items-center gap-2.5 hover:text-primary"
                     >
-                      <div className="text-xs font-semibold text-foreground truncate">
-                        {r.display_name || r.username}
-                      </div>
-                      <div className="text-[11px] font-mono text-muted-foreground truncate">
-                        @{r.username}
+                      <RevvAvatar
+                        src={r.avatar_url}
+                        name={r.display_name || r.username}
+                        frameCode={r.equipped_frame_code}
+                        size={36}
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1 min-w-0 text-xs font-semibold text-foreground">
+                          <span className="truncate">{r.display_name || r.username}</span>
+                          {r.is_verified_profile && <VerifiedCheckBadge size={12} />}
+                        </div>
+                        <div className="text-[11px] font-mono text-muted-foreground truncate">
+                          @{r.username}
+                        </div>
                       </div>
                     </Link>
                     {r.friendship_status === "friends" ? (
@@ -431,13 +440,22 @@ function MessagesPage() {
                     <Link
                       to="/id/$username"
                       params={{ username: f.username }}
-                      className="min-w-0 hover:text-primary"
+                      className="flex min-w-0 flex-1 items-center gap-2.5 hover:text-primary"
                     >
-                      <div className="text-xs font-semibold text-foreground truncate">
-                        {f.display_name || f.username}
-                      </div>
-                      <div className="text-[11px] font-mono text-muted-foreground truncate">
-                        @{f.username}
+                      <RevvAvatar
+                        src={f.avatar_url}
+                        name={f.display_name || f.username}
+                        frameCode={f.equipped_frame_code}
+                        size={36}
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1 min-w-0 text-xs font-semibold text-foreground">
+                          <span className="truncate">{f.display_name || f.username}</span>
+                          {f.is_verified_profile && <VerifiedCheckBadge size={12} />}
+                        </div>
+                        <div className="text-[11px] font-mono text-muted-foreground truncate">
+                          @{f.username}
+                        </div>
                       </div>
                     </Link>
                     <button
@@ -474,13 +492,22 @@ function MessagesPage() {
                     <Link
                       to="/id/$username"
                       params={{ username: req.username }}
-                      className="min-w-0 hover:text-primary"
+                      className="flex min-w-0 flex-1 items-center gap-2.5 hover:text-primary"
                     >
-                      <div className="text-xs font-semibold text-foreground truncate">
-                        {req.display_name || req.username}
-                      </div>
-                      <div className="text-[11px] font-mono text-muted-foreground">
-                        @{req.username}
+                      <RevvAvatar
+                        src={req.avatar_url}
+                        name={req.display_name || req.username}
+                        frameCode={req.equipped_frame_code}
+                        size={36}
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1 min-w-0 text-xs font-semibold text-foreground">
+                          <span className="truncate">{req.display_name || req.username}</span>
+                          {req.is_verified_profile && <VerifiedCheckBadge size={12} />}
+                        </div>
+                        <div className="text-[11px] font-mono text-muted-foreground">
+                          @{req.username}
+                        </div>
                       </div>
                     </Link>
                     <div className="flex items-center gap-1.5">

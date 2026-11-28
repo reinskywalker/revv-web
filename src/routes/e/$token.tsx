@@ -16,6 +16,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { AppOpenBanner } from "@/components/revv/AppOpenBanner";
+import { RevvAvatar, VerifiedCheckBadge } from "@/components/revv/RevvAvatar";
 import { SiteFooter, SiteHeader } from "@/components/revv/chrome";
 import { resolveMediaUrl } from "@/lib/api";
 import {
@@ -660,20 +661,16 @@ function PublicSharedEventPage() {
                         className="flex items-center justify-between gap-3 px-4 py-3"
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          {p.avatar_url ? (
-                            <img
-                              src={resolveMediaUrl(p.avatar_url) || ""}
-                              alt={p.display_name}
-                              className="h-10 w-10 rounded-full object-cover border border-border"
-                            />
-                          ) : (
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-bold text-foreground">
-                              {(p.display_name || p.username || "R").slice(0, 2).toUpperCase()}
-                            </div>
-                          )}
+                          <RevvAvatar
+                            src={p.avatar_url}
+                            name={p.display_name || p.username}
+                            frameCode={p.equipped_frame_code}
+                            size={40}
+                          />
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-foreground">
-                              {p.display_name}
+                            <p className="flex items-center gap-1 min-w-0 text-sm font-semibold text-foreground">
+                              <span className="truncate">{p.display_name}</span>
+                              {p.is_verified_profile && <VerifiedCheckBadge size={13} />}
                             </p>
                             <p className="truncate text-xs text-muted-foreground">
                               @{p.username}

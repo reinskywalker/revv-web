@@ -361,6 +361,8 @@ export interface FriendRequestItem {
   username: string;
   display_name: string;
   avatar_url?: string | null;
+  equipped_frame_code?: string | null;
+  is_verified_profile?: boolean;
   is_outgoing: boolean;
   created_at: string;
 }
